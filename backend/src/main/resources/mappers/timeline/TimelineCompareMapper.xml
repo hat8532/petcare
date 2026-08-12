@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.petcare.backend.domain.timeline.TimelineCompareMapper">
+
+    <select id="findByPetId" resultType="com.petcare.backend.domain.timeline.TimelineCompareDTO">
+        SELECT id, pet_id AS petId, before_diagnosis_id AS beforeDiagnosisId,
+               before_image_url AS beforeImageUrl, before_date AS beforeDate,
+               after_image_url AS afterImageUrl, after_date AS afterDate,
+               progress_status AS progressStatus, gemini_analysis AS geminiAnalysis,
+               created_at AS createdAt
+        FROM timeline_compares
+        WHERE pet_id = #{petId}
+        ORDER BY id DESC
+    </select>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM timeline_compares
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO timeline_compares (pet_id, before_diagnosis_id, before_image_url, before_date, after_image_url, after_date, progress_status, gemini_analysis)
+        VALUES (#{petId}, #{beforeDiagnosisId}, #{beforeImageUrl}, #{beforeDate}, #{afterImageUrl}, #{afterDate}, #{progressStatus}, #{geminiAnalysis})
+    </insert>
+
+</mapper>

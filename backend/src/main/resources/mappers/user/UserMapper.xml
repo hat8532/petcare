@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.petcare.backend.domain.user.UserMapper">
+
+    <select id="findById" resultType="com.petcare.backend.domain.user.UserDTO">
+        SELECT id, email, password, nickname, phone, profile_image_url AS profileImageUrl,
+               provider, role, status, created_at AS createdAt, updated_at AS updatedAt
+        FROM users
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByEmail" resultType="com.petcare.backend.domain.user.UserDTO">
+        SELECT id, email, password, nickname, phone, profile_image_url AS profileImageUrl,
+               provider, role, status, created_at AS createdAt, updated_at AS updatedAt
+        FROM users
+        WHERE email = #{email}
+    </select>
+
+    <select id="countByEmail" resultType="int">
+        SELECT COUNT(*) FROM users WHERE email = #{email}
+    </select>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM users
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (email, password, nickname, phone, profile_image_url, provider, role, status)
+        VALUES (#{email}, #{password}, #{nickname}, #{phone}, #{profileImageUrl}, #{provider}, #{role}, #{status})
+    </insert>
+
+    <update id="update">
+        UPDATE users
+        SET nickname = #{nickname},
+            phone = #{phone},
+            profile_image_url = #{profileImageUrl},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+</mapper>
