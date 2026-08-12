@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.petcare.backend.domain.hospital.HospitalMapper">
+
+    <select id="findNearbyHospitals" resultType="com.petcare.backend.domain.hospital.HospitalDTO">
+        SELECT id, name, phone, address, detail_address AS detailAddress,
+               latitude, longitude, is_emergency_24h AS isEmergency24h,
+               business_hours AS businessHours, rating, review_count AS reviewCount,
+               naver_place_url AS naverPlaceUrl, is_active AS isActive,
+               (6371 * acos(cos(radians(#{lat})) * cos(radians(latitude)) * cos(radians(longitude) - radians(#{lng})) + sin(radians(#{lat})) * sin(radians(latitude)))) AS distance
+        FROM hospitals
+        WHERE is_active = TRUE
+        <if test="isEmergency24h != null and isEmergency24h == true">
+            AND is_emergency_24h = TRUE
+        </if>
+        ORDER BY distance ASC
+    </select>
+
+    <select id="findById" resultType="com.petcare.backend.domain.hospital.HospitalDTO">
+        SELECT id, name, phone, address, detail_address AS detailAddress,
+               latitude, longitude, is_emergency_24h AS isEmergency24h,
+               business_hours AS businessHours, rating, review_count AS reviewCount,
+               naver_place_url AS naverPlaceUrl, is_active AS isActive
+        FROM hospitals
+        WHERE id = #{id}
+    </select>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM hospitals
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO hospitals (name, phone, address, detail_address, latitude, longitude, is_emergency_24h, business_hours, rating, review_count, naver_place_url, is_active)
+        VALUES (#{name}, #{phone}, #{address}, #{detailAddress}, #{latitude}, #{longitude}, #{isEmergency24h}, #{businessHours}, #{rating}, #{reviewCount}, #{naverPlaceUrl}, #{isActive})
+    </insert>
+
+</mapper>

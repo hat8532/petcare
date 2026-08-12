@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.petcare.backend.domain.pet.PetMapper">
+
+    <select id="findByUserId" resultType="com.petcare.backend.domain.pet.PetDTO">
+        SELECT id, user_id AS userId, name, species, breed, age, weight, icon, profile_image_url AS profileImageUrl
+        FROM pets
+        WHERE user_id = #{userId}
+        ORDER BY id ASC
+    </select>
+
+    <select id="findById" resultType="com.petcare.backend.domain.pet.PetDTO">
+        SELECT id, user_id AS userId, name, species, breed, age, weight, icon, profile_image_url AS profileImageUrl
+        FROM pets
+        WHERE id = #{id}
+    </select>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM pets
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO pets (user_id, name, species, breed, age, weight, icon, profile_image_url)
+        VALUES (#{userId}, #{name}, #{species}, #{breed}, #{age}, #{weight}, #{icon}, #{profileImageUrl})
+    </insert>
+
+    <update id="update">
+        UPDATE pets
+        SET name = #{name},
+            species = #{species},
+            breed = #{breed},
+            age = #{age},
+            weight = #{weight},
+            icon = #{icon},
+            profile_image_url = #{profileImageUrl}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM pets WHERE id = #{id}
+    </delete>
+
+</mapper>
