@@ -13,10 +13,10 @@ import java.util.*;
 @Service
 public class NaverNewsService {
 
-    @Value("${naver.map.client-id:r593k3kv4h}")
+    @Value("${naver.map.client-id:}")
     private String mapClientId;
 
-    @Value("${naver.map.client-secret:ogtTN2xj3U60kBgOspMnERqqy5cDML7F2jfjnVGL}")
+    @Value("${naver.map.client-secret:}")
     private String mapClientSecret;
 
     @Value("${naver.news.client-id:}")
