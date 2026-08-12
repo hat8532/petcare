@@ -41,4 +41,6 @@ out/
 *.env
 application-secret.properties
 application-local.properties
+application-dev.properties
+application-*.properties
 
