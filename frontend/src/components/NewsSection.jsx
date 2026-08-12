@@ -6,14 +6,17 @@ export default function NewsSection() {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isMoreLoading, setIsMoreLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [hoveredCardId, setHoveredCardId] = useState(null);
 
   const categories = [
-    { id: 'ALL', label: '전체 뉴스', icon: '📰' },
-    { id: 'HEALTH', label: '의학/건강', icon: '🩺' },
-    { id: 'NUTRITION', label: '영양/사료', icon: '🦴' },
-    { id: 'BEHAVIOR', label: '행동/훈련', icon: '🐕' },
-    { id: 'POLICY', label: '정책/라이프', icon: '🏛️' }
+    { id: 'ALL', label: '전체 뉴스', icon: '📰', query: '반려동물' },
+    { id: 'HEALTH', label: '의학/건강', icon: '🩺', query: '반려동물 건강 의학' },
+    { id: 'NUTRITION', label: '영양/사료', icon: '🦴', query: '반려동물 사료 영양' },
+    { id: 'BEHAVIOR', label: '행동/훈련', icon: '🐕', query: '반려동물 행동 훈련' },
+    { id: 'POLICY', label: '정책/라이프', icon: '🏛️', query: '반려동물 정책 지원' }
   ];
 
   const defaultNewsData = [
@@ -91,12 +94,22 @@ export default function NewsSection() {
     }
   ];
 
-  const fetchNews = async () => {
+  const getQueryForCategory = (catId) => {
+    const found = categories.find(c => c.id === catId);
+    return found ? found.query : '반려동물';
+  };
+
+  // Initial Fetch (Page 1)
+  const fetchNewsInitial = async (catId = selectedCategory) => {
     setIsLoading(true);
+    setPage(1);
+    setHasMore(true);
+    const query = getQueryForCategory(catId);
     try {
-      const data = await apiClient.getNews();
+      const data = await apiClient.getNews(query, 1, 12);
       if (data && data.length > 0) {
         setNewsList(data);
+        if (data.length < 10) setHasMore(false);
       } else {
         setNewsList(defaultNewsData);
       }
@@ -107,15 +120,44 @@ export default function NewsSection() {
     }
   };
 
+  // Load Next Page (+10 items)
+  const loadMoreNews = async () => {
+    if (isMoreLoading || !hasMore) return;
+    setIsMoreLoading(true);
+    const nextPage = page + 1;
+    const startParam = (nextPage - 1) * 10 + 1;
+    const query = getQueryForCategory(selectedCategory);
+
+    try {
+      const newItems = await apiClient.getNews(query, startParam, 10);
+      if (newItems && newItems.length > 0) {
+        setNewsList(prev => {
+          // Avoid duplicate articles by link/url or title
+          const existingTitles = new Set(prev.map(item => item.title));
+          const filteredNew = newItems.filter(item => !existingTitles.has(item.title));
+          return [...prev, ...filteredNew];
+        });
+        setPage(nextPage);
+        if (newItems.length < 10) setHasMore(false);
+      } else {
+        setHasMore(false);
+      }
+    } catch (e) {
+      console.warn('Failed to load more news:', e);
+      setHasMore(false);
+    } finally {
+      setIsMoreLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchNews();
-  }, []);
+    fetchNewsInitial(selectedCategory);
+  }, [selectedCategory]);
 
   const filteredNews = newsList.filter(n => {
-    const matchesCategory = selectedCategory === 'ALL' || n.category === selectedCategory;
     const matchesSearch = (n.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (n.description || '').toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesSearch;
   });
 
   const featuredNews = filteredNews.length > 0 ? filteredNews[0] : null;
@@ -155,7 +197,7 @@ export default function NewsSection() {
           }}>
             <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#059669', display: 'inline-block' }} className="pulse-dot" />
             <span style={{ fontSize: '13px', fontWeight: '800', color: '#047857', letterSpacing: '0.5px' }}>
-              NAVER API HUB • REAL-TIME PET NEWS SYNC
+              NAVER API HUB • INFINITE REAL-TIME NEWS SYNC ({newsList.length}건 수집 중)
             </span>
           </div>
 
@@ -163,7 +205,7 @@ export default function NewsSection() {
             실시간 수의학 & 펫 헬스 케어 브리핑
           </h2>
           <p style={{ fontSize: '16px', color: '#475569', marginTop: '10px', maxWidth: '680px', margin: '10px auto 0 auto', lineHeight: '1.6' }}>
-            Spring Boot 백엔드가 NAVER API HUB에서 실시간 수집하는 최신 반려동물 질병·건강, 사료 리콜, 지자체 정책 뉴스를 한눈에 확인하세요.
+            Spring Boot 백엔드가 NAVER API HUB에서 실시간 수집하는 최신 반려동물 질병·건강, 사료 리콜, 지자체 정책 뉴스를 끊임없이 계속 불러와 확인하세요.
           </p>
         </div>
 
@@ -238,7 +280,7 @@ export default function NewsSection() {
             </div>
 
             <button
-              onClick={fetchNews}
+              onClick={() => fetchNewsInitial(selectedCategory)}
               disabled={isLoading}
               style={{
                 padding: '10px 18px',
@@ -373,7 +415,7 @@ export default function NewsSection() {
         )}
 
         {/* News Grid Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '28px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '28px', marginBottom: '48px' }}>
           {gridNews.map((news) => {
             const badge = getCategoryBadgeStyle(news.category);
             const isHovered = hoveredCardId === news.id;
@@ -498,6 +540,39 @@ export default function NewsSection() {
             );
           })}
         </div>
+
+        {/* Endless Load More Button */}
+        {hasMore && (
+          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+            <button
+              onClick={loadMoreNews}
+              disabled={isMoreLoading}
+              style={{
+                padding: '16px 48px',
+                borderRadius: '9999px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                color: '#ffffff',
+                fontSize: '15px',
+                fontWeight: '800',
+                cursor: isMoreLoading ? 'wait' : 'pointer',
+                boxShadow: '0 10px 25px rgba(15, 23, 42, 0.2)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '10px',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              <span style={{ display: 'inline-block', transform: isMoreLoading ? 'rotate(360deg)' : 'none', transition: 'transform 1s linear' }}>
+                {isMoreLoading ? '⏳' : '✨'}
+              </span>
+              <span>{isMoreLoading ? '네이버 뉴스 계속 수집 중...' : '뉴스 계속 더보기 (+10개 더 불러오기)'}</span>
+            </button>
+            <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '12px' }}>
+              현재까지 총 <strong style={{ color: '#059669' }}>{newsList.length}개</strong>의 실시간 수의학 뉴스가 로드되었습니다.
+            </p>
+          </div>
+        )}
 
       </div>
     </section>
