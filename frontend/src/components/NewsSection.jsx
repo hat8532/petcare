@@ -5,6 +5,7 @@ export default function NewsSection() {
   const [newsList, setNewsList] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeQuery, setActiveQuery] = useState('반려동물 케어');
   const [isLoading, setIsLoading] = useState(false);
   const [isMoreLoading, setIsMoreLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -12,18 +13,26 @@ export default function NewsSection() {
   const [hoveredCardId, setHoveredCardId] = useState(null);
 
   const categories = [
-    { id: 'ALL', label: '전체 뉴스', icon: '📰', query: '반려동물' },
-    { id: 'HEALTH', label: '의학/건강', icon: '🩺', query: '반려동물 건강 의학' },
-    { id: 'NUTRITION', label: '영양/사료', icon: '🦴', query: '반려동물 사료 영양' },
-    { id: 'BEHAVIOR', label: '행동/훈련', icon: '🐕', query: '반려동물 행동 훈련' },
-    { id: 'POLICY', label: '정책/라이프', icon: '🏛️', query: '반려동물 정책 지원' }
+    { id: 'ALL', label: '전체 지식', icon: '🔍', defaultQuery: '반려동물 케어' },
+    { id: 'HEALTH', label: '질병/건강 지식', icon: '🩺', defaultQuery: '반려동물 질병 건강 관리' },
+    { id: 'NUTRITION', label: '영양/사료 가이드', icon: '🦴', defaultQuery: '반려동물 영양 사료 추천' },
+    { id: 'BEHAVIOR', label: '행동/훈련 솔루션', icon: '🐕', defaultQuery: '반려동물 행동 교정 훈련' },
+    { id: 'POLICY', label: '지원/라이프 정보', icon: '🏛️', defaultQuery: '반려동물 지원 혜택 정책' }
+  ];
+
+  const quickSearchChips = [
+    { label: '🦴 슬개골 탈구 예방', query: '강아지 슬개골 탈구 관리' },
+    { label: '🍫 먹으면 위험한 음식', query: '반려동물 섭취 금지 음식 초콜릿' },
+    { label: '🐱 고양이 음수량 늘리기', query: '고양이 음수량 방광염 예방' },
+    { label: '👂 귀염증/습진 관리', query: '강아지 귀염증 습진 관리' },
+    { label: '🐕 분리불안 행동 교정', query: '강아지 분리불안 훈련' }
   ];
 
   const defaultNewsData = [
     {
       id: 1,
       category: 'HEALTH',
-      categoryLabel: '의학/건강',
+      categoryLabel: '질병/건강',
       title: '여름철 습한 날씨 강아지 귀/피부 습진 예방법 및 수의학 초기 관리 지침',
       description: '장마철 실내 습도 상승으로 세균과 말라세지아 곰팡이 번식이 활발해짐에 따라 반려견 피부 발적 및 귀지 증가 시 즉시 이행해야 할 수의학 조치법을 알아봅니다.',
       publishedDate: '2026.08.12',
@@ -47,7 +56,7 @@ export default function NewsSection() {
     {
       id: 3,
       category: 'HEALTH',
-      categoryLabel: '의학/건강',
+      categoryLabel: '질병/건강',
       title: '고양이 안구 질환(급성 결막염/각막 손상) 초기 증상 체크리스트 5가지',
       description: '눈물샘 이상이나 눈을 제대로 뜨지 못하고 비비는 행동이 관찰될 때 가정에서 살필 수 있는 5가지 안구 정밀 조기 진단 포인트를 수의사가 공개합니다.',
       publishedDate: '2026.08.10',
@@ -71,7 +80,7 @@ export default function NewsSection() {
     {
       id: 5,
       category: 'POLICY',
-      categoryLabel: '정책/라이프',
+      categoryLabel: '지원/라이프',
       title: '2026년 반려동물 등록제 무상 지원 및 지자체 24시 응급 센터 확대',
       description: '전국 주요 지자체에서 내장형 외장형 동물등록 비용 시비 지원을 확대하고 야간 응급 진료센터 연계 시스템 구축 사업을 본격 시행합니다.',
       publishedDate: '2026.08.08',
@@ -94,19 +103,16 @@ export default function NewsSection() {
     }
   ];
 
-  const getQueryForCategory = (catId) => {
-    const found = categories.find(c => c.id === catId);
-    return found ? found.query : '반려동물';
-  };
-
-  // Initial Fetch (Page 1)
-  const fetchNewsInitial = async (catId = selectedCategory) => {
+  // Perform Search for given Query
+  const handleSearchExecution = async (targetQuery, catId = selectedCategory) => {
     setIsLoading(true);
     setPage(1);
     setHasMore(true);
-    const query = getQueryForCategory(catId);
+    const finalSearchQuery = targetQuery.startsWith('반려동물') ? targetQuery : `반려동물 ${targetQuery}`;
+    setActiveQuery(finalSearchQuery);
+
     try {
-      const data = await apiClient.getNews(query, 1, 12);
+      const data = await apiClient.getNews(finalSearchQuery, 1, 12);
       if (data && data.length > 0) {
         setNewsList(data);
         if (data.length < 10) setHasMore(false);
@@ -120,19 +126,37 @@ export default function NewsSection() {
     }
   };
 
+  // Category Switch Handler
+  const handleCategorySelect = (cat) => {
+    setSelectedCategory(cat.id);
+    setSearchTerm('');
+    handleSearchExecution(cat.defaultQuery, cat.id);
+  };
+
+  // Quick Search Chip Click Handler
+  const handleChipClick = (chip) => {
+    setSearchTerm(chip.query.replace('반려동물 ', '').replace('강아지 ', '').replace('고양이 ', ''));
+    handleSearchExecution(chip.query);
+  };
+
+  // Custom Keyword Form Submit
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    if (!searchTerm.trim()) return;
+    handleSearchExecution(searchTerm.trim());
+  };
+
   // Load Next Page (+10 items)
   const loadMoreNews = async () => {
     if (isMoreLoading || !hasMore) return;
     setIsMoreLoading(true);
     const nextPage = page + 1;
     const startParam = (nextPage - 1) * 10 + 1;
-    const query = getQueryForCategory(selectedCategory);
 
     try {
-      const newItems = await apiClient.getNews(query, startParam, 10);
+      const newItems = await apiClient.getNews(activeQuery, startParam, 10);
       if (newItems && newItems.length > 0) {
         setNewsList(prev => {
-          // Avoid duplicate articles by link/url or title
           const existingTitles = new Set(prev.map(item => item.title));
           const filteredNew = newItems.filter(item => !existingTitles.has(item.title));
           return [...prev, ...filteredNew];
@@ -143,7 +167,6 @@ export default function NewsSection() {
         setHasMore(false);
       }
     } catch (e) {
-      console.warn('Failed to load more news:', e);
       setHasMore(false);
     } finally {
       setIsMoreLoading(false);
@@ -151,17 +174,11 @@ export default function NewsSection() {
   };
 
   useEffect(() => {
-    fetchNewsInitial(selectedCategory);
-  }, [selectedCategory]);
+    handleSearchExecution('반려동물 케어');
+  }, []);
 
-  const filteredNews = newsList.filter(n => {
-    const matchesSearch = (n.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (n.description || '').toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
-
-  const featuredNews = filteredNews.length > 0 ? filteredNews[0] : null;
-  const gridNews = filteredNews.length > 1 ? filteredNews.slice(1) : filteredNews;
+  const featuredNews = newsList.length > 0 ? newsList[0] : null;
+  const gridNews = newsList.length > 1 ? newsList.slice(1) : newsList;
 
   const getCategoryBadgeStyle = (category) => {
     switch (category) {
@@ -174,7 +191,7 @@ export default function NewsSection() {
       case 'POLICY':
         return { bg: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', text: '#ffffff', icon: '🏛️' };
       default:
-        return { bg: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)', text: '#ffffff', icon: '✨' };
+        return { bg: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)', text: '#ffffff', icon: '💡' };
     }
   };
 
@@ -183,7 +200,7 @@ export default function NewsSection() {
       <div className="container" style={{ maxWidth: '1240px', margin: '0 auto', padding: '0 24px' }}>
         
         {/* Section Header */}
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -197,31 +214,112 @@ export default function NewsSection() {
           }}>
             <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#059669', display: 'inline-block' }} className="pulse-dot" />
             <span style={{ fontSize: '13px', fontWeight: '800', color: '#047857', letterSpacing: '0.5px' }}>
-              NAVER API HUB • INFINITE REAL-TIME NEWS SYNC ({newsList.length}건 수집 중)
+              NAVER API HUB • REAL-TIME PET KNOWLEDGE SEARCH
             </span>
           </div>
 
           <h2 style={{ fontSize: '36px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px', marginTop: '4px' }}>
-            실시간 수의학 & 펫 헬스 케어 브리핑
+            실시간 반려동물 백과 & 라이프 지식 센터
           </h2>
           <p style={{ fontSize: '16px', color: '#475569', marginTop: '10px', maxWidth: '680px', margin: '10px auto 0 auto', lineHeight: '1.6' }}>
-            Spring Boot 백엔드가 NAVER API HUB에서 실시간 수집하는 최신 반려동물 질병·건강, 사료 리콜, 지자체 정책 뉴스를 끊임없이 계속 불러와 확인하세요.
+            궁금한 질병 증상, 사료 영양, 행동 교정 키워드를 검색하면 NAVER 최신 검증 지식 정보를 실시간으로 끌어와 보여드립니다.
           </p>
         </div>
 
-        {/* Filter Bar & Search Control */}
+        {/* Big Interactive Search Bar Container */}
         <div style={{
           background: '#ffffff',
-          borderRadius: '24px',
-          padding: '16px 20px',
-          marginBottom: '40px',
-          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04)',
-          border: '1px solid #e2e8f0',
+          borderRadius: '28px',
+          padding: '24px 28px',
+          marginBottom: '32px',
+          boxShadow: '0 12px 36px rgba(15, 23, 42, 0.06)',
+          border: '1px solid #e2e8f0'
+        }}>
+          {/* Main Search Input Form */}
+          <form onSubmit={handleFormSubmit} style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <input
+                type="text"
+                placeholder="🔎 검색어를 입력하세요! (예: 슬개골 탈구, 초콜릿, 귀염증, 고양이 음수량, 분리불안)"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '14px 20px 14px 46px',
+                  borderRadius: '18px',
+                  border: '2px solid #cbd5e1',
+                  fontSize: '15px',
+                  outline: 'none',
+                  background: '#f8fafc',
+                  fontWeight: '600',
+                  color: '#0f172a',
+                  transition: 'all 0.25s ease'
+                }}
+              />
+              <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '18px' }}>
+                🔍
+              </span>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              style={{
+                padding: '14px 28px',
+                borderRadius: '18px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                color: '#ffffff',
+                fontWeight: '900',
+                fontSize: '15px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(5, 150, 105, 0.3)',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <span>{isLoading ? '⏳' : '⚡'}</span>
+              <span>{isLoading ? '실시간 검색 중...' : '지식 정보 검색'}</span>
+            </button>
+          </form>
+
+          {/* Quick Recommendation Search Chips */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: '800', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>💡 추천 키워드:</span>
+            </span>
+            {quickSearchChips.map((chip, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleChipClick(chip)}
+                style={{
+                  padding: '7px 15px',
+                  borderRadius: '9999px',
+                  fontSize: '12.5px',
+                  fontWeight: '700',
+                  background: '#f1f5f9',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Category Pill Bar & Active Query Indicator */}
+        <div style={{
           display: 'flex',
           alignItems: 'center',
           justify: 'space-between',
           flexWrap: 'wrap',
-          gap: '16px'
+          gap: '16px',
+          marginBottom: '32px'
         }}>
           {/* Category Tabs */}
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
@@ -230,18 +328,18 @@ export default function NewsSection() {
               return (
                 <button
                   key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
+                  onClick={() => handleCategorySelect(cat)}
                   style={{
                     padding: '10px 20px',
                     borderRadius: '14px',
                     fontSize: '13.5px',
                     fontWeight: isSelected ? '800' : '600',
-                    background: isSelected ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)' : '#f8fafc',
+                    background: isSelected ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : '#ffffff',
                     color: isSelected ? '#ffffff' : '#64748b',
                     border: isSelected ? 'none' : '1px solid #e2e8f0',
                     cursor: 'pointer',
                     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: isSelected ? '0 4px 14px rgba(5, 150, 105, 0.3)' : 'none',
+                    boxShadow: isSelected ? '0 4px 14px rgba(15, 23, 42, 0.2)' : 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
@@ -255,57 +353,26 @@ export default function NewsSection() {
             })}
           </div>
 
-          {/* Search Box & Action Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', width: '280px' }}>
-              <input
-                type="text"
-                placeholder="뉴스 제목 / 키워드 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 16px 10px 40px',
-                  borderRadius: '14px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '13.5px',
-                  outline: 'none',
-                  background: '#f8fafc',
-                  transition: 'all 0.2s ease'
-                }}
-              />
-              <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '15px' }}>
-                🔍
-              </span>
-            </div>
-
-            <button
-              onClick={() => fetchNewsInitial(selectedCategory)}
-              disabled={isLoading}
-              style={{
-                padding: '10px 18px',
-                borderRadius: '14px',
-                border: '1px solid #059669',
-                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                color: '#047857',
-                fontWeight: '800',
-                fontSize: '13.5px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 2px 8px rgba(5, 150, 105, 0.15)',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <span style={{ display: 'inline-block', transform: isLoading ? 'rotate(360deg)' : 'none', transition: 'transform 1s linear' }}>🔄</span>
-              <span>{isLoading ? '동기화 중...' : '실시간 새로고침'}</span>
-            </button>
+          {/* Active Query Status Badge */}
+          <div style={{
+            fontSize: '13.5px',
+            fontWeight: '800',
+            color: '#059669',
+            background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            padding: '8px 16px',
+            borderRadius: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <span>✨</span>
+            <span>'<strong>{activeQuery}</strong>' 실시간 검색 결과 ({newsList.length}건)</span>
           </div>
         </div>
 
-        {/* Featured Hero News (Top 1 Breaking Item) */}
-        {featuredNews && selectedCategory === 'ALL' && !searchTerm && (
+        {/* Featured Top Knowledge Card */}
+        {featuredNews && (
           <article
             onMouseEnter={() => setHoveredCardId(featuredNews.id)}
             onMouseLeave={() => setHoveredCardId(null)}
@@ -349,7 +416,7 @@ export default function NewsSection() {
                   boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)',
                   letterSpacing: '0.5px'
                 }}>
-                  🔥 BREAKING NEWS
+                  🔥 FEATURED GUIDE
                 </span>
                 <span style={{
                   background: getCategoryBadgeStyle(featuredNews.category).bg,
@@ -360,7 +427,7 @@ export default function NewsSection() {
                   borderRadius: '9999px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
                 }}>
-                  {getCategoryBadgeStyle(featuredNews.category).icon} {featuredNews.categoryLabel || featuredNews.category}
+                  {getCategoryBadgeStyle(featuredNews.category).icon} {featuredNews.categoryLabel || '펫 정보'}
                 </span>
               </div>
             </div>
@@ -374,7 +441,7 @@ export default function NewsSection() {
                   <span>📅 {featuredNews.publishedDate}</span>
                 </div>
 
-                <h3 style={{ fontSize: '24px', fontWeight: '900', color: '#ffffff', lineHeight: '1.4', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '23px', fontWeight: '900', color: '#ffffff', lineHeight: '1.4', marginBottom: '16px' }}>
                   {featuredNews.title}
                 </h3>
 
@@ -407,14 +474,14 @@ export default function NewsSection() {
                     transition: 'all 0.2s ease'
                   }}
                 >
-                  기사 전문 읽기 ↗
+                  상세 지식 전문 읽기 ↗
                 </a>
               </div>
             </div>
           </article>
         )}
 
-        {/* News Grid Cards */}
+        {/* Knowledge Grid Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '28px', marginBottom: '48px' }}>
           {gridNews.map((news) => {
             const badge = getCategoryBadgeStyle(news.category);
@@ -471,7 +538,7 @@ export default function NewsSection() {
                     }}
                   >
                     <span>{badge.icon}</span>
-                    <span>{news.categoryLabel || news.category}</span>
+                    <span>{news.categoryLabel || '펫 케어'}</span>
                   </span>
                 </div>
 
@@ -532,7 +599,7 @@ export default function NewsSection() {
                         transition: 'color 0.2s ease'
                       }}
                     >
-                      기사 원문 보기 ↗
+                      상세 전문 보기 ↗
                     </a>
                   </div>
                 </div>
@@ -566,10 +633,10 @@ export default function NewsSection() {
               <span style={{ display: 'inline-block', transform: isMoreLoading ? 'rotate(360deg)' : 'none', transition: 'transform 1s linear' }}>
                 {isMoreLoading ? '⏳' : '✨'}
               </span>
-              <span>{isMoreLoading ? '네이버 뉴스 계속 수집 중...' : '뉴스 계속 더보기 (+10개 더 불러오기)'}</span>
+              <span>{isMoreLoading ? '네이버 지식 계속 수집 중...' : `'${activeQuery}' 관련 지식 계속 더보기 (+10개)`}</span>
             </button>
             <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '12px' }}>
-              현재까지 총 <strong style={{ color: '#059669' }}>{newsList.length}개</strong>의 실시간 수의학 뉴스가 로드되었습니다.
+              현재까지 총 <strong style={{ color: '#059669' }}>{newsList.length}개</strong>의 지식 정보가 로드되었습니다.
             </p>
           </div>
         )}
