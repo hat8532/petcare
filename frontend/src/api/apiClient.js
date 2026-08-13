@@ -98,9 +98,9 @@ export const apiClient = {
   },
 
   // 5. News
-  getNews: async () => {
+  getNews: async (query = '반려동물', start = 1, display = 10) => {
     try {
-      const res = await fetch(`${BASE_URL}/news`);
+      const res = await fetch(`${BASE_URL}/news?query=${encodeURIComponent(query)}&start=${start}&display=${display}`);
       const data = await res.json();
       return data.data || [];
     } catch (e) {
