@@ -3,6 +3,17 @@
 
 ---
 
+## 📌 [팀원별 역할 분담 R&R (Role & Responsibility) 요약]
+
+| 구분 | 담당자 | 핵심 담당 영역 | 주요 DB 테이블 | 주요 API / 컴포넌트 |
+| :---: | :--- | :--- | :--- | :--- |
+| **회원/인증** | **👤 태준 (User)** | 이메일/소셜 회원가입, JWT 로그인, 사용자 프로필 관리 | `users` | Auth/User API, `LoginPage.jsx`, `Navbar.jsx` |
+| **AI 진단/분석** | **🤖 진한님** | Vision AI + Gemini RAG 질병 진단, Before/After 타임라인 분석 | `diagnosis_records`<br>`timeline_compares` | Diagnosis/Timeline API, `DiagnosisDropzone.jsx`, `TimelineSlider.jsx` |
+| **대시보드/펫관리** | **📊 세민님** | 1:N 펫 프로필 CRUD, 스마트 PHR 바이탈 관리, AI 챗봇/사료 계산기 | `pets` | Pet API, `PetHealthDashboard.jsx`, `DailyCareChatbot.jsx` |
+| **뉴스/지도/커뮤니티** | **📰 지호님** | 실시간 펫 뉴스 캐싱, 24시 응급병원 지도 탐색, 커뮤니티 게시판 | `news_items`<br>`hospitals`<br>`posts`<br>`comments` | News/Hospital/Community API, `HospitalLocator.jsx`, `CommunitySection.jsx` |
+
+---
+
 ## 1. 프로젝트 개요 (Overview)
 
 * **프로젝트명**: PetCare (Generative AI & Vision AI 기반 반려동물 질병 진단 및 헬스케어 웹 플랫폼)
@@ -18,7 +29,7 @@
 
 ## 2. 서비스 요구사항 명세 (Requirements Specification)
 
-### 2.1 [핵심] AI 질병 진단 (Vision AI + Gemini RAG LLM)
+### 2.1 [핵심] AI 질병 진단 (Vision AI + Gemini RAG LLM) — `[담당자: 🤖 진한님]`
 * **입력 데이터**:
   - 반려동물 선택 (프로필 연동)
   - 환부 사진 업로드 (피부, 눈, 귀, 구강 등)
@@ -30,25 +41,29 @@
 * **결과 출력**:
   - 의심 질환 Top 3 (확률%), 위험도 등급 (`OBSERVATION` / `CAUTION` / `EMERGENCY`), 가정 내 조치 가이드, 넥카라/소독 여부 제안
 
-### 2.2 [추가기능 A] 증상 변화 추이 타임라인 & 이미지 비교
+### 2.2 [추가기능 A] 증상 변화 추이 타임라인 & 이미지 비교 — `[담당자: 🤖 진한님]`
 * **Before / After 슬라이더 UI**: 동일 환부의 과거 진단 사진과 현재 사진을 한 화면에서 좌우 슬라이딩으로 시각적 비교
 * **AI 경과 추이 소견**: 이전 진단 데이터와 현재 데이터를 Gemini AI가 비교 분석하여 호전/유지/악화 판단 및 추가 소견 제공
 
-### 2.3 [추가기능 B] 실시간 펫 헬스 뉴스 (스케줄러)
+### 2.3 [추가기능 B] 실시간 펫 헬스 뉴스 (스케줄러) — `[담당자: 📰 지호님]`
 * **네이버 뉴스 API 연동**: 반려동물 건강, 질병, 사료 리콜 뉴스 수집
 * **백엔드 캐싱 스케줄러**: Spring Boot `@Scheduled`로 6시간마다 뉴스 자동 수집/캐싱하여 메인 페이지 하단 카드 UI로 고속 제공
 
-### 2.4 위치 기반 24시 응급 동물병원 지도 연동
+### 2.4 위치 기반 24시 응급 동물병원 지도 연동 — `[담당자: 🏥 지호님]`
 * **지도 API (카카오/네이버 지도)**: 유저 현재 위치(위도/경도) 기반 주변 동물병원 마커 표시
 * **응급 필터**: '24시 응급 병원' 필터링 및 카카오/네이버 길안내 앱/웹 링크 연동
 
-### 2.5 커뮤니티 (진단 리포트 첨부 게시판)
+### 2.5 커뮤니티 (진단 리포트 첨부 게시판) — `[담당자: 💬 지호님]`
 * **진단 리포트 연동 작성**: 게시글 작성 시 자신의 AI 진단 리포트를 선택 첨부 가능
-* **반려인 정보 공유**: 비슷 한 증상을 겪은 다른 반려인들과 질문 및 노하우 댓글 소통
+* **반려인 정보 공유**: 비슷한 증상을 겪은 다른 반려인들과 질문 및 노하우 댓글 소통
 
-### 2.6 회원가입 & 반려동물 프로필 (온보딩)
-* **최소 이메일/비밀번호 회원가입** 및 소셜 로그인 연동
+### 2.6 회원가입 & 로그인 — `[담당자: 👤 태준 (User)]`
+* **최소 이메일/비밀번호 회원가입** 및 소셜 로그인 연동 (카카오, 구글)
+* **JWT 토큰 기반 인증/인가** 및 내 프로필 정보 관리
+
+### 2.7 반려동물 프로필 & PHR 헬스 대시보드 — `[담당자: 📊 세민님]`
 * **1:N 반려동물 등록**: 회원 1명당 다수의 반려동물(강아지, 고양이 등) 프로필 등록 및 수정 지원
+* **스마트 PHR 대시보드 & AI 챗봇**: 바이탈 입력(체온, 심박수, 체중), 알레르기 관리 및 사료 계산기 연동
 
 ---
 
@@ -56,14 +71,21 @@
 
 ```mermaid
 graph TD
-    Client[Web / Mobile Client] -->|REST API| SpringBoot[Spring Boot Backend :8080]
+    Client[Web Client (React)] -->|REST API| SpringBoot[Spring Boot Backend :8080]
     SpringBoot -->|JPA / Hibernate| DB[(Supabase PostgreSQL)]
-    SpringBoot -->|HTTP Async| FastAPI[Python FastAPI AI Server :8000]
-    SpringBoot -->|@Scheduled 6h| NaverAPI[Naver News API]
-    Client -->|JS SDK| KakaoMap[Kakao / Naver Map API]
+    SpringBoot -->|HTTP Async| FastAPI[Python FastAPI AI Server :8000 - 🤖 진한님]
+    SpringBoot -->|@Scheduled 6h| NaverAPI[Naver News API - 📰 지호님]
+    Client -->|JS SDK| KakaoMap[Kakao Map API - 🏥 지호님]
 
+    subgraph "🤖 진한님 파이프라인"
     FastAPI -->|OpenCV/PyTorch| VisionAI[Vision AI Disease Classifier]
-    FastAPI -->|Vector DB + Prompt| Gemini[Google Gemini 1.5/2.0 API]
+    FastAPI -->|Vector DB + Prompt| Gemini[Google Gemini API]
+    end
+
+    subgraph "👤 태준 (User) / 📊 세민님 파이프라인"
+    SpringBoot -->|Auth & User API| UserDomain[User & Auth Domain - 👤 태준]
+    SpringBoot -->|Pet & PHR API| PetDomain[Pet & Dashboard Domain - 📊 세민님]
+    end
 ```
 
 ---
@@ -74,20 +96,20 @@ graph TD
 
 ```mermaid
 erDiagram
-    users ||--o{ pets : "1:N 등록"
-    users ||--o{ posts : "작성"
-    users ||--o{ comments : "작성"
-    pets ||--o{ diagnosis_records : "진단 기록"
-    pets ||--o{ timeline_compares : "경과 비교"
-    diagnosis_records ||--o{ posts : "리포트 첨부 (선택)"
-    posts ||--o{ comments : "댓글 목록"
+    users ||--o{ pets : "1:N 등록 (👤태준 / 📊세민)"
+    users ||--o{ posts : "작성 (👤태준 / 💬지호)"
+    users ||--o{ comments : "작성 (👤태준 / 💬지호)"
+    pets ||--o{ diagnosis_records : "진단 기록 (📊세민 / 🤖진한)"
+    pets ||--o{ timeline_compares : "경과 비교 (📊세민 / 🤖진한)"
+    diagnosis_records ||--o{ posts : "리포트 첨부 (🤖진한 / 💬지호)"
+    posts ||--o{ comments : "댓글 목록 (💬지호)"
 ```
 
 ---
 
 ### 4.2 테이블 상세 명세 (DDL & Columns)
 
-#### 1) `users` (회원 테이블)
+#### 1) `users` (회원 테이블) — `[담당자: 👤 태준 (User)]`
 | 컬럼명 | 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK, AUTO_INCREMENT | 회원 고유 식별자 |
@@ -99,7 +121,7 @@ erDiagram
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 가입 일시 |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 수정 일시 |
 
-#### 2) `pets` (반려동물 테이블)
+#### 2) `pets` (반려동물 테이블) — `[담당자: 📊 세민님]`
 | 컬럼명 | 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK, AUTO_INCREMENT | 반려동물 고유 식별자 |
@@ -113,7 +135,7 @@ erDiagram
 | `image_url` | TEXT | NULL | 반려동물 프로필 사진 URL |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 등록 일시 |
 
-#### 3) `diagnosis_records` (AI 진단 기록 테이블)
+#### 3) `diagnosis_records` (AI 진단 기록 테이블) — `[담당자: 🤖 진한님]`
 | 컬럼명 | 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK, AUTO_INCREMENT | 진단 기록 고유 식별자 |
@@ -127,7 +149,7 @@ erDiagram
 | `rag_report` | TEXT | NOT NULL | Gemini LLM + 수의학 백과 RAG 케어 리포트 |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 진단 일시 |
 
-#### 4) `timeline_compares` (증상 경과 비교 테이블)
+#### 4) `timeline_compares` (증상 경과 비교 테이블) — `[담당자: 🤖 진한님]`
 | 컬럼명 | 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK, AUTO_INCREMENT | 경과 비교 기록 식별자 |
@@ -138,7 +160,7 @@ erDiagram
 | `comparison_report` | TEXT | NOT NULL | Gemini AI 경과 비교 분석 소견 리포트 |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 비교 일시 |
 
-#### 5) `news_items` (실시간 펫 헬스 뉴스 테이블)
+#### 5) `news_items` (실시간 펫 헬스 뉴스 테이블) — `[담당자: 📰 지호님]`
 | 컬럼명 | 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK, AUTO_INCREMENT | 뉴스 식별자 |
@@ -148,7 +170,7 @@ erDiagram
 | `pub_date` | TIMESTAMP | NULL | 기사 작성일 |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 스케줄러 캐싱 수집 일시 |
 
-#### 6) `hospitals` (24시 응급 동물병원 테이블)
+#### 6) `hospitals` (24시 응급 동물병원 테이블) — `[담당자: 🏥 지호님]`
 | 컬럼명 | 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK, AUTO_INCREMENT | 병원 식별자 |
@@ -159,7 +181,7 @@ erDiagram
 | `longitude` | DOUBLE PRECISION | NOT NULL | 경도 |
 | `is_emergency_24h` | BOOLEAN | DEFAULT TRUE | 24시 응급 여부 |
 
-#### 7) `posts` (커뮤니티 게시글 테이블)
+#### 7) `posts` (커뮤니티 게시글 테이블) — `[담당자: 💬 지호님]`
 | 컬럼명 | 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK, AUTO_INCREMENT | 게시글 식별자 |
@@ -172,7 +194,7 @@ erDiagram
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 작성 일시 |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 수정 일시 |
 
-#### 8) `comments` (커뮤니티 댓글 테이블)
+#### 8) `comments` (커뮤니티 댓글 테이블) — `[담당자: 💬 지호님]`
 | 컬럼명 | 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK, AUTO_INCREMENT | 댓글 식별자 |
@@ -180,3 +202,4 @@ erDiagram
 | `user_id` | BIGINT | FK (users.id), NOT NULL | 작성자 회원 ID |
 | `content` | TEXT | NOT NULL | 댓글 내용 |
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 작성 일시 |
+

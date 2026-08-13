@@ -3,6 +3,14 @@
 
 ---
 
+## 📌 [도메인별 담당자 요약]
+* **👤 태준 (User)**: 회원 & 인증 (Auth & User API)
+* **🤖 진한님**: AI 질병 진단 & 경과 관찰 타임라인 (AI Diagnosis & Timeline API)
+* **📊 세민님**: 반려동물 온보딩 & PHR 헬스 대시보드 (Pet & Dashboard API)
+* **📰 지호님**: 24시 응급 동물병원, 실시간 펫 뉴스, 커뮤니티 (Hospital, News & Community API)
+
+---
+
 ## 1. 공통 API 응답 구조 (Common Response Wrapper)
 
 ```json
@@ -17,7 +25,7 @@
 
 ## 2. 도메인별 REST API 명세 (Domain APIs)
 
-### 2.1 회원 & 인증 (Auth & User API)
+### 2.1 회원 & 인증 (Auth & User API) — `[담당자: 👤 태준 (User)]`
 | Method | Endpoint | 설명 | Auth |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/auth/signup` | 이메일/비밀번호 회원가입 | Public |
@@ -32,7 +40,7 @@
 
 ---
 
-### 2.2 반려동물 온보딩 & 관리 (Pet API)
+### 2.2 반려동물 온보딩 & 관리 (Pet API) — `[담당자: 📊 세민님]`
 | Method | Endpoint | 설명 | Auth |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/pets/breeds` | 축종별 품종 마스터 데이터 자동완성 목록 조회 | Public |
@@ -45,7 +53,7 @@
 
 ---
 
-### 2.3 AI 질병 진단 (AI Diagnosis API - Core)
+### 2.3 AI 질병 진단 (AI Diagnosis API - Core) — `[담당자: 🤖 진한님]`
 | Method | Endpoint | 설명 | Auth |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/diagnosis/symptoms` | 환부 카테고리별 동적 증상 체크박스 목록 조회 | Public |
@@ -86,7 +94,7 @@
 
 ---
 
-### 2.4 경과 관찰 & 타임라인 (Timeline API - 추가기능 A)
+### 2.4 경과 관찰 & 타임라인 (Timeline API - 추가기능 A) — `[담당자: 🤖 진한님]`
 | Method | Endpoint | 설명 | Auth |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/timeline/{petId}` | 특정 반려동물의 환부별 경과 타임라인 목록 조회 | User |
@@ -95,7 +103,7 @@
 
 ---
 
-### 2.5 24시 응급 동물병원 (Hospital & Map API)
+### 2.5 24시 응급 동물병원 (Hospital & Map API) — `[담당자: 🏥 지호님]`
 | Method | Endpoint | 설명 | Auth |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/hospitals` | 사용자 현재 위경도 기준 주변 동물병원 검색 (`lat`, `lng`, `radius`, `isEmergency24h`) | Public |
@@ -105,14 +113,14 @@
 
 ---
 
-### 2.6 실시간 펫 헬스 뉴스 (News API - 추가기능 B)
+### 2.6 실시간 펫 헬스 뉴스 (News API - 추가기능 B) — `[담당자: 📰 지호님]`
 | Method | Endpoint | 설명 | Auth |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/news` | 6시간 캐싱된 최신 펫 헬스 뉴스 목록 조회 (메인 슬라이더) | Public |
 
 ---
 
-### 2.7 선택적 커뮤니티 (Community API)
+### 2.7 선택적 커뮤니티 (Community API) — `[담당자: 💬 지호님]`
 | Method | Endpoint | 설명 | Auth |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/posts` | 커뮤니티 게시글 목록 조회 (페이징 & 검색) | Public |
@@ -123,3 +131,4 @@
 | `POST` | `/api/v1/posts/{postId}/likes` | 게시글 좋아요 토글 | User |
 | `POST` | `/api/v1/posts/{postId}/comments` | 게시글 댓글 작성 | User |
 | `DELETE` | `/api/v1/comments/{commentId}` | 본인 댓글 삭제 | User |
+
