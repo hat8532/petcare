@@ -8,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -48,29 +47,8 @@ public class NaverNewsService {
         int validStart = Math.max(1, Math.min(start, 1000));
         int validDisplay = Math.max(1, Math.min(display, 100));
 
-        // 1. Try NAVER API HUB Endpoint (NCP)
-        try {
-            String encodedQuery = java.net.URLEncoder.encode(query, StandardCharsets.UTF_8);
-            String url = String.format("https://naverapihub.apigw.ntruss.com/search/v1/news?query=%s&start=%d&display=%d&sort=date", encodedQuery, validStart, validDisplay);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("X-NCP-APIGW-API-KEY-ID", cId.trim());
-            headers.set("X-NCP-APIGW-API-KEY", cSec.trim());
-
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                List<Map<String, Object>> items = (List<Map<String, Object>>) response.getBody().get("items");
-                if (items != null && !items.isEmpty()) {
-                    return parseItems(items, validStart);
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("NAVER API HUB News Search Error: " + e.getMessage());
-        }
-
-        // 2. Fallback to Developers API Endpoint
+    
+        // 네이버 개발자 뉴스 검색 API호출
         try {
             String encodedQuery = java.net.URLEncoder.encode(query, StandardCharsets.UTF_8);
             String url = String.format("https://openapi.naver.com/v1/search/news.json?query=%s&start=%d&display=%d&sort=date", encodedQuery, validStart, validDisplay);
@@ -142,11 +120,7 @@ public class NaverNewsService {
     private String cleanHtmlAndDecode(String input) {
         if (input == null || input.isBlank()) return "";
         String text = input.replaceAll("<[^>]*>", "").replaceAll("&quot;", "\"").replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">");
-        try {
-            if (text.contains("%")) {
-                text = URLDecoder.decode(text, StandardCharsets.UTF_8);
-            }
-        } catch (Exception ignored) {}
+        
         return text;
     }
 }
