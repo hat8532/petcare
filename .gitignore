@@ -1,0 +1,69 @@
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Frontend build and local files
+/frontend/logs/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/dist-ssr/
+/frontend/**/*.local
+
+# Frontend editor files
+/frontend/.vscode/*
+!/frontend/.vscode/extensions.json
+/frontend/.idea/
+/frontend/*.suo
+/frontend/*.ntvs*
+/frontend/*.njsproj
+/frontend/*.sln
+/frontend/*.sw?
+
+# Backend build files
+/backend/HELP.md
+/backend/.gradle/
+/backend/build/
+!/backend/gradle/wrapper/gradle-wrapper.jar
+!/backend/**/src/main/**/build/
+!/backend/**/src/test/**/build/
+/backend/bin/
+!/backend/**/src/main/**/bin/
+!/backend/**/src/test/**/bin/
+
+# Backend IDE files
+/backend/.apt_generated/
+/backend/.classpath
+/backend/.factorypath
+/backend/.project
+/backend/.settings/
+/backend/.springBeans
+/backend/.sts4-cache/
+/backend/.idea/
+/backend/*.iws
+/backend/*.iml
+/backend/*.ipr
+/backend/out/
+!/backend/**/src/main/**/out/
+!/backend/**/src/test/**/out/
+/backend/nbproject/private/
+/backend/nbbuild/
+/backend/dist/
+/backend/nbdist/
+/backend/.nb-gradle/
+/backend/.vscode/
+
+# Backend secrets and environment-specific settings
+/backend/.env
+/backend/*.env
+/backend/**/.env
+/backend/**/application-secret.properties
+/backend/**/application-local.properties
+/backend/**/application-dev.properties
+/backend/**/application-*.properties
