@@ -4,20 +4,20 @@
 <mapper namespace="com.petcare.backend.domain.diagnosis.DiagnosisRecordMapper">
 
     <select id="findByPetId" resultType="com.petcare.backend.domain.diagnosis.DiagnosisRecordDTO">
-        SELECT id, user_id AS userId, pet_id AS petId, affected_area AS affectedArea,
+        SELECT id, pet_id AS petId, affected_area AS affectedArea,
                symptoms_json AS symptomsJson, image_url AS imageUrl, description,
-               risk_level AS riskLevel, risk_label AS riskLabel, diseases_json AS diseasesJson,
-               report_content AS reportContent, created_at AS createdAt
+               risk_level AS riskLevel, vision_result_json AS diseasesJson,
+               rag_report AS reportContent, created_at AS createdAt
         FROM diagnosis_records
         WHERE pet_id = #{petId}
         ORDER BY id DESC
     </select>
 
     <select id="findById" resultType="com.petcare.backend.domain.diagnosis.DiagnosisRecordDTO">
-        SELECT id, user_id AS userId, pet_id AS petId, affected_area AS affectedArea,
+        SELECT id, pet_id AS petId, affected_area AS affectedArea,
                symptoms_json AS symptomsJson, image_url AS imageUrl, description,
-               risk_level AS riskLevel, risk_label AS riskLabel, diseases_json AS diseasesJson,
-               report_content AS reportContent, created_at AS createdAt
+               risk_level AS riskLevel, vision_result_json AS diseasesJson,
+               rag_report AS reportContent, created_at AS createdAt
         FROM diagnosis_records
         WHERE id = #{id}
     </select>

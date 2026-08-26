@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +20,44 @@ public class DiagnosisController {
     public DiagnosisController(DiagnosisRecordMapper diagnosisRecordMapper, GeminiService geminiService) {
         this.diagnosisRecordMapper = diagnosisRecordMapper;
         this.geminiService = geminiService;
+    }
+
+    @GetMapping("/symptoms")
+    public ResponseEntity<Map<String, Object>> getSymptoms() {
+        Map<String, List<String>> symptoms = new LinkedHashMap<>();
+        symptoms.put("SKIN", List.of("가려움/긁음", "발적/각질", "탈모 부위", "진물/부종", "통증/예민"));
+        symptoms.put("EYE", List.of("눈물과다", "충혈/발적", "눈곱/분비물", "눈 지침/못 뜸", "혼탁 현상"));
+        symptoms.put("EAR", List.of("귀를 자주 턴다", "악취/검은 귀지", "귓바퀴 붉어짐", "통증 반응"));
+        symptoms.put("MOUTH", List.of("구취/입 냄새", "잇몸 부종", "치석 누적", "침 흘림 과다"));
+        symptoms.put("PAW_LIMB", List.of("절뚝거림/파행", "발바닥 부종/습진", "관절 부위 예민", "발톱 상처"));
+        symptoms.put("NOSE_RESPIRATORY", List.of("콧물/재채기", "호흡 가쁨", "코 건조/갈라짐", "기침 소리"));
+        symptoms.put("ABDOMEN", List.of("구토/토사물", "설사/무른 변", "배가 딱딱함", "식욕 부진"));
+        symptoms.put("CUSTOM", List.of("통증/예민", "이상 붓기", "행동 이상", "식욕 감소"));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "SUCCESS");
+        response.put("data", symptoms);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{diagnosisId}")
+    public ResponseEntity<Map<String, Object>> getDiagnosis(
+            @PathVariable("diagnosisId") Long diagnosisId) {
+        DiagnosisRecordDTO record = diagnosisRecordMapper.findById(diagnosisId);
+
+        if (record == null) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", "ERROR");
+            error.put("message", "해당 진단 기록을 찾을 수 없습니다.");
+            return ResponseEntity.status(404).body(error);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "SUCCESS");
+        response.put("data", record);
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/analyze")
