@@ -3,6 +3,10 @@ import { apiClient } from '../api/apiClient';
 
 export default function CommunitySection() {
   const [posts, setPosts] = useState([]);
+  const [isWriteOpen, setIsWriteOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newContent, setNewContent] = useState('');
+
 
   useEffect(() => {
     async function loadCommunity() {
@@ -37,6 +41,31 @@ export default function CommunitySection() {
     loadCommunity();
   }, []);
 
+  // 글 작성: 유효성 검사 → 저장 → 목록 새로고침 → 폼 초기화
+  async function handleSubmit() {
+    if (!newTitle.trim() || !newContent.trim()) {
+      alert('제목과 내용을 모두 입력해주세요.');
+      return;
+    }
+
+    try {
+      await apiClient.createCommunityPost({
+        title: newTitle,
+        content: newContent,
+        petInfo: '초코 (푸들 4살)'
+      });
+
+      const data = await apiClient.getCommunityPosts();
+      setPosts(data);
+
+      setNewTitle('');
+      setNewContent('');
+      setIsWriteOpen(false);
+    } catch (e) {
+      alert('글 작성에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    }
+  }
+
   return (
     <section id="community-section" style={{ padding: '60px 0', background: '#f8fafc' }}>
       <div className="container">
@@ -48,10 +77,44 @@ export default function CommunitySection() {
             <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a', margin: 0 }}>반려인 케어 정보 공유 커뮤니티</h2>
             <p style={{ fontSize: '14.5px', color: '#64748b', marginTop: '4px', margin: 0 }}>자신의 AI 진단 리포트를 선택 첨부하여 비슷한 증상을 겪은 반려인들과 소통하고 노하우를 나눠보세요.</p>
           </div>
-          <button className="btn btn-primary" style={{ padding: '10px 20px', fontSize: '13.5px' }}>
+          <button className="btn btn-primary" onClick={() => setIsWriteOpen(true)} style={{ padding: '10px 20px', fontSize: '13.5px' }}>
             ✏️ 새 글 작성하기
           </button>
         </div>
+        {isWriteOpen && (
+          <div style={{ padding: '24px', background: '#ffffff', borderRadius: '12px', marginBottom: '24px' }}>
+            <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '800', color: '#0f172a' }}>새 글 작성</h4>
+
+            <input
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="제목을 입력하세요"
+              style={{ width: '100%', padding: '10px 14px', fontSize: '14px', border: '1px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box' }}
+            />
+            <textarea
+              value={newContent}
+              onChange={(e) => setNewContent(e.target.value)}
+              placeholder="내용을 입력하세요"
+              rows={4}
+              style={{ width: '100%', padding: '10px 14px', fontSize: '14px', border: '1px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', marginTop: '12px', resize: 'vertical', fontFamily: 'inherit' }}
+            />
+
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button
+                onClick={() => setIsWriteOpen(false)}
+                style={{ padding: '9px 18px', fontSize: '13.5px', fontWeight: '700', border: '1px solid #e2e8f0', background: '#ffffff', color: '#64748b', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                취소
+              </button>
+              <button className="btn btn-primary" onClick={handleSubmit} style={{ padding: '9px 18px', fontSize: '13.5px' }}>
+                게시하기
+              </button>
+            </div>
+
+
+          </div>
+        )}
 
         <div className="grid-2">
           {posts.map((p) => (
