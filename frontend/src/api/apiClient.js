@@ -119,5 +119,20 @@ export const apiClient = {
       console.warn('Backend API error:', e);
       return [];
     }
+  },
+
+  createCommunityPost: async (postPayload) => {
+    try {
+      const res = await fetch(`${BASE_URL}/community`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(postPayload)
+      });
+      const data = await res.json();
+      return data.data;
+    } catch(e) {
+      console.warn('Backend API error on community post creation', e);
+      throw e;
+    }
   }
 };

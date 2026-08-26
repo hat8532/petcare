@@ -41,6 +41,31 @@ export default function CommunitySection() {
     loadCommunity();
   }, []);
 
+  // 글 작성: 유효성 검사 → 저장 → 목록 새로고침 → 폼 초기화
+  async function handleSubmit() {
+    if (!newTitle.trim() || !newContent.trim()) {
+      alert('제목과 내용을 모두 입력해주세요.');
+      return;
+    }
+
+    try {
+      await apiClient.createCommunityPost({
+        title: newTitle,
+        content: newContent,
+        petInfo: '초코 (푸들 4살)'
+      });
+
+      const data = await apiClient.getCommunityPosts();
+      setPosts(data);
+
+      setNewTitle('');
+      setNewContent('');
+      setIsWriteOpen(false);
+    } catch (e) {
+      alert('글 작성에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    }
+  }
+
   return (
     <section id="community-section" style={{ padding: '60px 0', background: '#f8fafc' }}>
       <div className="container">
@@ -82,7 +107,7 @@ export default function CommunitySection() {
               >
                 취소
               </button>
-              <button className="btn btn-primary" style={{ padding: '9px 18px', fontSize: '13.5px' }}>
+              <button className="btn btn-primary" onClick={handleSubmit} style={{ padding: '9px 18px', fontSize: '13.5px' }}>
                 게시하기
               </button>
             </div>
