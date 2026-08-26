@@ -62,12 +62,24 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             return;
         }
 
+        // 탈퇴(DELETED) 또는 정지(INACTIVE) 회원 로그인 차단
+        if ("DELETED".equalsIgnoreCase(user.getStatus())) {
+            response.sendRedirect(frontendUrl + "/login?error=deleted_user");
+            return;
+        }
+
+        if ("INACTIVE".equalsIgnoreCase(user.getStatus()) || "BLOCKED".equalsIgnoreCase(user.getStatus())) {
+            response.sendRedirect(frontendUrl + "/login?error=inactive_user");
+            return;
+        }
+
         String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
         String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
 
         String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/oauth2/callback")
                 .queryParam("accessToken", accessToken)
                 .queryParam("refreshToken", refreshToken)
+                .queryParam("id", user.getId())
                 .queryParam("nickname", user.getNickname())
                 .queryParam("email", user.getEmail())
                 .queryParam("role", user.getRole())

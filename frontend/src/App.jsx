@@ -10,27 +10,51 @@ import HospitalLocator from './components/HospitalLocator';
 import NewsSection from './components/NewsSection';
 import CommunitySection from './components/CommunitySection';
 import LoginPage from './components/LoginPage';
+import OAuth2CallbackPage from './components/OAuth2CallbackPage';
 import PetEditModal from './components/PetEditModal';
 import Footer from './components/Footer';
 import { apiClient } from './api/apiClient';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (window.location.pathname.startsWith('/login') || window.location.search.includes('error=')) {
+      return 'login';
+    }
+    return 'home';
+  });
   const [pets, setPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
   const [editingPet, setEditingPet] = useState(null);
 
-  // Real backend API integration: Fetch Pets on mount
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('petcare_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  // Check if current URL is OAuth2 callback
+  const [isOAuth2Callback, setIsOAuth2Callback] = useState(() => 
+    window.location.pathname.startsWith('/oauth2/callback')
+  );
+
+  // Real backend API integration: Fetch Pets on mount and whenever user changes
   useEffect(() => {
+    if (isOAuth2Callback) return;
+    if (!user || !user.id) {
+      setPets([]);
+      setSelectedPet(null);
+      return;
+    }
     async function loadPets() {
-      const data = await apiClient.getPetsByUser(1);
-      setPets(data);
+      const data = await apiClient.getPetsByUser(user.id);
+      setPets(data || []);
       if (data && data.length > 0) {
         setSelectedPet(data[0]);
+      } else {
+        setSelectedPet(null);
       }
     }
     loadPets();
-  }, []);
+  }, [user, isOAuth2Callback]);
 
   const handlePetAdded = (newPet) => {
     setPets((prev) => [...prev, newPet]);
@@ -168,7 +192,10 @@ export default function App() {
           <LoginPage
             isOpen={true}
             isEmbeddedPage={true}
-            onLoginSuccess={() => setActiveTab('home')}
+            onLoginSuccess={(loggedInUser) => {
+              setUser(loggedInUser);
+              setActiveTab('home');
+            }}
           />
         );
 
@@ -272,10 +299,25 @@ export default function App() {
     }
   };
 
+  if (isOAuth2Callback) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
+        <OAuth2CallbackPage onLoginSuccess={(loggedInUser) => {
+          setUser(loggedInUser);
+          setIsOAuth2Callback(false);
+          setActiveTab('home');
+        }} />
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
       {/* Top Unified Navbar */}
       <Navbar
+        user={user}
+        onUserChange={setUser}
         activeTab={activeTab}
         setActiveTab={(tab) => {
           setActiveTab(tab);

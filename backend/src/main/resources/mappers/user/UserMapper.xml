@@ -21,13 +21,20 @@
         SELECT COUNT(*) FROM users WHERE email = #{email}
     </select>
 
+    <select id="countByNickname" resultType="int">
+        SELECT COUNT(*) FROM users WHERE nickname = #{nickname}
+    </select>
+
     <select id="countAll" resultType="int">
         SELECT COUNT(*) FROM users
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO users (email, password, nickname, phone, profile_image_url, provider, role, status)
-        VALUES (#{email}, #{password}, #{nickname}, #{phone}, #{profileImageUrl}, #{provider}, #{role}, #{status})
+        VALUES (#{email}, #{password}, #{nickname}, #{phone}, #{profileImageUrl},
+                COALESCE(#{provider}, 'LOCAL'),
+                COALESCE(#{role}, 'ROLE_USER'),
+                COALESCE(#{status}, 'ACTIVE'))
     </insert>
 
     <update id="update">
@@ -35,6 +42,20 @@
         SET nickname = #{nickname},
             phone = #{phone},
             profile_image_url = #{profileImageUrl},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE users
+        SET status = #{status},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <update id="updatePassword">
+        UPDATE users
+        SET password = #{password},
             updated_at = CURRENT_TIMESTAMP
         WHERE id = #{id}
     </update>

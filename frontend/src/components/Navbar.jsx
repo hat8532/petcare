@@ -1,20 +1,38 @@
 import React, { useState } from 'react';
 import LoginPage from './LoginPage';
 import PetRegisterModal from './PetRegisterModal';
+import { apiClient } from '../api/apiClient';
 
-export default function Navbar({ activeTab, setActiveTab, selectedPet, setSelectedPet, pets, onPetAdded, onOpenEditPet }) {
+export default function Navbar({
+  user,
+  onUserChange,
+  activeTab,
+  setActiveTab,
+  selectedPet,
+  setSelectedPet,
+  pets,
+  onPetAdded,
+  onOpenEditPet
+}) {
   const [showPetDropdown, setShowPetDropdown] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showPetRegisterModal, setShowPetRegisterModal] = useState(false);
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('petcare_user');
-    return saved ? JSON.parse(saved) : null;
-  });
 
-  const handleLogout = () => {
-    localStorage.removeItem('petcare_token');
-    localStorage.removeItem('petcare_user');
-    setUser(null);
+  const handleLogout = async () => {
+    await apiClient.logout();
+    if (onUserChange) onUserChange(null);
+  };
+
+  const handleWithdraw = async () => {
+    if (window.confirm('정말로 탈퇴하시겠습니까? 탈퇴 후 기존 정보는 안전하게 보존되지만 로그인이 제한됩니다.')) {
+      try {
+        await apiClient.withdraw();
+        if (onUserChange) onUserChange(null);
+        alert('회원 탈퇴 처리가 완료되었습니다.');
+      } catch (e) {
+        alert(e.message || '탈퇴 처리에 실패했습니다.');
+      }
+    }
   };
 
   return (
@@ -268,6 +286,22 @@ export default function Navbar({ activeTab, setActiveTab, selectedPet, setSelect
                 >
                   로그아웃
                 </button>
+                <button
+                  onClick={handleWithdraw}
+                  title="회원 탈퇴"
+                  style={{
+                    padding: '6px 8px',
+                    fontSize: '11px',
+                    borderRadius: '8px',
+                    background: 'transparent',
+                    color: '#94a3b8',
+                    border: 'none',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  탈퇴
+                </button>
               </div>
             ) : (
               <button
@@ -287,7 +321,7 @@ export default function Navbar({ activeTab, setActiveTab, selectedPet, setSelect
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
         onLoginSuccess={(loggedInUser) => {
-          setUser(loggedInUser);
+          if (onUserChange) onUserChange(loggedInUser);
           if (pets.length === 0) {
             setShowPetRegisterModal(true);
           }
