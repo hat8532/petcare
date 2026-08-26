@@ -11,6 +11,14 @@
         ORDER BY id DESC
     </select>
 
+    <select id="findById" resultType="com.petcare.backend.domain.community.CommunityPostDTO">
+        SELECT id, author_name AS authorName, pet_info AS petInfo, title,
+               attached_report AS attachedReport, content, comments_count AS commentsCount,
+               likes_count AS likesCount, time_ago AS timeAgo, created_at AS createdAt
+        FROM community_posts
+        WHERE id = #{id}
+    </select>
+
     <select id="countAll" resultType="int">
         SELECT COUNT(*) FROM community_posts
     </select>

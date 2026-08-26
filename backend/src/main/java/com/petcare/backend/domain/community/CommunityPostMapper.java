@@ -9,4 +9,5 @@ public interface CommunityPostMapper {
     List<CommunityPostDTO> findAll();
     void insert(CommunityPostDTO post);
     int countAll();
+    CommunityPostDTO findById(Long id);
 }
