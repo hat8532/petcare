@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { apiClient } from '../api/apiClient';
+import { hospitalApi } from '../api/hospitalApi';
 
 export default function HospitalLocator() {
   const [filter24h, setFilter24h] = useState(true);
@@ -193,7 +193,7 @@ export default function HospitalLocator() {
       setLoading(true);
 
       // Try Backend DB First
-      const backendData = await apiClient.getNearbyHospitals(mapCenter.lat, mapCenter.lng, filter24h);
+      const backendData = await hospitalApi.getNearbyHospitals(mapCenter.lat, mapCenter.lng, filter24h);
       
       // Dynamic Regional Generation for current Map Center
       const dynamicList = generateDynamicNearbyHospitals(mapCenter.lat, mapCenter.lng);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { apiClient } from '../api/apiClient';
+import { petApi } from '../api/petApi';
 
 export default function PetEditModal({ isOpen, onClose, pet, onPetUpdated, onPetDeleted }) {
   const [name, setName] = useState('');
@@ -74,7 +74,7 @@ export default function PetEditModal({ isOpen, onClose, pet, onPetUpdated, onPet
     };
 
     try {
-      const updatedPet = await apiClient.updatePet(pet.id, updatedPayload);
+      const updatedPet = await petApi.updatePet(pet.id, updatedPayload);
       if (onPetUpdated) {
         onPetUpdated({ id: pet.id, ...updatedPayload });
       }
@@ -93,7 +93,7 @@ export default function PetEditModal({ isOpen, onClose, pet, onPetUpdated, onPet
 
     setIsSubmitting(true);
     try {
-      await apiClient.deletePet(pet.id);
+      await petApi.deletePet(pet.id);
       if (onPetDeleted) {
         onPetDeleted(pet.id);
       }

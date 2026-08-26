@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { apiClient } from '../api/apiClient';
+import { petApi } from '../api/petApi';
 
 export default function PetRegisterModal({ isOpen, onClose, onPetCreated }) {
   const [name, setName] = useState('');
@@ -60,7 +60,7 @@ export default function PetRegisterModal({ isOpen, onClose, onPetCreated }) {
     const currentSpeciesObj = speciesOptions.find(s => s.id === species);
 
     try {
-      const newPet = await apiClient.createPet({
+      const newPet = await petApi.createPet({
         userId: currentUser.id || 1,
         name: name.trim(),
         species,

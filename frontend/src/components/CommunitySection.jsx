@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '../api/apiClient';
+import { communityApi } from '../api/communityApi';
 
 export default function CommunitySection() {
   const [posts, setPosts] = useState([]);
@@ -10,7 +10,7 @@ export default function CommunitySection() {
 
   useEffect(() => {
     async function loadCommunity() {
-      const data = await apiClient.getCommunityPosts();
+      const data = await communityApi.getCommunityPosts();
       if (data && data.length > 0) {
         setPosts(data);
       } else {
@@ -49,13 +49,13 @@ export default function CommunitySection() {
     }
 
     try {
-      await apiClient.createCommunityPost({
+      await communityApi.createCommunityPost({
         title: newTitle,
         content: newContent,
         petInfo: '초코 (푸들 4살)'
       });
 
-      const data = await apiClient.getCommunityPosts();
+      const data = await communityApi.getCommunityPosts();
       setPosts(data);
 
       setNewTitle('');

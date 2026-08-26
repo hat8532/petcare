@@ -13,7 +13,7 @@ import LoginPage from './components/LoginPage';
 import OAuth2CallbackPage from './components/OAuth2CallbackPage';
 import PetEditModal from './components/PetEditModal';
 import Footer from './components/Footer';
-import { apiClient } from './api/apiClient';
+import { petApi } from './api/petApi';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -45,7 +45,7 @@ export default function App() {
       return;
     }
     async function loadPets() {
-      const data = await apiClient.getPetsByUser(user.id);
+      const data = await petApi.getPetsByUser(user.id);
       setPets(data || []);
       if (data && data.length > 0) {
         setSelectedPet(data[0]);

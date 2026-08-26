@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import LoginPage from './LoginPage';
 import PetRegisterModal from './PetRegisterModal';
-import { apiClient } from '../api/apiClient';
+import { authApi } from '../api/authApi';
 
 export default function Navbar({
   user,
@@ -19,14 +19,14 @@ export default function Navbar({
   const [showPetRegisterModal, setShowPetRegisterModal] = useState(false);
 
   const handleLogout = async () => {
-    await apiClient.logout();
+    await authApi.logout();
     if (onUserChange) onUserChange(null);
   };
 
   const handleWithdraw = async () => {
     if (window.confirm('정말로 탈퇴하시겠습니까? 탈퇴 후 기존 정보는 안전하게 보존되지만 로그인이 제한됩니다.')) {
       try {
-        await apiClient.withdraw();
+        await authApi.withdraw();
         if (onUserChange) onUserChange(null);
         alert('회원 탈퇴 처리가 완료되었습니다.');
       } catch (e) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '../api/apiClient';
+import { newsApi } from '../api/newsApi';
 
 export default function NewsSection() {
   const [newsList, setNewsList] = useState([]);
@@ -112,7 +112,7 @@ export default function NewsSection() {
     setActiveQuery(finalSearchQuery);
 
     try {
-      const data = await apiClient.getNews(finalSearchQuery, 1, 12);
+      const data = await newsApi.getNews(finalSearchQuery, 1, 12);
       if (data && data.length > 0) {
         setNewsList(data);
         if (data.length < 10) setHasMore(false);
@@ -154,7 +154,7 @@ export default function NewsSection() {
     const startParam = (nextPage - 1) * 10 + 1;
 
     try {
-      const newItems = await apiClient.getNews(activeQuery, startParam, 10);
+      const newItems = await newsApi.getNews(activeQuery, startParam, 10);
       if (newItems && newItems.length > 0) {
         setNewsList(prev => {
           const existingTitles = new Set(prev.map(item => item.title));

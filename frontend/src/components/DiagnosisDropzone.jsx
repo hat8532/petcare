@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { diagnosisApi } from '../api/diagnosisApi';
 
 export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onNavigateHospital }) {
   const [affectedArea, setAffectedArea] = useState('SKIN');
@@ -92,19 +93,19 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
 
     const petName = selectedPet?.name || '반려동물';
     const healthProfile = selectedPet?.healthProfile;
+    const diagnosisRequest = {
+      petId: selectedPet?.id || 1,
+      petName,
+      affectedArea,
+      customAreaText,
+      symptoms: selectedSymptoms,
+      description,
+      healthProfile
+    };
 
     // Real Backend API attempt
     try {
-      const apiRes = await apiClient.runDiagnosis({
-        userId: 1,
-        petId: selectedPet?.id || 1,
-        petName,
-        affectedArea,
-        customAreaText,
-        symptoms: selectedSymptoms,
-        description,
-        healthProfile
-      });
+      const apiRes = await diagnosisApi.analyze(diagnosisRequest);
 
       if (apiRes) {
         let parsedDiseases = [];

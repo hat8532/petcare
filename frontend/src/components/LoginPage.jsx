@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '../api/apiClient';
+import { authApi } from '../api/authApi';
 
 export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedPage = false }) {
   // 모드 상태: 'login' | 'register' | 'forgot'
@@ -46,7 +46,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
       return;
     }
     const timer = setTimeout(async () => {
-      const res = await apiClient.checkEmail(email);
+      const res = await authApi.checkEmail(email);
       setEmailStatus(res);
     }, 400);
     return () => clearTimeout(timer);
@@ -59,7 +59,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
       return;
     }
     const timer = setTimeout(async () => {
-      const res = await apiClient.checkNickname(nickname);
+      const res = await authApi.checkNickname(nickname);
       setNicknameStatus(res);
     }, 400);
     return () => clearTimeout(timer);
@@ -82,7 +82,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
       }
       try {
         setLoading(true);
-        const res = await apiClient.forgotPassword(email.trim());
+        const res = await authApi.forgotPassword(email.trim());
         setSuccessMessage(res.message || '임시 비밀번호가 발급되었습니다.');
         if (res.tempPassword) {
           setTempPasswordResult(res.tempPassword);
@@ -124,7 +124,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
 
       if (viewMode === 'register') {
         // 백엔드 회원가입 API 호출 (POST /api/v1/auth/signup)
-        const response = await apiClient.signup({
+        const response = await authApi.signup({
           email: email.trim(),
           password: password.trim(),
           nickname: nickname.trim(),
@@ -147,7 +147,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
         }
       } else {
         // 백엔드 로그인 API 호출 (POST /api/v1/auth/login)
-        const response = await apiClient.login({
+        const response = await authApi.login({
           email: email.trim(),
           password: password.trim()
         });
