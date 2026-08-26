@@ -30,6 +30,23 @@ public class CommunityController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> getCommunityPostDetail(@PathVariable("id") Long id) {
+        CommunityPostDTO post = communityPostMapper.findById(id);
+        if (post == null) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", "ERROR");
+            error.put("message", "해당 게시글을 찾을 수 없습니다.");
+            return ResponseEntity.status(404).body(error);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "SUCCESS");
+        response.put("data", post);
+
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping
     public ResponseEntity<Map<String, Object>> createPost(@RequestBody CommunityPostDTO post) {
         if (post.getAuthorName() == null) post.setAuthorName("초코마미");
