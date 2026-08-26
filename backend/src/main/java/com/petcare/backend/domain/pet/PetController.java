@@ -1,6 +1,10 @@
 package com.petcare.backend.domain.pet;
 
+import com.petcare.backend.domain.user.UserDTO;
+import com.petcare.backend.domain.user.UserMapper;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -13,13 +17,31 @@ import java.util.Map;
 public class PetController {
 
     private final PetMapper petMapper;
+    private final UserMapper userMapper;
 
-    public PetController(PetMapper petMapper) {
+    public PetController(PetMapper petMapper, UserMapper userMapper) {
         this.petMapper = petMapper;
+        this.userMapper = userMapper;
     }
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<Map<String, Object>> getPetsByUserId(@PathVariable("userId") Long userId) {
+    public ResponseEntity<Map<String, Object>> getPetsByUserId(
+            @PathVariable("userId") Long userId,
+            Authentication authentication
+    ) {
+        if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())) {
+            String currentEmail = authentication.getName();
+            UserDTO currentUser = userMapper.findByEmail(currentEmail);
+
+            // IDOR 방지: 본인 계정이 아니면서 관리자(ROLE_ADMIN)도 아닌 경우 403 차단
+            if (currentUser != null && !currentUser.getId().equals(userId) && !"ROLE_ADMIN".equalsIgnoreCase(currentUser.getRole())) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("status", "FAIL");
+                errorResponse.put("message", "본인의 반려동물 정보만 조회할 수 있습니다.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+            }
+        }
+
         List<PetDTO> pets = petMapper.findByUserId(userId);
 
         Map<String, Object> response = new HashMap<>();

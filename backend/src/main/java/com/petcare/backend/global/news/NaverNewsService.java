@@ -14,12 +14,6 @@ import java.util.*;
 @Service
 public class NaverNewsService {
 
-    @Value("${naver.map.client-id:}")
-    private String mapClientId;
-
-    @Value("${naver.map.client-secret:}")
-    private String mapClientSecret;
-
     @Value("${naver.news.client-id:}")
     private String newsClientId;
 
@@ -29,7 +23,7 @@ public class NaverNewsService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     public boolean isConfigured() {
-        return (newsClientId != null && !newsClientId.isBlank()) || (mapClientId != null && !mapClientId.isBlank());
+        return newsClientId != null && !newsClientId.isBlank();
     }
 
     public List<Map<String, Object>> searchPetNews(String query, int display) {
@@ -37,25 +31,21 @@ public class NaverNewsService {
     }
 
     public List<Map<String, Object>> searchPetNews(String query, int start, int display) {
-        String cId = (newsClientId != null && !newsClientId.isBlank()) ? newsClientId : mapClientId;
-        String cSec = (newsClientSecret != null && !newsClientSecret.isBlank()) ? newsClientSecret : mapClientSecret;
-
-        if (cId == null || cId.isBlank()) {
+        if (!isConfigured()) {
             return Collections.emptyList();
         }
 
         int validStart = Math.max(1, Math.min(start, 1000));
         int validDisplay = Math.max(1, Math.min(display, 100));
 
-    
-        // 네이버 개발자 뉴스 검색 API호출
+        // Official Naver Developers News Search API
         try {
             String encodedQuery = java.net.URLEncoder.encode(query, StandardCharsets.UTF_8);
             String url = String.format("https://openapi.naver.com/v1/search/news.json?query=%s&start=%d&display=%d&sort=date", encodedQuery, validStart, validDisplay);
 
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Naver-Client-Id", cId.trim());
-            headers.set("X-Naver-Client-Secret", cSec.trim());
+            headers.set("X-Naver-Client-Id", newsClientId.trim());
+            headers.set("X-Naver-Client-Secret", newsClientSecret.trim());
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
             ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
@@ -88,10 +78,10 @@ public class NaverNewsService {
         for (Map<String, Object> item : items) {
             Map<String, Object> news = new HashMap<>();
             String rawTitle = (String) item.get("title");
-            String cleanTitle = cleanHtmlAndDecode(rawTitle);
+            String cleanTitle = cleanHtml(rawTitle);
             
             String rawDesc = (String) item.get("description");
-            String cleanDesc = cleanHtmlAndDecode(rawDesc);
+            String cleanDesc = cleanHtml(rawDesc);
 
             String pubDate = (String) item.get("pubDate");
             String formattedDate = pubDate;
@@ -117,10 +107,13 @@ public class NaverNewsService {
         return result;
     }
 
-    private String cleanHtmlAndDecode(String input) {
+    private String cleanHtml(String input) {
         if (input == null || input.isBlank()) return "";
-        String text = input.replaceAll("<[^>]*>", "").replaceAll("&quot;", "\"").replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">");
-        
-        return text;
+        return input.replaceAll("<[^>]*>", "")
+                .replaceAll("&quot;", "\"")
+                .replaceAll("&amp;", "&")
+                .replaceAll("&lt;", "<")
+                .replaceAll("&gt;", ">")
+                .replaceAll("&apos;", "'");
     }
 }
