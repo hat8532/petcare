@@ -20,7 +20,9 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
   const [nicknameStatus, setNicknameStatus] = useState(null); // { available, message }
   const [tempPasswordResult, setTempPasswordResult] = useState('');
 
-  if (!isOpen && !isEmbeddedPage) return null;
+  // 비밀번호 보기/숨기기 토글 상태
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // 소셜 로그인 리다이렉트 실패 에러 파라미터 처리 (?error=deleted_user 등)
   useEffect(() => {
@@ -64,6 +66,8 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
     }, 400);
     return () => clearTimeout(timer);
   }, [nickname, viewMode]);
+
+  if (!isOpen && !isEmbeddedPage) return null;
 
   // 비밀번호 유효성 검사 (영문, 숫자, 특수문자 8자 이상)
   const isPasswordValid = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/.test(password);
@@ -303,25 +307,62 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
         {/* 비밀번호 (로그인 / 회원가입) */}
         {viewMode !== 'forgot' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <label style={{ fontSize: '12px', fontWeight: '700', color: '#334155' }}>비밀번호</label>
-              {viewMode === 'login' && (
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+              비밀번호
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ width: '100%', padding: '11px 40px 11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', background: '#f8fafc' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: showPassword ? '#059669' : '#94a3b8'
+                }}
+              >
+                {showPassword ? (
+                  /* Eye Open SVG */
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                ) : (
+                  /* Eye Slash / Closed SVG */
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                  </svg>
+                )}
+              </button>
+            </div>
+            {viewMode === 'login' && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
                 <button
                   type="button"
                   onClick={() => { setViewMode('forgot'); setMessage(''); setSuccessMessage(''); }}
-                  style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '11px', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline' }}
+                  style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', textDecoration: 'underline' }}
                 >
-                  비밀번호를 잊으셨나요?
+                  비밀번호 찾기
                 </button>
-              )}
-            </div>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ width: '100%', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', background: '#f8fafc' }}
-            />
+              </div>
+            )}
             {viewMode === 'register' && password && (
               <div style={{ fontSize: '11px', marginTop: '4px', fontWeight: '600', color: isPasswordValid ? '#059669' : '#e11d48' }}>
                 {isPasswordValid ? '✓ 안전한 비밀번호 형식입니다.' : '✗ 영문, 숫자, 특수문자 포함 8자 이상 필요'}
@@ -334,13 +375,48 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
         {viewMode === 'register' && (
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>비밀번호 확인</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              style={{ width: '100%', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', background: '#f8fafc' }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={{ width: '100%', padding: '11px 40px 11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none', background: '#f8fafc' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                title={showConfirmPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: showConfirmPassword ? '#059669' : '#94a3b8'
+                }}
+              >
+                {showConfirmPassword ? (
+                  /* Eye Open SVG */
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                ) : (
+                  /* Eye Slash / Closed SVG */
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                  </svg>
+                )}
+              </button>
+            </div>
             {confirmPassword && (
               <div style={{ fontSize: '11px', marginTop: '4px', fontWeight: '600', color: isPasswordMatch ? '#059669' : '#e11d48' }}>
                 {isPasswordMatch ? '✓ 비밀번호가 일치합니다.' : '✗ 비밀번호가 일치하지 않습니다.'}
@@ -405,7 +481,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
                 gap: '8px'
               }}
             >
-              <span style={{ fontSize: '16px' }}>💬</span> 카카오로 3초 만에 시작하기
+              <span style={{ fontSize: '16px' }}>💬</span> 카카오로 로그인
             </button>
 
             <button
@@ -426,28 +502,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
                 gap: '8px'
               }}
             >
-              <span style={{ fontSize: '15px', fontWeight: '900' }}>N</span> 네이버로 시작하기
-            </button>
-
-            <button
-              onClick={() => handleSocialLogin('google')}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                background: '#ffffff',
-                color: '#334155',
-                fontWeight: '700',
-                fontSize: '13px',
-                borderRadius: '14px',
-                border: '1px solid #cbd5e1',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              <span style={{ fontSize: '16px' }}>🌐</span> 구글 계정으로 로그인
+              <span style={{ fontSize: '15px', fontWeight: '900' }}>N</span> 네이버로 로그인
             </button>
           </div>
         </>

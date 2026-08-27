@@ -84,9 +84,11 @@ export default function App() {
       case 'dashboard':
         return (
           <PetHealthDashboard
+            user={user}
             selectedPet={selectedPet}
             setSelectedPet={setSelectedPet}
             pets={pets}
+            onOpenLogin={() => setActiveTab('login')}
             onNavigateDiagnosis={() => setActiveTab('diagnosis')}
             onOpenEditPet={(petToEdit) => setEditingPet(petToEdit)}
           />

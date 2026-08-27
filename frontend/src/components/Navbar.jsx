@@ -137,8 +137,9 @@ export default function Navbar({
             <div style={{ position: 'relative' }}>
               <button
                 onClick={() => {
-                  if (!user && pets.length === 0) {
+                  if (!user) {
                     alert('🔒 반려동물 등록은 로그인 후 이용하실 수 있습니다.');
+                    if (setActiveTab) setActiveTab('login');
                     setShowLoginModal(true);
                     return;
                   }
@@ -178,55 +179,64 @@ export default function Navbar({
                   boxShadow: '0 10px 30px rgba(15, 23, 42, 0.1)',
                   border: '1px solid #e2e8f0'
                 }}>
-                  <div style={{ fontSize: '11px', color: '#94a3b8', padding: '4px 6px', fontWeight: '700' }}>
-                    나의 반려동물 목록 ({pets.length}마리)
+                  <div style={{
+                    fontSize: '11px',
+                    fontWeight: '800',
+                    color: '#64748b',
+                    padding: '4px 8px 8px',
+                    borderBottom: '1px solid #f1f5f9'
+                  }}>
+                    내 반려동물 목록
                   </div>
 
                   {pets.length === 0 ? (
-                    <div style={{ padding: '12px 6px', textAlign: 'center', fontSize: '12.5px', color: '#64748b' }}>
-                      등록된 반려동물이 없습니다.
+                    <div style={{ padding: '12px 8px', fontSize: '12px', color: '#94a3b8', textAlign: 'center' }}>
+                      등록된 아이가 없습니다
                     </div>
                   ) : (
-                    pets.map((pet) => (
+                    pets.map(pet => (
                       <div
                         key={pet.id}
-                        onClick={() => {
-                          setSelectedPet(pet);
-                          setShowPetDropdown(false);
-                        }}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '10px',
+                          justifyContent: 'space-between',
                           padding: '8px 10px',
                           borderRadius: '10px',
+                          background: selectedPet?.id === pet.id ? '#ecfdf5' : '#ffffff',
                           cursor: 'pointer',
-                          background: selectedPet?.id === pet.id ? '#ecfdf5' : 'transparent',
-                          transition: 'background 0.2s'
+                          marginTop: '4px'
                         }}
                       >
-                        <span style={{ fontSize: '22px' }}>{pet.icon}</span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>{pet.name}</div>
-                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>{pet.breed} ({pet.age})</div>
+                        <div 
+                          onClick={() => {
+                            setSelectedPet(pet);
+                            setShowPetDropdown(false);
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}
+                        >
+                          <span style={{ fontSize: '16px' }}>{pet.icon || '🐶'}</span>
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a' }}>{pet.name}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{pet.breed} ({pet.age})</div>
+                          </div>
                         </div>
+
                         {onOpenEditPet && (
                           <button
-                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedPet(pet);
                               setShowPetDropdown(false);
                               onOpenEditPet(pet);
                             }}
-                            title="정보 수정"
                             style={{
-                              background: '#f1f5f9',
                               border: '1px solid #cbd5e1',
+                              background: '#ffffff',
                               borderRadius: '6px',
-                              padding: '3px 7px',
-                              fontSize: '11.5px',
+                              padding: '3px 6px',
+                              fontSize: '11px',
                               cursor: 'pointer',
+                              fontWeight: '700',
                               color: '#475569'
                             }}
                           >
@@ -242,6 +252,7 @@ export default function Navbar({
                       setShowPetDropdown(false);
                       if (!user) {
                         alert('🔒 반려동물 등록은 로그인 후 이용하실 수 있습니다.');
+                        if (setActiveTab) setActiveTab('login');
                         setShowLoginModal(true);
                         return;
                       }
