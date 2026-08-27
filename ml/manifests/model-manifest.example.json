@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "petcare-model-manifest/v1",
+  "modelName": "pending-baseline",
+  "modelVersion": "0.0.0-draft",
+  "approvalStatus": "DRAFT",
+  "datasetManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "artifact": {
+    "path": "../artifacts/pending-model.pt",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "format": "torchscript"
+  },
+  "labels": ["NO_VISIBLE_LESION", "VISIBLE_SKIN_LESION"],
+  "preprocessing": {
+    "imageSize": 224,
+    "colorSpace": "RGB",
+    "normalization": "pending"
+  },
+  "thresholds": {
+    "minimumConfidence": 0.0
+  }
+}

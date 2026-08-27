@@ -59,6 +59,11 @@ lerna-debug.log*
 /backend/.nb-gradle/
 /backend/.vscode/
 
+# Python AI service local environment
+/ml/.venv/
+/ml/.pytest_cache/
+/ml/**/__pycache__/
+
 # Backend secrets and environment-specific settings
 /backend/.env
 /backend/*.env

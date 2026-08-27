@@ -2,6 +2,8 @@ package com.petcare.backend.domain.diagnosis;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -25,5 +27,25 @@ public class DiagnosisExceptionHandler {
 
         return ResponseEntity.badRequest()
                 .body(DiagnosisApiResponse.error(400, message));
+    }
+
+    @ExceptionHandler(DiagnosisImageException.class)
+    public ResponseEntity<DiagnosisApiResponse<Void>> handleImage(DiagnosisImageException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(DiagnosisApiResponse.error(exception.getStatus().value(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<DiagnosisApiResponse<Void>> handleMissingPart(
+            MissingServletRequestPartException exception) {
+        return ResponseEntity.badRequest()
+                .body(DiagnosisApiResponse.error(400, exception.getRequestPartName() + " Part가 필요합니다."));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<DiagnosisApiResponse<Void>> handleUploadSize(
+            MaxUploadSizeExceededException exception) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(DiagnosisApiResponse.error(413, "Image File은 10MB 이하만 전송할 수 있습니다."));
     }
 }

@@ -6,9 +6,10 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -35,9 +36,10 @@ public class DiagnosisController {
         return ResponseEntity.ok(DiagnosisApiResponse.success(diagnosisService.getDiagnosis(diagnosisId)));
     }
 
-    @PostMapping
+    @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<DiagnosisApiResponse<DiagnosisResultResponse>> analyzeDiagnosis(
-            @Valid @RequestBody DiagnosisAnalyzeRequest request) {
-        return ResponseEntity.ok(DiagnosisApiResponse.success(diagnosisService.analyzeDiagnosis(request)));
+            @Valid @RequestPart("request") DiagnosisAnalyzeRequest request,
+            @RequestPart("image") MultipartFile image) {
+        return ResponseEntity.ok(DiagnosisApiResponse.success(diagnosisService.analyzeDiagnosis(request, image)));
     }
 }

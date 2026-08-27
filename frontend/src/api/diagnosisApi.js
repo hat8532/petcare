@@ -36,6 +36,7 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  * @typedef {Object} DiagnosisAnalyzeRequest
  * @property {number} petId
  * @property {string} petName
+ * @property {string} petSpecies
  * @property {string} affectedArea
  * @property {string[]} symptoms
  * @property {string} description
@@ -57,6 +58,12 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  * @property {string} riskLabel
  * @property {{diseaseName: string, probability: number}[]} visionTopDiseases
  * @property {string|null} ragReport
+ * @property {string} analysisMode
+ * @property {string|null} model
+ * @property {string|null} modelVersion
+ * @property {string|null} failureCode
+ * @property {string[]} limitations
+ * @property {string|null} requestId
  * @property {string} createdAt
  */
 
@@ -137,8 +144,19 @@ export const diagnosisApi = Object.freeze({
    *
    * @param {DiagnosisAnalyzeRequest} request
    */
-  analyze: async (request) => {
-    const body = await httpClient.post(DIAGNOSIS_ENDPOINTS.create, request);
+  analyze: async (request, imageFile) => {
+    if (!(imageFile instanceof File)) {
+      throw new TypeError('진단할 환부 Image File이 필요합니다.');
+    }
+
+    const formData = new FormData();
+    formData.append(
+      'request',
+      new Blob([JSON.stringify(request)], { type: 'application/json' })
+    );
+    formData.append('image', imageFile, imageFile.name);
+
+    const body = await httpClient.postForm(DIAGNOSIS_ENDPOINTS.create, formData);
     const response = requireSuccessfulDiagnosisResponse(body);
     return response.data;
   }

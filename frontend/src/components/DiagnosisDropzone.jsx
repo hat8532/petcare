@@ -8,7 +8,9 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
   const [description, setDescription] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisError, setAnalysisError] = useState('');
   const [customPhoto, setCustomPhoto] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
   const [fileName, setFileName] = useState('');
   const [isDragging, setIsDragging] = useState(false);
 
@@ -44,22 +46,32 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
     }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      setCustomPhoto(URL.createObjectURL(file));
+  const selectImageFile = (file) => {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setAnalysisError('JPEG, PNG 또는 WEBP Image만 선택할 수 있습니다.');
+      return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      setAnalysisError('Image File은 10MB 이하만 선택할 수 있습니다.');
+      return;
+    }
+
+    setAnalysisError('');
+    setImageFile(file);
+    setFileName(file.name);
+    setCustomPhoto(URL.createObjectURL(file));
+  };
+
+  const handleFileChange = (e) => {
+    selectImageFile(e.target.files?.[0]);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setFileName(file.name);
-      setCustomPhoto(URL.createObjectURL(file));
-    }
+    selectImageFile(file);
   };
 
   const petSpecies = (selectedPet?.species || '').toUpperCase();
@@ -90,12 +102,14 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
   const handleRunDiagnosis = async () => {
     setIsAnalyzing(true);
     setAnalysisResult(null);
+    setAnalysisError('');
 
     const petName = selectedPet?.name || '반려동물';
     const healthProfile = selectedPet?.healthProfile;
     const diagnosisRequest = {
       petId: selectedPet?.id || 1,
       petName,
+      petSpecies: selectedPet?.species || 'UNKNOWN',
       affectedArea,
       customAreaText,
       symptoms: selectedSymptoms,
@@ -105,7 +119,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
 
     // Real Backend API attempt
     try {
-      const apiRes = await diagnosisApi.analyze(diagnosisRequest);
+      const apiRes = await diagnosisApi.analyze(diagnosisRequest, imageFile);
 
       if (apiRes) {
         const parsedDiseases = (apiRes.visionTopDiseases || []).map((disease) => ({
@@ -119,13 +133,24 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
           riskBadgeClass: apiRes.riskLevel === 'EMERGENCY' ? 'badge-rose' : 'badge-amber',
           hasPhrContext: !!healthProfile,
           diseases: parsedDiseases,
-          report: apiRes.ragReport
+          report: apiRes.ragReport,
+          analysisMode: apiRes.analysisMode,
+          model: apiRes.model,
+          modelVersion: apiRes.modelVersion,
+          failureCode: apiRes.failureCode,
+          limitations: apiRes.limitations || []
         });
         setIsAnalyzing(false);
         return;
       }
-    } catch (e) {
-      console.warn('Backend API call fallback to dynamic AI engine');
+    } catch (error) {
+      const demoFallbackEnabled = import.meta.env.DEV
+        && import.meta.env.VITE_ENABLE_DIAGNOSIS_DEMO === 'true';
+      if (!demoFallbackEnabled) {
+        setAnalysisError(error?.message || '진단 API 요청에 실패했습니다.');
+        setIsAnalyzing(false);
+        return;
+      }
     }
 
     setTimeout(() => {
@@ -538,7 +563,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
               <input
                 type="file"
                 ref={fileInputRef}
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleFileChange}
                 style={{ display: 'none' }}
               />
@@ -636,7 +661,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
             {/* Run Button */}
             <button
               onClick={handleRunDiagnosis}
-              disabled={isAnalyzing || selectedSymptoms.length === 0 || !description.trim()}
+              disabled={isAnalyzing || !imageFile || selectedSymptoms.length === 0 || !description.trim()}
               title={selectedSymptoms.length === 0 || !description.trim()
                 ? '증상을 하나 이상 선택하고 상세 증상을 입력해 주세요.'
                 : undefined}
@@ -664,9 +689,9 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
             {isAnalyzing && (
               <div style={{ textAlign: 'center', padding: '60px 20px' }}>
                 <div style={{ fontSize: '48px', marginBottom: '16px' }} className="animate-glow">🔍</div>
-                <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>AI 분석 파이프라인 가동 중</h4>
+                <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>환부 Image와 증상 분석 중</h4>
                 <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '24px' }}>
-                  PyTorch 피부 모델 및 수의학 백과 Vector DB에서 유사 사례를 탐색하고 있습니다.
+                  Image 형식을 검증하고 입력한 증상을 Backend에서 분석하고 있습니다.
                 </p>
                 <div style={{ width: '80%', height: '6px', background: '#e2e8f0', borderRadius: '3px', margin: '0 auto', overflow: 'hidden' }}>
                   <div style={{ width: '70%', height: '100%', background: 'linear-gradient(90deg, #059669, #0891b2)', borderRadius: '3px' }} className="animate-glow"></div>
@@ -681,6 +706,11 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                 <p style={{ fontSize: '13px', lineHeight: '1.6' }}>
                   좌측 양식을 작성 후 <strong>[AI 질병 진단 실행하기]</strong> 버튼을 누르면 이 곳에 Vision AI 분석 결과와 Gemini RAG 리포트가 표시됩니다.
                 </p>
+                {analysisError && (
+                  <p role="alert" style={{ marginTop: '12px', color: '#dc2626', fontWeight: '700' }}>
+                    {analysisError}
+                  </p>
+                )}
               </div>
             )}
 
@@ -698,10 +728,33 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                   AI 진단 결과 리포트
                 </h3>
 
+                {analysisResult.analysisMode === 'EXPERIMENTAL_DEMO' && (
+                  <div role="alert" style={{ marginBottom: '16px', padding: '12px', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: '10px', color: '#9a3412', fontSize: '13px', fontWeight: '700' }}>
+                    실험용 Demo 결과입니다. 실제 AI Model 추론이나 수의학적 진단 결과가 아닙니다.
+                  </div>
+                )}
+
+                <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '10px', fontSize: '12px', color: '#475569' }}>
+                  <strong>분석 Mode:</strong> {analysisResult.analysisMode || 'UNKNOWN'}
+                  {analysisResult.model && (
+                    <span> · <strong>Model:</strong> {analysisResult.model} {analysisResult.modelVersion || ''}</span>
+                  )}
+                  {analysisResult.failureCode && (
+                    <div style={{ marginTop: '6px', color: '#b45309' }}>
+                      Vision 상태: {analysisResult.failureCode}
+                    </div>
+                  )}
+                  {analysisResult.limitations?.map((limitation) => (
+                    <div key={limitation} style={{ marginTop: '4px' }}>제한: {limitation}</div>
+                  ))}
+                </div>
+
                 {/* Top 3 Diseases Bar Chart */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
                   <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px', fontWeight: '700' }}>
-                    📊 Vision AI 의심 질환 Top 3 (확률)
+                    {analysisResult.analysisMode === 'EXPERIMENTAL_DEMO'
+                      ? '📊 결과 표시 구조 예시 (임상 확률 아님)'
+                      : '📊 의심 질환 Top 3'}
                   </div>
                   {analysisResult.diseases.map((d, idx) => (
                     <div key={idx} style={{ marginBottom: '10px' }}>
@@ -734,7 +787,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                 }}>
                   <div style={{ fontWeight: '800', color: '#047857', marginBottom: '10px', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '18px' }}>🤖</span>
-                    <span>Gemini AI 수의학 진단 & 추천 행동 가이드</span>
+                    <span>증상 분석 리포트 & 추천 행동 가이드</span>
                   </div>
 
                   {/* Quick Action Badges */}
@@ -790,7 +843,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
           </div>
         </div>
 
-        {/* AI Fine-Tuning & Accuracy Optimization Showcase Banner */}
+        {/* AI Model Evaluation Plan */}
         <div style={{
           marginTop: '50px',
           background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -802,19 +855,19 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
             <div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 12px', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #059669', color: '#34d399', fontSize: '12px', fontWeight: '800', marginBottom: '8px' }}>
-                🔬 AI MODEL FINE-TUNING ACHIEVEMENT
+                🔬 AI MODEL EVALUATION PLAN
               </div>
               <h3 style={{ fontSize: '24px', fontWeight: '900', color: '#ffffff', margin: 0 }}>
-                자체 AI 미세조정(Fine-Tuning)으로 <span style={{ color: '#34d399' }}>정확도 +23.4%p 향상</span>
+                실제 Dataset 확보 후 <span style={{ color: '#34d399' }}>동일 Protocol로 성능 비교</span>
               </h3>
               <p style={{ fontSize: '13.5px', color: '#94a3b8', marginTop: '6px', margin: 0 }}>
-                범용 AI를 단순히 가져다 쓰는 대신, 털 노이즈 제거 전처리, Focal Loss 파인튜닝, Gemini RAG를 통해 **71.4% ➡️ 94.8% SOTA 성능**을 달성했습니다.
+                현재는 평가 구조만 준비된 상태입니다. 검증된 Dataset·Model Artifact·동일 Pet Group Split이 확보되기 전에는 정확도나 성능 수치를 게시하지 않습니다.
               </p>
             </div>
             <div style={{ background: 'rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '16px', padding: '12px 20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>최종 분류 정확도 (Accuracy)</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>현재 평가 상태</div>
               <div style={{ fontSize: '30px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>
-                94.8% <span style={{ fontSize: '12px', color: '#94a3b8', textDecoration: 'line-through' }}>71.4%</span>
+                평가 전
               </div>
             </div>
           </div>
@@ -822,33 +875,33 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
           {/* 4-Step Engineering Acceleration Pipeline */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '24px' }}>
             <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 1. 전처리 파이프라인</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>CLAHE 털 노이즈 제거</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>정확도 +6.8%p ↑ (78.2%)</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 1. Baseline 측정</div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>ResNet 계열 Baseline</div>
+              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>Macro F1 · Class Recall 측정</div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 2. 경량 백본 전환</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>EfficientNet-B4</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>속도 85% 단축 (180ms)</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 2. 후보 Model 비교</div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>EfficientNet-B0 / B4</div>
+              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>동일 Pet Group Split로 비교</div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 3. 손실함수 파인튜닝</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>Focal Loss ($\gamma=2.0$)</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>희귀 질환 감지 +6.1%p ↑</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 3. 학습 기여도 검증</div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>전처리 · Loss Ablation</div>
+              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>각 변경의 기여도를 분리 측정</div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid #059669', borderRadius: '16px', padding: '16px', background: 'rgba(5, 150, 105, 0.15)' }}>
-              <div style={{ fontSize: '11px', color: '#34d399', fontWeight: '800' }}>STEP 4. 수의학 DB RAG</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>Gemini + FAISS DB</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '800', marginTop: '8px' }}>환각률 1.5% 이하 최적화</div>
+              <div style={{ fontSize: '11px', color: '#34d399', fontWeight: '800' }}>STEP 4. RAG 안전성 평가</div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>Gemini without / with RAG</div>
+              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '800', marginTop: '8px' }}>근거 일치율 · 안전 위반률 비교</div>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', fontSize: '12px', color: '#94a3b8' }}>
-            <span>📄 자세한 벤치마크 실험 데이터 및 평가 코드: <strong style={{ color: '#ffffff' }}>docs/AI_MODEL_OPTIMIZATION_AND_BENCHMARK.md</strong> 및 <strong style={{ color: '#ffffff' }}>ml/benchmark_eval.py</strong> 참조</span>
-            <span style={{ color: '#34d399', fontWeight: '700' }}>SOTA PERFORMANCE</span>
+            <span>📄 평가 결과는 승인된 Dataset·Model Manifest와 재현 가능한 Evidence가 확보된 뒤 게시합니다.</span>
+            <span style={{ color: '#34d399', fontWeight: '700' }}>EVALUATION PENDING</span>
           </div>
         </div>
 

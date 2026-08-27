@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.petcare.backend.global.ai.GeminiService;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,14 +16,20 @@ public class DiagnosisService {
     private final DiagnosisRecordMapper diagnosisRecordMapper;
     private final GeminiService geminiService;
     private final ObjectMapper objectMapper;
+    private final DiagnosisImageValidator diagnosisImageValidator;
+    private final VisionInferenceClient visionInferenceClient;
 
     public DiagnosisService(
             DiagnosisRecordMapper diagnosisRecordMapper,
             GeminiService geminiService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            DiagnosisImageValidator diagnosisImageValidator,
+            VisionInferenceClient visionInferenceClient) {
         this.diagnosisRecordMapper = diagnosisRecordMapper;
         this.geminiService = geminiService;
         this.objectMapper = objectMapper;
+        this.diagnosisImageValidator = diagnosisImageValidator;
+        this.visionInferenceClient = visionInferenceClient;
     }
 
     public Map<String, List<String>> getSymptoms() {
@@ -49,7 +56,10 @@ public class DiagnosisService {
         return DiagnosisResultResponse.from(record, objectMapper);
     }
 
-    public DiagnosisResultResponse analyzeDiagnosis(DiagnosisAnalyzeRequest request) {
+    public DiagnosisResultResponse analyzeDiagnosis(DiagnosisAnalyzeRequest request, MultipartFile image) {
+        diagnosisImageValidator.validate(image);
+        String requestId = VisionInferenceClient.newRequestId();
+        VisionInferenceResult visionResult = visionInferenceClient.infer(request, image, requestId);
         Long petId = request.petId();
         String affectedArea = request.affectedArea();
         String customAreaText = request.customAreaText();
@@ -59,8 +69,12 @@ public class DiagnosisService {
         Map<String, Object> healthProfile = request.healthProfile();
 
         String areaLabel = getAreaLabel(affectedArea, customAreaText);
-        String topDisease = getTopDisease(petName, affectedArea, symptoms, description);
-        String diseasesJson = buildDiseasesJson(affectedArea, topDisease);
+        String topDisease = visionResult.hasPredictions()
+                ? visionResult.predictions().getFirst().diseaseName()
+                : getTopDisease(petName, affectedArea, symptoms, description);
+        String diseasesJson = visionResult.hasPredictions()
+                ? writeJson(visionResult.predictions())
+                : buildDiseasesJson(affectedArea, topDisease);
 
         boolean isEmergency = checkEmergency(affectedArea, symptoms, description, healthProfile);
         String riskLevel = isEmergency ? "EMERGENCY" : "CAUTION";
@@ -68,8 +82,12 @@ public class DiagnosisService {
 
         String report = null;
 
+        if ("EXPERIMENTAL_DEMO".equals(visionResult.mode())) {
+            report = buildExperimentalDemoReport(areaLabel, symptoms);
+        }
+
         // Call Real Google Gemini 2.0 Flash AI if configured
-        if (geminiService.isConfigured()) {
+        if (report == null && geminiService.isConfigured()) {
             String prompt = String.format(
                     "당신은 수의학 AI 전문 수의사입니다. 다음 반려동물의 환부와 증상 데이터를 바탕으로 수의학 맞춤 진단 리포트를 작성해 주세요.\n\n" +
                     "• 반려동물 이름: %s\n" +
@@ -109,7 +127,19 @@ public class DiagnosisService {
             savedRecord = record;
         }
 
-        return DiagnosisResultResponse.from(savedRecord, objectMapper);
+        return DiagnosisResultResponse.from(savedRecord, objectMapper, visionResult);
+    }
+
+    private String buildExperimentalDemoReport(String areaLabel, List<String> symptoms) {
+        return String.format(
+                "[실험용 진단 리포트 구조 예시]\n" +
+                "1. 후보 분석: 실제 Model 연결 후 %s 이미지와 입력 증상을 분석해 표시합니다.\n" +
+                "2. 위험도: 현재 표시는 입력 기반 안전 Logic의 동작 구조만 확인합니다.\n" +
+                "3. 후속 행동: 실제 서비스에서는 검증된 판정 근거에 따라 안내합니다.\n\n" +
+                "입력 증상: %s\n" +
+                "※ 실제 AI Model 추론이나 수의학적 진단 결과가 아닙니다.",
+                areaLabel,
+                symptoms.isEmpty() ? "없음" : String.join(", ", symptoms));
     }
 
     private String writeJson(Object value) {
@@ -253,7 +283,7 @@ public class DiagnosisService {
 
     private boolean checkEmergency(String area, List<String> symptoms, String desc, Map<String, Object> healthProfile) {
         String fullText = String.join(" ", symptoms) + " " + desc;
-        if (fullText.contains("응급") || fullText.contains("구토") || fullText.contains("충혈") || fullText.contains("각막") || fullText.contains("출혈") || fullText.contains("천공") || fullText.contains("호흡 가쁨") || fullText.contains("빨갛") || fullText.contains("혈변") || fullText.contains("피똥") || fullText.contains("피")) {
+        if (fullText.contains("응급") || fullText.contains("구토") || fullText.contains("충혈") || fullText.contains("각막") || fullText.contains("출혈") || fullText.contains("천공") || fullText.contains("호흡 가쁨") || fullText.contains("빨갛") || fullText.contains("혈변") || fullText.contains("피똥") || fullText.contains("피가 ") || fullText.contains("피를 ")) {
             return true;
         }
         if (healthProfile != null && healthProfile.get("bodyTemp") != null) {

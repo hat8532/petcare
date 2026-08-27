@@ -113,6 +113,12 @@ const requestWithJsonBody = (method, endpoint, body, options = {}) => request(en
 export const httpClient = Object.freeze({
   get: (endpoint, options) => request(endpoint, options),
   post: (endpoint, body, options) => requestWithJsonBody('POST', endpoint, body, options),
+  // FormData의 multipart boundary는 Browser가 생성하므로 Content-Type을 직접 지정하지 않는다.
+  postForm: (endpoint, formData, options = {}) => request(endpoint, {
+    ...options,
+    method: 'POST',
+    body: formData
+  }),
   put: (endpoint, body, options) => requestWithJsonBody('PUT', endpoint, body, options),
   patch: (endpoint, body, options) => requestWithJsonBody('PATCH', endpoint, body, options),
   delete: (endpoint, options) => request(endpoint, { ...options, method: 'DELETE' })

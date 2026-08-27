@@ -44,6 +44,7 @@ class PetDiagnosisControllerTest {
     private DiagnosisResultResponse result(Long id) {
         return new DiagnosisResultResponse(id, 1L, "SKIN", null, null,
                 "CAUTION", "주의 (CAUTION)", List.of(), "경과 관찰",
+                "LEGACY_UNKNOWN", null, null, "PROVENANCE_NOT_STORED", List.of(), null,
                 LocalDateTime.of(2026, 8, 27, 10, 0));
     }
 }
