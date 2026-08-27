@@ -9,7 +9,7 @@
   "licenseUrl": "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=561",
   "species": ["DOG", "CAT"],
   "bodyArea": "SKIN",
-  "groupKey": "pet-identifier-required-before-split",
+  "groupKey": "pet_id",
   "classes": {
     "A1": "PAPULE_PLAQUE",
     "A2": "SCALE_COLLARETTE",

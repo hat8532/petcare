@@ -12,7 +12,7 @@ def test_dataset_manifest_requires_group_split_and_complete_ratio():
     parsed = DatasetManifest.model_validate(manifest)
 
     assert parsed.approval_status == "DRAFT"
-    assert parsed.group_key == "pet-identifier-required-before-split"
+    assert parsed.group_key == "pet_id"
     assert sum(parsed.split_policy.values()) == 1.0
 
 
