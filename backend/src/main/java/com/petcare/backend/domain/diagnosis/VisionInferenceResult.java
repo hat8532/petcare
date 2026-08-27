@@ -32,6 +32,7 @@ public record VisionInferenceResult(
     }
 
     public boolean hasPredictions() {
-        return "VISION".equals(mode) && !predictions.isEmpty();
+        return ("VISION".equals(mode) || "EXPERIMENTAL_DEMO".equals(mode))
+                && !predictions.isEmpty();
     }
 }

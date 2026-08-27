@@ -82,8 +82,12 @@ public class DiagnosisService {
 
         String report = null;
 
+        if ("EXPERIMENTAL_DEMO".equals(visionResult.mode())) {
+            report = buildExperimentalDemoReport(areaLabel, symptoms);
+        }
+
         // Call Real Google Gemini 2.0 Flash AI if configured
-        if (geminiService.isConfigured()) {
+        if (report == null && geminiService.isConfigured()) {
             String prompt = String.format(
                     "당신은 수의학 AI 전문 수의사입니다. 다음 반려동물의 환부와 증상 데이터를 바탕으로 수의학 맞춤 진단 리포트를 작성해 주세요.\n\n" +
                     "• 반려동물 이름: %s\n" +
@@ -124,6 +128,18 @@ public class DiagnosisService {
         }
 
         return DiagnosisResultResponse.from(savedRecord, objectMapper, visionResult);
+    }
+
+    private String buildExperimentalDemoReport(String areaLabel, List<String> symptoms) {
+        return String.format(
+                "[실험용 진단 리포트 구조 예시]\n" +
+                "1. 후보 분석: 실제 Model 연결 후 %s 이미지와 입력 증상을 분석해 표시합니다.\n" +
+                "2. 위험도: 현재 표시는 입력 기반 안전 Logic의 동작 구조만 확인합니다.\n" +
+                "3. 후속 행동: 실제 서비스에서는 검증된 판정 근거에 따라 안내합니다.\n\n" +
+                "입력 증상: %s\n" +
+                "※ 실제 AI Model 추론이나 수의학적 진단 결과가 아닙니다.",
+                areaLabel,
+                symptoms.isEmpty() ? "없음" : String.join(", ", symptoms));
     }
 
     private String writeJson(Object value) {

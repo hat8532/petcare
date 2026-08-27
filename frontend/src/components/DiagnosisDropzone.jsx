@@ -728,6 +728,12 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                   AI 진단 결과 리포트
                 </h3>
 
+                {analysisResult.analysisMode === 'EXPERIMENTAL_DEMO' && (
+                  <div role="alert" style={{ marginBottom: '16px', padding: '12px', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: '10px', color: '#9a3412', fontSize: '13px', fontWeight: '700' }}>
+                    실험용 Demo 결과입니다. 실제 AI Model 추론이나 수의학적 진단 결과가 아닙니다.
+                  </div>
+                )}
+
                 <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '10px', fontSize: '12px', color: '#475569' }}>
                   <strong>분석 Mode:</strong> {analysisResult.analysisMode || 'UNKNOWN'}
                   {analysisResult.model && (
@@ -746,7 +752,9 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                 {/* Top 3 Diseases Bar Chart */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
                   <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px', fontWeight: '700' }}>
-                    📊 의심 질환 Top 3 (현재 Rule 분석 Score)
+                    {analysisResult.analysisMode === 'EXPERIMENTAL_DEMO'
+                      ? '📊 결과 표시 구조 예시 (임상 확률 아님)'
+                      : '📊 의심 질환 Top 3'}
                   </div>
                   {analysisResult.diseases.map((d, idx) => (
                     <div key={idx} style={{ marginBottom: '10px' }}>

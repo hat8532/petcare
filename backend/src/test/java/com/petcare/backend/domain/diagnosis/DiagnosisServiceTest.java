@@ -53,6 +53,39 @@ class DiagnosisServiceTest {
     }
 
     @Test
+    void preservesExperimentalDemoModeAndExamplePredictions() {
+        when(geminiService.isConfigured()).thenReturn(false);
+        when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
+                new VisionInferenceResult(
+                        "EXPERIMENTAL_DEMO",
+                        "petcare-contract-demo",
+                        "0.1.0",
+                        List.of(new VisionInferenceResult.Prediction("예시 후보 1 (실제 판정 아님)", 50.0)),
+                        List.of("실제 Vision Model 추론 결과가 아닙니다."),
+                        null,
+                        invocation.getArgument(2)));
+        doAnswer(invocation -> {
+            DiagnosisRecordDTO record = invocation.getArgument(0);
+            record.setId(109L);
+            return null;
+        }).when(mapper).insert(any());
+        when(mapper.findById(109L)).thenReturn(null);
+
+        DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
+                1L, "초코", "CAT", "SKIN", null, List.of("가려움/긁음"),
+                "구조 확인", Map.of()), jpegImage());
+
+        assertThat(response.analysisMode()).isEqualTo("EXPERIMENTAL_DEMO");
+        assertThat(response.model()).isEqualTo("petcare-contract-demo");
+        assertThat(response.visionTopDiseases())
+                .extracting(DiagnosisResultResponse.DiseasePrediction::diseaseName)
+                .containsExactly("예시 후보 1 (실제 판정 아님)");
+        assertThat(response.limitations()).contains("실제 Vision Model 추론 결과가 아닙니다.");
+        assertThat(response.ragReport())
+                .contains("실험용 진단 리포트 구조 예시", "실제 AI Model 추론이나 수의학적 진단 결과가 아닙니다.");
+    }
+
+    @Test
     void historyUsesMapperOrderAndConvertsEveryRecord() {
         when(mapper.findByPetId(1L)).thenReturn(List.of(
                 DiagnosisRecordDTO.builder().id(20L).petId(1L).diseasesJson("[]").build(),

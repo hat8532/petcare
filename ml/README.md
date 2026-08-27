@@ -17,6 +17,14 @@ DIAGNOSIS_VISION_ENABLED=true
 DIAGNOSIS_VISION_BASE_URL=http://127.0.0.1:8000
 ```
 
+실제 Model 없이 화면·API 구조만 확인하는 Local Demo는 FastAPI 실행 환경에 아래 값을 별도로 설정한다. 기본값은 비활성화다.
+
+```text
+PETCARE_EXPERIMENTAL_DEMO_ENABLED=true
+```
+
+Demo는 `DOG·CAT + SKIN` 요청만 받고 `EXPERIMENTAL_DEMO` Mode와 예시 후보를 반환한다. Score는 임상 확률이나 Model 성능이 아니며 실제 평가 Evidence로 사용할 수 없다.
+
 ## Endpoints
 
 - `GET /health`: Service Process 상태
