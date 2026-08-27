@@ -36,6 +36,7 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  * @typedef {Object} DiagnosisAnalyzeRequest
  * @property {number} petId
  * @property {string} petName
+ * @property {string} petSpecies
  * @property {string} affectedArea
  * @property {string[]} symptoms
  * @property {string} description
@@ -57,6 +58,12 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  * @property {string} riskLabel
  * @property {{diseaseName: string, probability: number}[]} visionTopDiseases
  * @property {string|null} ragReport
+ * @property {string} analysisMode
+ * @property {string|null} model
+ * @property {string|null} modelVersion
+ * @property {string|null} failureCode
+ * @property {string[]} limitations
+ * @property {string|null} requestId
  * @property {string} createdAt
  */
 

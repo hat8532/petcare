@@ -17,16 +17,19 @@ public class DiagnosisService {
     private final GeminiService geminiService;
     private final ObjectMapper objectMapper;
     private final DiagnosisImageValidator diagnosisImageValidator;
+    private final VisionInferenceClient visionInferenceClient;
 
     public DiagnosisService(
             DiagnosisRecordMapper diagnosisRecordMapper,
             GeminiService geminiService,
             ObjectMapper objectMapper,
-            DiagnosisImageValidator diagnosisImageValidator) {
+            DiagnosisImageValidator diagnosisImageValidator,
+            VisionInferenceClient visionInferenceClient) {
         this.diagnosisRecordMapper = diagnosisRecordMapper;
         this.geminiService = geminiService;
         this.objectMapper = objectMapper;
         this.diagnosisImageValidator = diagnosisImageValidator;
+        this.visionInferenceClient = visionInferenceClient;
     }
 
     public Map<String, List<String>> getSymptoms() {
@@ -55,6 +58,8 @@ public class DiagnosisService {
 
     public DiagnosisResultResponse analyzeDiagnosis(DiagnosisAnalyzeRequest request, MultipartFile image) {
         diagnosisImageValidator.validate(image);
+        String requestId = VisionInferenceClient.newRequestId();
+        VisionInferenceResult visionResult = visionInferenceClient.infer(request, image, requestId);
         Long petId = request.petId();
         String affectedArea = request.affectedArea();
         String customAreaText = request.customAreaText();
@@ -64,8 +69,12 @@ public class DiagnosisService {
         Map<String, Object> healthProfile = request.healthProfile();
 
         String areaLabel = getAreaLabel(affectedArea, customAreaText);
-        String topDisease = getTopDisease(petName, affectedArea, symptoms, description);
-        String diseasesJson = buildDiseasesJson(affectedArea, topDisease);
+        String topDisease = visionResult.hasPredictions()
+                ? visionResult.predictions().getFirst().diseaseName()
+                : getTopDisease(petName, affectedArea, symptoms, description);
+        String diseasesJson = visionResult.hasPredictions()
+                ? writeJson(visionResult.predictions())
+                : buildDiseasesJson(affectedArea, topDisease);
 
         boolean isEmergency = checkEmergency(affectedArea, symptoms, description, healthProfile);
         String riskLevel = isEmergency ? "EMERGENCY" : "CAUTION";
@@ -114,7 +123,7 @@ public class DiagnosisService {
             savedRecord = record;
         }
 
-        return DiagnosisResultResponse.from(savedRecord, objectMapper);
+        return DiagnosisResultResponse.from(savedRecord, objectMapper, visionResult);
     }
 
     private String writeJson(Object value) {

@@ -13,6 +13,7 @@ import java.util.Map;
 public record DiagnosisAnalyzeRequest(
         @NotNull @Positive Long petId,
         @Size(max = 100) String petName,
+        @NotBlank @Size(max = 30) String petSpecies,
         @NotBlank
         @Pattern(regexp = "SKIN|EYE|EAR|MOUTH|PAW_LIMB|NOSE_RESPIRATORY|ABDOMEN|CUSTOM")
         String affectedArea,

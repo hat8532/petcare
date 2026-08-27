@@ -21,13 +21,16 @@ class DiagnosisServiceTest {
 
     private final DiagnosisRecordMapper mapper = mock(DiagnosisRecordMapper.class);
     private final GeminiService geminiService = mock(GeminiService.class);
+    private final VisionInferenceClient visionInferenceClient = mock(VisionInferenceClient.class);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final DiagnosisService service = new DiagnosisService(
-            mapper, geminiService, objectMapper, new DiagnosisImageValidator());
+            mapper, geminiService, objectMapper, new DiagnosisImageValidator(), visionInferenceClient);
 
     @Test
     void createsDiagnosisAndStoresCanonicalAnalysisFields() {
         when(geminiService.isConfigured()).thenReturn(false);
+        when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
+                VisionInferenceResult.unavailable("MODEL_UNAVAILABLE", invocation.getArgument(2)));
         doAnswer(invocation -> {
             DiagnosisRecordDTO record = invocation.getArgument(0);
             record.setId(108L);
@@ -36,7 +39,7 @@ class DiagnosisServiceTest {
         when(mapper.findById(108L)).thenReturn(null);
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
-                1L, "초코", "SKIN", null, List.of("가려움/긁음"),
+                1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
                 "붉은 부위를 계속 긁습니다.", Map.of()), jpegImage());
 
         ArgumentCaptor<DiagnosisRecordDTO> captor = ArgumentCaptor.forClass(DiagnosisRecordDTO.class);
@@ -45,6 +48,8 @@ class DiagnosisServiceTest {
         assertThat(captor.getValue().getSymptomsJson()).isEqualTo("[\"가려움/긁음\"]");
         assertThat(captor.getValue().getDiseasesJson()).contains("diseaseName", "probability");
         assertThat(captor.getValue().getReportContent()).isNotBlank();
+        assertThat(response.analysisMode()).isEqualTo("RULE_FALLBACK");
+        assertThat(response.failureCode()).isEqualTo("MODEL_UNAVAILABLE");
     }
 
     @Test

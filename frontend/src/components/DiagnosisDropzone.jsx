@@ -109,6 +109,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
     const diagnosisRequest = {
       petId: selectedPet?.id || 1,
       petName,
+      petSpecies: selectedPet?.species || 'UNKNOWN',
       affectedArea,
       customAreaText,
       symptoms: selectedSymptoms,
@@ -132,7 +133,12 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
           riskBadgeClass: apiRes.riskLevel === 'EMERGENCY' ? 'badge-rose' : 'badge-amber',
           hasPhrContext: !!healthProfile,
           diseases: parsedDiseases,
-          report: apiRes.ragReport
+          report: apiRes.ragReport,
+          analysisMode: apiRes.analysisMode,
+          model: apiRes.model,
+          modelVersion: apiRes.modelVersion,
+          failureCode: apiRes.failureCode,
+          limitations: apiRes.limitations || []
         });
         setIsAnalyzing(false);
         return;
@@ -721,6 +727,21 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                 <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
                   AI 진단 결과 리포트
                 </h3>
+
+                <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '10px', fontSize: '12px', color: '#475569' }}>
+                  <strong>분석 Mode:</strong> {analysisResult.analysisMode || 'UNKNOWN'}
+                  {analysisResult.model && (
+                    <span> · <strong>Model:</strong> {analysisResult.model} {analysisResult.modelVersion || ''}</span>
+                  )}
+                  {analysisResult.failureCode && (
+                    <div style={{ marginTop: '6px', color: '#b45309' }}>
+                      Vision 상태: {analysisResult.failureCode}
+                    </div>
+                  )}
+                  {analysisResult.limitations?.map((limitation) => (
+                    <div key={limitation} style={{ marginTop: '4px' }}>제한: {limitation}</div>
+                  ))}
+                </div>
 
                 {/* Top 3 Diseases Bar Chart */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>

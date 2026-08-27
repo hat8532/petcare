@@ -34,6 +34,7 @@ class DiagnosisControllerTest {
                                 {
                                   "petId": 1,
                                   "petName": "초코",
+                                  "petSpecies": "DOG",
                                   "affectedArea": "SKIN",
                                   "symptoms": ["가려움/긁음"],
                                   "description": "붉은 부위를 계속 긁습니다."
@@ -65,8 +66,9 @@ class DiagnosisControllerTest {
     void missingImageUsesDiagnosisErrorEnvelope() throws Exception {
         mockMvc.perform(multipart("/api/v1/diagnosis")
                         .file(new MockMultipartFile("request", "", "application/json", """
-                                {
+                {
                                   "petId": 1,
+                                  "petSpecies": "DOG",
                                   "affectedArea": "SKIN",
                                   "symptoms": ["가려움/긁음"],
                                   "description": "붉은 부위를 계속 긁습니다."
@@ -101,7 +103,9 @@ class DiagnosisControllerTest {
         return new DiagnosisResultResponse(id, 1L, "SKIN", null,
                 "붉은 부위", "OBSERVATION", "관찰 (OBSERVATION)",
                 List.of(new DiagnosisResultResponse.DiseasePrediction("피부염", 72.5)),
-                "경과를 관찰하세요.", LocalDateTime.of(2026, 8, 27, 10, 0));
+                "경과를 관찰하세요.", "RULE_FALLBACK", null, null,
+                "VISION_DISABLED", List.of("제한"), "request-001",
+                LocalDateTime.of(2026, 8, 27, 10, 0));
     }
 
     private MockMultipartFile jpegImage() {

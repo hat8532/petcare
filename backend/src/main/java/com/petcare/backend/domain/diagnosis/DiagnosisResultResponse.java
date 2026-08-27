@@ -17,6 +17,12 @@ public record DiagnosisResultResponse(
         String riskLabel,
         List<DiseasePrediction> visionTopDiseases,
         String ragReport,
+        String analysisMode,
+        String model,
+        String modelVersion,
+        String failureCode,
+        List<String> limitations,
+        String requestId,
         LocalDateTime createdAt
 ) {
     public record DiseasePrediction(String diseaseName, double probability) {
@@ -33,7 +39,38 @@ public record DiagnosisResultResponse(
                 record.getRiskLabel() == null ? riskLabelOf(record.getRiskLevel()) : record.getRiskLabel(),
                 readPredictions(record.getDiseasesJson(), objectMapper),
                 record.getReportContent(),
+                "LEGACY_UNKNOWN",
+                null,
+                null,
+                "PROVENANCE_NOT_STORED",
+                List.of("이 기록에는 과거 분석 Mode·Model Version이 저장되지 않았습니다."),
+                null,
                 record.getCreatedAt()
+        );
+    }
+
+    public static DiagnosisResultResponse from(
+            DiagnosisRecordDTO record,
+            ObjectMapper objectMapper,
+            VisionInferenceResult visionResult) {
+        DiagnosisResultResponse stored = from(record, objectMapper);
+        return new DiagnosisResultResponse(
+                stored.diagnosisId(),
+                stored.petId(),
+                stored.affectedArea(),
+                stored.description(),
+                stored.imageUrl(),
+                stored.riskLevel(),
+                stored.riskLabel(),
+                stored.visionTopDiseases(),
+                stored.ragReport(),
+                visionResult.mode(),
+                visionResult.model(),
+                visionResult.modelVersion(),
+                visionResult.failureCode(),
+                visionResult.limitations(),
+                visionResult.requestId(),
+                stored.createdAt()
         );
     }
 
