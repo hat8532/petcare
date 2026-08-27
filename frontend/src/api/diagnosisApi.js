@@ -21,8 +21,8 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
   symptoms: '/diagnosis/symptoms',
   // 전달받은 ID를 URL에 넣어 상세·이력 주소를 만든다.
   detail: (diagnosisId) => `/diagnosis/${diagnosisId}`,
-  historyByPet: (petId) => `/diagnosis/pet/${petId}`,
-  analyze: '/diagnosis/analyze'
+  historyByPet: (petId) => `/pets/${petId}/diagnoses`,
+  create: '/diagnosis'
 });
 
 /* ====================================================
@@ -48,15 +48,15 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  * `string|null`은 문자열이 오거나 값이 없을 수 있다는 의미다.
  *
  * @typedef {Object} DiagnosisRecord
- * @property {number} id
+ * @property {number} diagnosisId
  * @property {number} petId
  * @property {string} affectedArea
- * @property {string|null} symptomsJson
  * @property {string|null} imageUrl
  * @property {string|null} description
  * @property {string} riskLevel
- * @property {string|null} diseasesJson
- * @property {string|null} reportContent
+ * @property {string} riskLabel
+ * @property {{diseaseName: string, probability: number}[]} visionTopDiseases
+ * @property {string|null} ragReport
  * @property {string} createdAt
  */
 
@@ -92,7 +92,7 @@ const requirePositiveId = (value, fieldName) => {
 /** httpClient가 HTTP 성공으로 반환한 Body의 진단 업무 상태를 검사한다. */
 const requireSuccessfulDiagnosisResponse = (body) => {
   // [주의] HTTP 200이어도 Backend의 업무 상태가 SUCCESS가 아니면 성공 데이터로 사용하지 않는다.
-  if (body?.status !== 'SUCCESS') {
+  if (body?.code !== 200 || body?.message !== 'SUCCESS') {
     throw new DiagnosisApiError(
       body?.message || '진단 API가 성공하지 않은 응답을 반환했습니다.',
       200,
@@ -138,7 +138,7 @@ export const diagnosisApi = Object.freeze({
    * @param {DiagnosisAnalyzeRequest} request
    */
   analyze: async (request) => {
-    const body = await httpClient.post(DIAGNOSIS_ENDPOINTS.analyze, request);
+    const body = await httpClient.post(DIAGNOSIS_ENDPOINTS.create, request);
     const response = requireSuccessfulDiagnosisResponse(body);
     return response.data;
   }

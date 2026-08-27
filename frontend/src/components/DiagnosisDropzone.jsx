@@ -108,12 +108,10 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
       const apiRes = await diagnosisApi.analyze(diagnosisRequest);
 
       if (apiRes) {
-        let parsedDiseases = [];
-        try {
-          parsedDiseases = typeof apiRes.diseasesJson === 'string' ? JSON.parse(apiRes.diseasesJson) : apiRes.diseasesJson;
-        } catch (e) {
-          parsedDiseases = [{ name: '질병 정밀 소견', prob: 86.4 }];
-        }
+        const parsedDiseases = (apiRes.visionTopDiseases || []).map((disease) => ({
+          name: disease.diseaseName,
+          prob: disease.probability
+        }));
 
         setAnalysisResult({
           riskLevel: apiRes.riskLevel,
@@ -121,7 +119,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
           riskBadgeClass: apiRes.riskLevel === 'EMERGENCY' ? 'badge-rose' : 'badge-amber',
           hasPhrContext: !!healthProfile,
           diseases: parsedDiseases,
-          report: apiRes.reportContent
+          report: apiRes.ragReport
         });
         setIsAnalyzing(false);
         return;
@@ -638,7 +636,10 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
             {/* Run Button */}
             <button
               onClick={handleRunDiagnosis}
-              disabled={isAnalyzing}
+              disabled={isAnalyzing || selectedSymptoms.length === 0 || !description.trim()}
+              title={selectedSymptoms.length === 0 || !description.trim()
+                ? '증상을 하나 이상 선택하고 상세 증상을 입력해 주세요.'
+                : undefined}
               className="btn-diagnosis-glow"
             >
               {isAnalyzing ? (
