@@ -23,8 +23,14 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO diagnosis_records (user_id, pet_id, affected_area, symptoms_json, image_url, description, risk_level, risk_label, diseases_json, report_content)
-        VALUES (#{userId}, #{petId}, #{affectedArea}, #{symptomsJson}, #{imageUrl}, #{description}, #{riskLevel}, #{riskLabel}, #{diseasesJson}, #{reportContent})
+        INSERT INTO diagnosis_records (
+            pet_id, affected_area, symptoms_json, image_url, description,
+            risk_level, vision_result_json, rag_report
+        )
+        VALUES (
+            #{petId}, #{affectedArea}, #{symptomsJson}, #{imageUrl}, #{description},
+            #{riskLevel}, #{diseasesJson}, #{reportContent}
+        )
     </insert>
 
 </mapper>
