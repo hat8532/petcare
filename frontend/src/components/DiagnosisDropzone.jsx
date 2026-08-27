@@ -843,7 +843,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
           </div>
         </div>
 
-        {/* AI Fine-Tuning & Accuracy Optimization Showcase Banner */}
+        {/* AI Model Evaluation Plan */}
         <div style={{
           marginTop: '50px',
           background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -855,19 +855,19 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
             <div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 12px', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #059669', color: '#34d399', fontSize: '12px', fontWeight: '800', marginBottom: '8px' }}>
-                🔬 AI MODEL FINE-TUNING ACHIEVEMENT
+                🔬 AI MODEL EVALUATION PLAN
               </div>
               <h3 style={{ fontSize: '24px', fontWeight: '900', color: '#ffffff', margin: 0 }}>
-                자체 AI 미세조정(Fine-Tuning)으로 <span style={{ color: '#34d399' }}>정확도 +23.4%p 향상</span>
+                실제 Dataset 확보 후 <span style={{ color: '#34d399' }}>동일 Protocol로 성능 비교</span>
               </h3>
               <p style={{ fontSize: '13.5px', color: '#94a3b8', marginTop: '6px', margin: 0 }}>
-                범용 AI를 단순히 가져다 쓰는 대신, 털 노이즈 제거 전처리, Focal Loss 파인튜닝, Gemini RAG를 통해 **71.4% ➡️ 94.8% SOTA 성능**을 달성했습니다.
+                현재는 평가 구조만 준비된 상태입니다. 검증된 Dataset·Model Artifact·동일 Pet Group Split이 확보되기 전에는 정확도나 성능 수치를 게시하지 않습니다.
               </p>
             </div>
             <div style={{ background: 'rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '16px', padding: '12px 20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>최종 분류 정확도 (Accuracy)</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>현재 평가 상태</div>
               <div style={{ fontSize: '30px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>
-                94.8% <span style={{ fontSize: '12px', color: '#94a3b8', textDecoration: 'line-through' }}>71.4%</span>
+                평가 전
               </div>
             </div>
           </div>
@@ -875,33 +875,33 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
           {/* 4-Step Engineering Acceleration Pipeline */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '24px' }}>
             <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 1. 전처리 파이프라인</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>CLAHE 털 노이즈 제거</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>정확도 +6.8%p ↑ (78.2%)</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 1. Baseline 측정</div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>ResNet 계열 Baseline</div>
+              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>Macro F1 · Class Recall 측정</div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 2. 경량 백본 전환</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>EfficientNet-B4</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>속도 85% 단축 (180ms)</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 2. 후보 Model 비교</div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>EfficientNet-B0 / B4</div>
+              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>동일 Pet Group Split로 비교</div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 3. 손실함수 파인튜닝</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>Focal Loss ($\gamma=2.0$)</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>희귀 질환 감지 +6.1%p ↑</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 3. 학습 기여도 검증</div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>전처리 · Loss Ablation</div>
+              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>각 변경의 기여도를 분리 측정</div>
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid #059669', borderRadius: '16px', padding: '16px', background: 'rgba(5, 150, 105, 0.15)' }}>
-              <div style={{ fontSize: '11px', color: '#34d399', fontWeight: '800' }}>STEP 4. 수의학 DB RAG</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>Gemini + FAISS DB</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '800', marginTop: '8px' }}>환각률 1.5% 이하 최적화</div>
+              <div style={{ fontSize: '11px', color: '#34d399', fontWeight: '800' }}>STEP 4. RAG 안전성 평가</div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>Gemini without / with RAG</div>
+              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '800', marginTop: '8px' }}>근거 일치율 · 안전 위반률 비교</div>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', fontSize: '12px', color: '#94a3b8' }}>
-            <span>📄 자세한 벤치마크 실험 데이터 및 평가 코드: <strong style={{ color: '#ffffff' }}>docs/AI_MODEL_OPTIMIZATION_AND_BENCHMARK.md</strong> 및 <strong style={{ color: '#ffffff' }}>ml/benchmark_eval.py</strong> 참조</span>
-            <span style={{ color: '#34d399', fontWeight: '700' }}>SOTA PERFORMANCE</span>
+            <span>📄 평가 결과는 승인된 Dataset·Model Manifest와 재현 가능한 Evidence가 확보된 뒤 게시합니다.</span>
+            <span style={{ color: '#34d399', fontWeight: '700' }}>EVALUATION PENDING</span>
           </div>
         </div>
 

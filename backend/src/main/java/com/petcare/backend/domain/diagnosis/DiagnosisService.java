@@ -283,7 +283,7 @@ public class DiagnosisService {
 
     private boolean checkEmergency(String area, List<String> symptoms, String desc, Map<String, Object> healthProfile) {
         String fullText = String.join(" ", symptoms) + " " + desc;
-        if (fullText.contains("응급") || fullText.contains("구토") || fullText.contains("충혈") || fullText.contains("각막") || fullText.contains("출혈") || fullText.contains("천공") || fullText.contains("호흡 가쁨") || fullText.contains("빨갛") || fullText.contains("혈변") || fullText.contains("피똥") || fullText.contains("피")) {
+        if (fullText.contains("응급") || fullText.contains("구토") || fullText.contains("충혈") || fullText.contains("각막") || fullText.contains("출혈") || fullText.contains("천공") || fullText.contains("호흡 가쁨") || fullText.contains("빨갛") || fullText.contains("혈변") || fullText.contains("피똥") || fullText.contains("피가 ") || fullText.contains("피를 ")) {
             return true;
         }
         if (healthProfile != null && healthProfile.get("bodyTemp") != null) {

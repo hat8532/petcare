@@ -73,9 +73,10 @@ class DiagnosisServiceTest {
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "CAT", "SKIN", null, List.of("가려움/긁음"),
-                "구조 확인", Map.of()), jpegImage());
+                "구조 검증용 피부 증상 설명입니다.", Map.of()), jpegImage());
 
         assertThat(response.analysisMode()).isEqualTo("EXPERIMENTAL_DEMO");
+        assertThat(response.riskLevel()).isEqualTo("CAUTION");
         assertThat(response.model()).isEqualTo("petcare-contract-demo");
         assertThat(response.visionTopDiseases())
                 .extracting(DiagnosisResultResponse.DiseasePrediction::diseaseName)
@@ -83,6 +84,25 @@ class DiagnosisServiceTest {
         assertThat(response.limitations()).contains("실제 Vision Model 추론 결과가 아닙니다.");
         assertThat(response.ragReport())
                 .contains("실험용 진단 리포트 구조 예시", "실제 AI Model 추론이나 수의학적 진단 결과가 아닙니다.");
+    }
+
+    @Test
+    void treatsExplicitBleedingPhraseAsEmergency() {
+        when(geminiService.isConfigured()).thenReturn(false);
+        when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
+                VisionInferenceResult.unavailable("MODEL_UNAVAILABLE", invocation.getArgument(2)));
+        doAnswer(invocation -> {
+            DiagnosisRecordDTO record = invocation.getArgument(0);
+            record.setId(110L);
+            return null;
+        }).when(mapper).insert(any());
+        when(mapper.findById(110L)).thenReturn(null);
+
+        DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
+                1L, "초코", "DOG", "SKIN", null, List.of("통증/예민"),
+                "상처에서 피가 납니다.", Map.of()), jpegImage());
+
+        assertThat(response.riskLevel()).isEqualTo("EMERGENCY");
     }
 
     @Test
