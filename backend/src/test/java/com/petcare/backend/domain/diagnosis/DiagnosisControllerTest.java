@@ -2,6 +2,7 @@ package com.petcare.backend.domain.diagnosis;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -12,7 +13,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -26,11 +27,10 @@ class DiagnosisControllerTest {
 
     @Test
     void canonicalEndpointUsesDiagnosisContract() throws Exception {
-        when(service.analyzeDiagnosis(any())).thenReturn(result(108L));
+        when(service.analyzeDiagnosis(any(), any())).thenReturn(result(108L));
 
-        mockMvc.perform(post("/api/v1/diagnosis")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(multipart("/api/v1/diagnosis")
+                        .file(new MockMultipartFile("request", "", "application/json", """
                                 {
                                   "petId": 1,
                                   "petName": "초코",
@@ -38,7 +38,8 @@ class DiagnosisControllerTest {
                                   "symptoms": ["가려움/긁음"],
                                   "description": "붉은 부위를 계속 긁습니다."
                                 }
-                                """))
+                                """.getBytes()))
+                        .file(jpegImage()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("SUCCESS"))
@@ -49,15 +50,31 @@ class DiagnosisControllerTest {
 
     @Test
     void invalidRequestUsesDiagnosisErrorEnvelope() throws Exception {
-        mockMvc.perform(post("/api/v1/diagnosis")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mockMvc.perform(multipart("/api/v1/diagnosis")
+                        .file(new MockMultipartFile("request", "", "application/json", """
                                 {"petId":0,"affectedArea":"UNKNOWN","symptoms":[],"description":""}
-                                """))
+                                """.getBytes()))
+                        .file(jpegImage()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").isNotEmpty())
                 .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    void missingImageUsesDiagnosisErrorEnvelope() throws Exception {
+        mockMvc.perform(multipart("/api/v1/diagnosis")
+                        .file(new MockMultipartFile("request", "", "application/json", """
+                                {
+                                  "petId": 1,
+                                  "affectedArea": "SKIN",
+                                  "symptoms": ["가려움/긁음"],
+                                  "description": "붉은 부위를 계속 긁습니다."
+                                }
+                                """.getBytes())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("image Part가 필요합니다."));
     }
 
     @Test
@@ -85,5 +102,11 @@ class DiagnosisControllerTest {
                 "붉은 부위", "OBSERVATION", "관찰 (OBSERVATION)",
                 List.of(new DiagnosisResultResponse.DiseasePrediction("피부염", 72.5)),
                 "경과를 관찰하세요.", LocalDateTime.of(2026, 8, 27, 10, 0));
+    }
+
+    private MockMultipartFile jpegImage() {
+        return new MockMultipartFile(
+                "image", "lesion.jpg", MediaType.IMAGE_JPEG_VALUE,
+                new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00});
     }
 }

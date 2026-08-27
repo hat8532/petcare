@@ -137,8 +137,19 @@ export const diagnosisApi = Object.freeze({
    *
    * @param {DiagnosisAnalyzeRequest} request
    */
-  analyze: async (request) => {
-    const body = await httpClient.post(DIAGNOSIS_ENDPOINTS.create, request);
+  analyze: async (request, imageFile) => {
+    if (!(imageFile instanceof File)) {
+      throw new TypeError('진단할 환부 Image File이 필요합니다.');
+    }
+
+    const formData = new FormData();
+    formData.append(
+      'request',
+      new Blob([JSON.stringify(request)], { type: 'application/json' })
+    );
+    formData.append('image', imageFile, imageFile.name);
+
+    const body = await httpClient.postForm(DIAGNOSIS_ENDPOINTS.create, formData);
     const response = requireSuccessfulDiagnosisResponse(body);
     return response.data;
   }

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.petcare.backend.global.ai.GeminiService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -20,7 +22,8 @@ class DiagnosisServiceTest {
     private final DiagnosisRecordMapper mapper = mock(DiagnosisRecordMapper.class);
     private final GeminiService geminiService = mock(GeminiService.class);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-    private final DiagnosisService service = new DiagnosisService(mapper, geminiService, objectMapper);
+    private final DiagnosisService service = new DiagnosisService(
+            mapper, geminiService, objectMapper, new DiagnosisImageValidator());
 
     @Test
     void createsDiagnosisAndStoresCanonicalAnalysisFields() {
@@ -34,7 +37,7 @@ class DiagnosisServiceTest {
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "SKIN", null, List.of("가려움/긁음"),
-                "붉은 부위를 계속 긁습니다.", Map.of()));
+                "붉은 부위를 계속 긁습니다.", Map.of()), jpegImage());
 
         ArgumentCaptor<DiagnosisRecordDTO> captor = ArgumentCaptor.forClass(DiagnosisRecordDTO.class);
         verify(mapper).insert(captor.capture());
@@ -53,5 +56,11 @@ class DiagnosisServiceTest {
         assertThat(service.getDiagnosisHistoryByPet(1L))
                 .extracting(DiagnosisResultResponse::diagnosisId)
                 .containsExactly(20L, 10L);
+    }
+
+    private MockMultipartFile jpegImage() {
+        return new MockMultipartFile(
+                "image", "lesion.jpg", MediaType.IMAGE_JPEG_VALUE,
+                new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00});
     }
 }

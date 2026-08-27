@@ -8,7 +8,9 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
   const [description, setDescription] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisError, setAnalysisError] = useState('');
   const [customPhoto, setCustomPhoto] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
   const [fileName, setFileName] = useState('');
   const [isDragging, setIsDragging] = useState(false);
 
@@ -44,22 +46,32 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
     }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      setCustomPhoto(URL.createObjectURL(file));
+  const selectImageFile = (file) => {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setAnalysisError('JPEG 또는 PNG Image만 선택할 수 있습니다.');
+      return;
     }
+    if (file.size > 1024 * 1024) {
+      setAnalysisError('Image File은 1MB 이하만 선택할 수 있습니다.');
+      return;
+    }
+
+    setAnalysisError('');
+    setImageFile(file);
+    setFileName(file.name);
+    setCustomPhoto(URL.createObjectURL(file));
+  };
+
+  const handleFileChange = (e) => {
+    selectImageFile(e.target.files?.[0]);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setFileName(file.name);
-      setCustomPhoto(URL.createObjectURL(file));
-    }
+    selectImageFile(file);
   };
 
   const petSpecies = (selectedPet?.species || '').toUpperCase();
@@ -90,6 +102,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
   const handleRunDiagnosis = async () => {
     setIsAnalyzing(true);
     setAnalysisResult(null);
+    setAnalysisError('');
 
     const petName = selectedPet?.name || '반려동물';
     const healthProfile = selectedPet?.healthProfile;
@@ -105,7 +118,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
 
     // Real Backend API attempt
     try {
-      const apiRes = await diagnosisApi.analyze(diagnosisRequest);
+      const apiRes = await diagnosisApi.analyze(diagnosisRequest, imageFile);
 
       if (apiRes) {
         const parsedDiseases = (apiRes.visionTopDiseases || []).map((disease) => ({
@@ -124,8 +137,14 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
         setIsAnalyzing(false);
         return;
       }
-    } catch (e) {
-      console.warn('Backend API call fallback to dynamic AI engine');
+    } catch (error) {
+      const demoFallbackEnabled = import.meta.env.DEV
+        && import.meta.env.VITE_ENABLE_DIAGNOSIS_DEMO === 'true';
+      if (!demoFallbackEnabled) {
+        setAnalysisError(error?.message || '진단 API 요청에 실패했습니다.');
+        setIsAnalyzing(false);
+        return;
+      }
     }
 
     setTimeout(() => {
@@ -538,7 +557,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
               <input
                 type="file"
                 ref={fileInputRef}
-                accept="image/*"
+                accept="image/jpeg,image/png"
                 onChange={handleFileChange}
                 style={{ display: 'none' }}
               />
@@ -636,7 +655,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
             {/* Run Button */}
             <button
               onClick={handleRunDiagnosis}
-              disabled={isAnalyzing || selectedSymptoms.length === 0 || !description.trim()}
+              disabled={isAnalyzing || !imageFile || selectedSymptoms.length === 0 || !description.trim()}
               title={selectedSymptoms.length === 0 || !description.trim()
                 ? '증상을 하나 이상 선택하고 상세 증상을 입력해 주세요.'
                 : undefined}
@@ -664,9 +683,9 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
             {isAnalyzing && (
               <div style={{ textAlign: 'center', padding: '60px 20px' }}>
                 <div style={{ fontSize: '48px', marginBottom: '16px' }} className="animate-glow">🔍</div>
-                <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>AI 분석 파이프라인 가동 중</h4>
+                <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>환부 Image와 증상 분석 중</h4>
                 <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '24px' }}>
-                  PyTorch 피부 모델 및 수의학 백과 Vector DB에서 유사 사례를 탐색하고 있습니다.
+                  Image 형식을 검증하고 입력한 증상을 Backend에서 분석하고 있습니다.
                 </p>
                 <div style={{ width: '80%', height: '6px', background: '#e2e8f0', borderRadius: '3px', margin: '0 auto', overflow: 'hidden' }}>
                   <div style={{ width: '70%', height: '100%', background: 'linear-gradient(90deg, #059669, #0891b2)', borderRadius: '3px' }} className="animate-glow"></div>
@@ -681,6 +700,11 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                 <p style={{ fontSize: '13px', lineHeight: '1.6' }}>
                   좌측 양식을 작성 후 <strong>[AI 질병 진단 실행하기]</strong> 버튼을 누르면 이 곳에 Vision AI 분석 결과와 Gemini RAG 리포트가 표시됩니다.
                 </p>
+                {analysisError && (
+                  <p role="alert" style={{ marginTop: '12px', color: '#dc2626', fontWeight: '700' }}>
+                    {analysisError}
+                  </p>
+                )}
               </div>
             )}
 
@@ -701,7 +725,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                 {/* Top 3 Diseases Bar Chart */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
                   <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px', fontWeight: '700' }}>
-                    📊 Vision AI 의심 질환 Top 3 (확률)
+                    📊 의심 질환 Top 3 (현재 Rule 분석 Score)
                   </div>
                   {analysisResult.diseases.map((d, idx) => (
                     <div key={idx} style={{ marginBottom: '10px' }}>
@@ -734,7 +758,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                 }}>
                   <div style={{ fontWeight: '800', color: '#047857', marginBottom: '10px', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '18px' }}>🤖</span>
-                    <span>Gemini AI 수의학 진단 & 추천 행동 가이드</span>
+                    <span>증상 분석 리포트 & 추천 행동 가이드</span>
                   </div>
 
                   {/* Quick Action Badges */}

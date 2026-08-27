@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.petcare.backend.global.ai.GeminiService;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,14 +16,17 @@ public class DiagnosisService {
     private final DiagnosisRecordMapper diagnosisRecordMapper;
     private final GeminiService geminiService;
     private final ObjectMapper objectMapper;
+    private final DiagnosisImageValidator diagnosisImageValidator;
 
     public DiagnosisService(
             DiagnosisRecordMapper diagnosisRecordMapper,
             GeminiService geminiService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            DiagnosisImageValidator diagnosisImageValidator) {
         this.diagnosisRecordMapper = diagnosisRecordMapper;
         this.geminiService = geminiService;
         this.objectMapper = objectMapper;
+        this.diagnosisImageValidator = diagnosisImageValidator;
     }
 
     public Map<String, List<String>> getSymptoms() {
@@ -49,7 +53,8 @@ public class DiagnosisService {
         return DiagnosisResultResponse.from(record, objectMapper);
     }
 
-    public DiagnosisResultResponse analyzeDiagnosis(DiagnosisAnalyzeRequest request) {
+    public DiagnosisResultResponse analyzeDiagnosis(DiagnosisAnalyzeRequest request, MultipartFile image) {
+        diagnosisImageValidator.validate(image);
         Long petId = request.petId();
         String affectedArea = request.affectedArea();
         String customAreaText = request.customAreaText();
