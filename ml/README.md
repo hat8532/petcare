@@ -53,3 +53,14 @@ Dataset 원본을 Git에 넣지 않고, 먼저 `image_path,pet_id,species,label`
 ```
 
 누락 File, Manifest 밖 Species·Label, 내용이 같은 중복 Image가 발견되면 Exit Code `1`로 실패하며 Split Index를 만들지 않는다. AI-Hub 원본 Annotation을 이 정규화 CSV로 변환하는 Adapter는 실제 제공 Schema를 확인한 뒤 별도로 작성한다.
+
+## AI-Hub 561 Sample
+
+AI-Hub 경량 Sample ZIP은 CP949 경로와 `라벨링데이터/TL*/**/*.jpg + *.json` Pair를 사용한다. 전체 압축을 풀지 않고 구조만 확인하려면 다음을 실행한다.
+
+```bash
+.venv/bin/python -m tools.prepare_aihub_sample \
+  --archive /path/to/New_Sample.zip
+```
+
+`Raw data ID`의 일부에는 개체로 보이는 숫자 Segment가 있지만 공식 개체 ID Field로 확인되지 않았고 일부 Record에는 Segment가 없다. Adapter는 이를 `group_candidate`로만 기록하고 `pet_id`는 비워 두며 Exit Code `2`로 Group Split을 차단한다. AI-Hub에 개체 식별 기준을 확인하기 전에는 Sample 성능을 Test 성능으로 발표하지 않는다.
