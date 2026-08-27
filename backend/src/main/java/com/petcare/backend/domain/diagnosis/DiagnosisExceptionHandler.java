@@ -46,6 +46,6 @@ public class DiagnosisExceptionHandler {
     public ResponseEntity<DiagnosisApiResponse<Void>> handleUploadSize(
             MaxUploadSizeExceededException exception) {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
-                .body(DiagnosisApiResponse.error(413, "Image File은 1MB 이하만 전송할 수 있습니다."));
+                .body(DiagnosisApiResponse.error(413, "Image File은 10MB 이하만 전송할 수 있습니다."));
     }
 }

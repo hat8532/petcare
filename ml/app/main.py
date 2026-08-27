@@ -1,12 +1,12 @@
 import os
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
+from app.manifest import ManifestState, inspect_model_manifest
+
 SERVICE_VERSION = "0.1.0"
-MODEL_MANIFEST_PATH = os.getenv("PETCARE_MODEL_MANIFEST", "")
 
 
 class Prediction(BaseModel):
@@ -31,8 +31,8 @@ class InferenceResponse(BaseModel):
 app = FastAPI(title="PetCare Vision Inference", version=SERVICE_VERSION)
 
 
-def model_is_available() -> bool:
-    return bool(MODEL_MANIFEST_PATH) and Path(MODEL_MANIFEST_PATH).is_file()
+def model_state() -> ManifestState:
+    return inspect_model_manifest(os.getenv("PETCARE_MODEL_MANIFEST", ""))
 
 
 @app.get("/health")
@@ -41,10 +41,17 @@ def health() -> dict[str, str]:
 
 
 @app.get("/version")
-def version() -> dict[str, str | bool]:
+def version() -> dict[str, str | bool | None]:
+    state = model_state()
     return {
         "serviceVersion": SERVICE_VERSION,
-        "modelAvailable": model_is_available(),
+        "modelAvailable": False,
+        "manifestValid": state.valid,
+        "modelApproved": state.approved,
+        "artifactValid": state.artifact_valid,
+        "modelName": state.model_name,
+        "modelVersion": state.model_version,
+        "modelStateCode": state.failure_code or "MODEL_LOADER_NOT_IMPLEMENTED",
     }
 
 
@@ -64,17 +71,19 @@ async def infer(
 ) -> InferenceResponse:
     del pet_id, species, affected_area, symptoms, description
 
-    if image.content_type not in {"image/jpeg", "image/png"}:
+    if image.content_type not in {"image/jpeg", "image/png", "image/webp"}:
         raise HTTPException(
             status_code=415,
             detail={"failureCode": "UNSUPPORTED_MEDIA_TYPE", "requestId": request_id},
         )
 
-    if not model_is_available():
+    state = model_state()
+    if not state.artifact_valid:
         raise HTTPException(
             status_code=503,
             detail={
                 "failureCode": "MODEL_UNAVAILABLE",
+                "reasonCode": state.failure_code,
                 "message": "승인된 Vision Model Artifact가 없습니다.",
                 "requestId": request_id,
             },

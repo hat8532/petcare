@@ -30,3 +30,12 @@ DIAGNOSIS_VISION_BASE_URL=http://127.0.0.1:8000
 ```
 
 Model Loader를 추가할 때는 Dataset·License·Label Map·Model Version·Preprocessing·Threshold를 결속한 Manifest를 먼저 승인받아야 한다.
+
+## Model Gate
+
+- Dataset 후보와 선택 Gate: `manifests/DATASET-CANDIDATES.md`
+- Dataset Manifest 예시: `manifests/dataset-manifest.example.json`
+- Model Manifest 예시: `manifests/model-manifest.example.json`
+- 실행 환경변수: `PETCARE_MODEL_MANIFEST=<승인된 model manifest 경로>`
+
+FastAPI는 `APPROVED` Manifest, 존재하는 TorchScript Artifact, Manifest에 기록된 SHA-256이 모두 일치해야 Artifact를 유효하게 본다. 현재는 실제 Loader와 승인된 Artifact가 없으므로 이 검증을 통과하더라도 `MODEL_LOADER_NOT_IMPLEMENTED`를 반환한다.

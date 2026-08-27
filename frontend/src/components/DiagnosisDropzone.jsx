@@ -48,12 +48,12 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
 
   const selectImageFile = (file) => {
     if (!file) return;
-    if (!['image/jpeg', 'image/png'].includes(file.type)) {
-      setAnalysisError('JPEG 또는 PNG Image만 선택할 수 있습니다.');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setAnalysisError('JPEG, PNG 또는 WEBP Image만 선택할 수 있습니다.');
       return;
     }
-    if (file.size > 1024 * 1024) {
-      setAnalysisError('Image File은 1MB 이하만 선택할 수 있습니다.');
+    if (file.size > 10 * 1024 * 1024) {
+      setAnalysisError('Image File은 10MB 이하만 선택할 수 있습니다.');
       return;
     }
 
@@ -563,7 +563,7 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
               <input
                 type="file"
                 ref={fileInputRef}
-                accept="image/jpeg,image/png"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleFileChange}
                 style={{ display: 'none' }}
               />

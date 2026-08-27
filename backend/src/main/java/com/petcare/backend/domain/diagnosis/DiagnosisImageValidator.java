@@ -10,23 +10,22 @@ import java.util.Set;
 @Component
 public class DiagnosisImageValidator {
 
-    // Spring Boot의 현재 기본 multipart file 한도와 같게 유지한다.
-    static final long MAX_IMAGE_BYTES = 1024L * 1024;
-    private static final Set<String> ALLOWED_MEDIA_TYPES = Set.of("image/jpeg", "image/png");
+    static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
+    private static final Set<String> ALLOWED_MEDIA_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
     public void validate(MultipartFile image) {
         if (image == null || image.isEmpty()) {
             throw new DiagnosisImageException(HttpStatus.BAD_REQUEST, "진단할 환부 Image File이 필요합니다.");
         }
         if (image.getSize() > MAX_IMAGE_BYTES) {
-            throw new DiagnosisImageException(HttpStatus.PAYLOAD_TOO_LARGE, "Image File은 1MB 이하만 전송할 수 있습니다.");
+            throw new DiagnosisImageException(HttpStatus.PAYLOAD_TOO_LARGE, "Image File은 10MB 이하만 전송할 수 있습니다.");
         }
         if (!ALLOWED_MEDIA_TYPES.contains(image.getContentType())) {
-            throw new DiagnosisImageException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "JPEG 또는 PNG Image만 전송할 수 있습니다.");
+            throw new DiagnosisImageException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "JPEG, PNG 또는 WEBP Image만 전송할 수 있습니다.");
         }
 
         try {
-            byte[] signature = image.getInputStream().readNBytes(8);
+            byte[] signature = image.getInputStream().readNBytes(12);
             if (!matchesContentType(image.getContentType(), signature)) {
                 throw new DiagnosisImageException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Image 형식과 실제 File 내용이 일치하지 않습니다.");
             }
@@ -42,7 +41,8 @@ public class DiagnosisImageValidator {
                     && unsigned(signature[1]) == 0xD8
                     && unsigned(signature[2]) == 0xFF;
         }
-        return signature.length >= 8
+        if ("image/png".equals(contentType)) {
+            return signature.length >= 8
                 && unsigned(signature[0]) == 0x89
                 && signature[1] == 'P'
                 && signature[2] == 'N'
@@ -51,6 +51,16 @@ public class DiagnosisImageValidator {
                 && unsigned(signature[5]) == 0x0A
                 && unsigned(signature[6]) == 0x1A
                 && unsigned(signature[7]) == 0x0A;
+        }
+        return signature.length >= 12
+                && signature[0] == 'R'
+                && signature[1] == 'I'
+                && signature[2] == 'F'
+                && signature[3] == 'F'
+                && signature[8] == 'W'
+                && signature[9] == 'E'
+                && signature[10] == 'B'
+                && signature[11] == 'P';
     }
 
     private int unsigned(byte value) {

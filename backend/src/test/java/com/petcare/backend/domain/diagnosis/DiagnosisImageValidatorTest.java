@@ -22,6 +22,15 @@ class DiagnosisImageValidatorTest {
     }
 
     @Test
+    void acceptsWebpSignature() {
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "lesion.webp", "image/webp",
+                new byte[]{'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P'});
+
+        assertThatCode(() -> validator.validate(image)).doesNotThrowAnyException();
+    }
+
+    @Test
     void rejectsUnsupportedMediaType() {
         MockMultipartFile image = new MockMultipartFile(
                 "image", "lesion.gif", "image/gif", new byte[]{'G', 'I', 'F'});
@@ -42,7 +51,7 @@ class DiagnosisImageValidatorTest {
     }
 
     @Test
-    void rejectsImageLargerThanOneMegabyte() {
+    void rejectsImageLargerThanTenMegabytes() {
         MockMultipartFile image = new MockMultipartFile(
                 "image", "large.png", "image/png",
                 new byte[(int) DiagnosisImageValidator.MAX_IMAGE_BYTES + 1]);

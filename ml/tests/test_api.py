@@ -12,6 +12,7 @@ def test_health_and_version_expose_service_state():
     assert version.status_code == 200
     assert version.json()["serviceVersion"] == "0.1.0"
     assert version.json()["modelAvailable"] is False
+    assert version.json()["modelStateCode"] == "MODEL_MANIFEST_MISSING"
 
 
 def test_inference_returns_model_unavailable_without_artifact():
@@ -30,6 +31,7 @@ def test_inference_returns_model_unavailable_without_artifact():
 
     assert response.status_code == 503
     assert response.json()["detail"]["failureCode"] == "MODEL_UNAVAILABLE"
+    assert response.json()["detail"]["reasonCode"] == "MODEL_MANIFEST_MISSING"
     assert response.json()["detail"]["requestId"] == "request-001"
 
 

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "petcare-dataset-manifest/v1",
+  "datasetId": "aihub-pet-skin-561",
+  "datasetVersion": "1.3",
+  "approvalStatus": "DRAFT",
+  "sourceUrl": "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=561",
+  "sourceRevision": "2024-04-23",
+  "licenseName": "AI-Hub terms pending team review",
+  "licenseUrl": "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=561",
+  "species": ["DOG", "CAT"],
+  "bodyArea": "SKIN",
+  "groupKey": "pet-identifier-required-before-split",
+  "classes": {
+    "A1": "PAPULE_PLAQUE",
+    "A2": "SCALE_COLLARETTE",
+    "A3": "LICHENIFICATION_HYPERPIGMENTATION",
+    "A4": "PUSTULE_ACNE",
+    "A5": "EROSION_ULCER",
+    "A6": "NODULE_MASS",
+    "A7": "NO_VISIBLE_LESION"
+  },
+  "splitPolicy": {
+    "train": 0.7,
+    "validation": 0.15,
+    "test": 0.15
+  }
+}
