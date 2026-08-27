@@ -2,7 +2,6 @@ package com.petcare.backend.domain.diagnosis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.petcare.backend.global.ai.GeminiService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,19 +13,16 @@ import java.util.Map;
 public class DiagnosisService {
 
     private final DiagnosisRecordMapper diagnosisRecordMapper;
-    private final GeminiService geminiService;
     private final ObjectMapper objectMapper;
     private final DiagnosisImageValidator diagnosisImageValidator;
     private final VisionInferenceClient visionInferenceClient;
 
     public DiagnosisService(
             DiagnosisRecordMapper diagnosisRecordMapper,
-            GeminiService geminiService,
             ObjectMapper objectMapper,
             DiagnosisImageValidator diagnosisImageValidator,
             VisionInferenceClient visionInferenceClient) {
         this.diagnosisRecordMapper = diagnosisRecordMapper;
-        this.geminiService = geminiService;
         this.objectMapper = objectMapper;
         this.diagnosisImageValidator = diagnosisImageValidator;
         this.visionInferenceClient = visionInferenceClient;
@@ -86,26 +82,11 @@ public class DiagnosisService {
             report = buildExperimentalDemoReport(areaLabel, symptoms);
         }
 
-        // Call Real Google Gemini 2.0 Flash AI if configured
-        if (report == null && geminiService.isConfigured()) {
-            String prompt = String.format(
-                    "당신은 수의학 AI 전문 수의사입니다. 다음 반려동물의 환부와 증상 데이터를 바탕으로 수의학 맞춤 진단 리포트를 작성해 주세요.\n\n" +
-                    "• 반려동물 이름: %s\n" +
-                    "• 환부 부위: %s\n" +
-                    "• 관찰된 증상: %s\n" +
-                    "• 보호자 메모: %s\n" +
-                    "• 건강 프로필: %s\n\n" +
-                    "다음 구조로 이모지를 포함하여 명확하고 친절하게 한국어로 리포트를 작성해 주세요:\n" +
-                    "1. 🤖 AI 의심 질환 분석 (%s 및 세부 원인)\n" +
-                    "2. 🚨 위험도 등급 (%s) 및 판단 이유\n" +
-                    "3. 🏡 가정 내 수의학 맞춤 조치사항 (3단계 행동 가이드)",
-                    petName, areaLabel, String.join(", ", symptoms), description, healthProfile != null ? healthProfile.toString() : "없음",
-                    topDisease, riskLabel
-            );
-            report = geminiService.generateContent(prompt);
+        if ("GEMINI_MULTIMODAL".equals(visionResult.mode())) {
+            report = buildGeminiMultimodalReport(areaLabel, visionResult, riskLabel);
         }
 
-        // Fallback to dynamic rule-based report if Gemini API is not set or calls fail
+        // Image Provider가 실패하면 Text-only AI 결과로 성공을 위장하지 않고 Rule report로 축소한다.
         if (report == null || report.isBlank()) {
             report = buildDynamicReport(petName, areaLabel, topDisease, symptoms, description, healthProfile, isEmergency);
         }
@@ -140,6 +121,29 @@ public class DiagnosisService {
                 "※ 실제 AI Model 추론이나 수의학적 진단 결과가 아닙니다.",
                 areaLabel,
                 symptoms.isEmpty() ? "없음" : String.join(", ", symptoms));
+    }
+
+    private String buildGeminiMultimodalReport(
+            String areaLabel,
+            VisionInferenceResult visionResult,
+            String riskLabel) {
+        String findings = visionResult.predictions().stream()
+                .map(prediction -> String.format(
+                        "- %s (Model confidence %.1f%%)",
+                        prediction.diseaseName(), prediction.probability()))
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("- 판정 가능한 시각적 소견 없음");
+        String limitations = String.join("\n- ", visionResult.limitations());
+
+        return String.format(
+                "[AI 이미지 의심 소견 안내]\n" +
+                "환부: %s\n" +
+                "%s\n\n" +
+                "위험도: %s\n" +
+                "위험도는 Image Model이 아니라 입력 기반 Safety Rule이 결정합니다.\n\n" +
+                "한계:\n- %s\n" +
+                "※ 확정 진단이나 처방이 아니며 수의사의 진료가 필요합니다.",
+                areaLabel, findings, riskLabel, limitations);
     }
 
     private String writeJson(Object value) {

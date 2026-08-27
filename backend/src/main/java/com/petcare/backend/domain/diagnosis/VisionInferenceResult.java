@@ -32,7 +32,9 @@ public record VisionInferenceResult(
     }
 
     public boolean hasPredictions() {
-        return ("VISION".equals(mode) || "EXPERIMENTAL_DEMO".equals(mode))
+        return ("VISION".equals(mode)
+                || "GEMINI_MULTIMODAL".equals(mode)
+                || "EXPERIMENTAL_DEMO".equals(mode))
                 && !predictions.isEmpty();
     }
 }
