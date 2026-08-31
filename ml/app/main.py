@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
+from app.gemini_adapter import GeminiAdapterError, GeminiMultimodalAdapter
 from app.manifest import ManifestState, inspect_model_manifest
 
 SERVICE_VERSION = "0.1.0"
@@ -12,6 +13,10 @@ DEMO_MODEL_NAME = "petcare-contract-demo"
 
 def experimental_demo_enabled() -> bool:
     return os.getenv("PETCARE_EXPERIMENTAL_DEMO_ENABLED", "false").lower() == "true"
+
+
+def get_gemini_adapter() -> GeminiMultimodalAdapter:
+    return GeminiMultimodalAdapter.from_environment()
 
 
 class Prediction(BaseModel):
@@ -48,6 +53,7 @@ def health() -> dict[str, str]:
 @app.get("/version")
 def version() -> dict[str, str | bool | None]:
     state = model_state()
+    gemini = get_gemini_adapter()
     return {
         "serviceVersion": SERVICE_VERSION,
         "modelAvailable": False,
@@ -58,6 +64,8 @@ def version() -> dict[str, str | bool | None]:
         "modelVersion": state.model_version,
         "modelStateCode": state.failure_code or "MODEL_LOADER_NOT_IMPLEMENTED",
         "experimentalDemoEnabled": experimental_demo_enabled(),
+        "geminiEnabled": gemini.is_configured(),
+        "geminiModel": gemini.model if gemini.is_configured() else None,
     }
 
 
@@ -75,7 +83,7 @@ async def infer(
     description: Annotated[str, Form()],
     request_id: Annotated[str, Form(alias="requestId")],
 ) -> InferenceResponse:
-    del pet_id, symptoms, description
+    del pet_id
 
     if image.content_type not in {"image/jpeg", "image/png", "image/webp"}:
         raise HTTPException(
@@ -107,6 +115,51 @@ async def infer(
                 "실제 Vision Model 추론 결과가 아닌 화면·API 구조 확인용 예시입니다.",
                 "표시 Score는 임상 정확도나 질환 확률이 아닙니다.",
                 "진단과 치료 판단은 수의사의 진료가 필요합니다.",
+            ],
+            failureCode=None,
+            requestId=request_id,
+        )
+
+    gemini = get_gemini_adapter()
+    if gemini.is_configured():
+        if species not in {"DOG", "CAT"} or affected_area != "SKIN":
+            raise HTTPException(
+                status_code=422,
+                detail={"failureCode": "OUT_OF_SCOPE", "requestId": request_id},
+            )
+        try:
+            result = await gemini.analyze(
+                image_bytes=await image.read(),
+                mime_type=image.content_type,
+                species=species,
+                affected_area=affected_area,
+                symptoms=symptoms,
+                description=description,
+            )
+        except GeminiAdapterError as exception:
+            status_code = {
+                "INVALID_INPUT": 400,
+                "PROVIDER_REJECTED": 422,
+                "PROVIDER_RATE_LIMITED": 429,
+                "INFERENCE_TIMEOUT": 504,
+            }.get(exception.failure_code, 503)
+            raise HTTPException(
+                status_code=status_code,
+                detail={"failureCode": exception.failure_code, "requestId": request_id},
+            ) from exception
+
+        return InferenceResponse(
+            mode="GEMINI_MULTIMODAL",
+            model=result.model,
+            modelVersion=result.model_version,
+            predictions=[
+                Prediction(diseaseName=finding.finding, probability=finding.confidence)
+                for finding in result.analysis.findings
+            ],
+            limitations=[
+                *result.analysis.limitations,
+                "표시 Score는 임상 확률이나 검증된 정확도가 아닌 Model confidence입니다.",
+                "확정 진단과 치료 판단은 수의사의 진료가 필요합니다.",
             ],
             failureCode=None,
             requestId=request_id,

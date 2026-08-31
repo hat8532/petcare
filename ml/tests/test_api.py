@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.gemini_adapter import GeminiAdapterResult, GeminiFinding, GeminiStructuredAnalysis
 from app.main import app
 
 client = TestClient(app)
@@ -96,3 +97,46 @@ def test_experimental_demo_rejects_out_of_scope_area(monkeypatch):
 
     assert response.status_code == 422
     assert response.json()["detail"]["failureCode"] == "OUT_OF_SCOPE"
+
+
+def test_gemini_multimodal_result_preserves_mode_and_limitations(monkeypatch):
+    class FakeGeminiAdapter:
+        model = "gemini-test"
+
+        def is_configured(self):
+            return True
+
+        async def analyze(self, **_kwargs):
+            return GeminiAdapterResult(
+                model=self.model,
+                model_version="test-version",
+                analysis=GeminiStructuredAnalysis(
+                    findings=[GeminiFinding(finding="피부 발적 소견", confidence=72.5)],
+                    limitations=["사진 한 장만 분석했습니다."],
+                ),
+            )
+
+    monkeypatch.setattr("app.main.get_gemini_adapter", lambda: FakeGeminiAdapter())
+
+    response = client.post(
+        "/v1/diagnoses/infer",
+        files={"image": ("lesion.jpg", b"\xff\xd8\xff\x00", "image/jpeg")},
+        data={
+            "petId": "1",
+            "species": "DOG",
+            "affectedArea": "SKIN",
+            "symptoms": '["가려움/긁음"]',
+            "description": "붉은 부위를 계속 긁습니다.",
+            "requestId": "request-gemini",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "GEMINI_MULTIMODAL"
+    assert body["model"] == "gemini-test"
+    assert body["modelVersion"] == "test-version"
+    assert body["predictions"] == [
+        {"diseaseName": "피부 발적 소견", "probability": 72.5}
+    ]
+    assert any("임상 확률" in limitation for limitation in body["limitations"])

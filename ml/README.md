@@ -1,6 +1,6 @@
 # PetCare FastAPI Vision Service
 
-현재 단계는 Spring과 FastAPI 사이의 Image Inference Contract를 검증한다. 승인된 Model Artifact가 없으므로 질환 예측을 성공으로 위장하지 않고 `MODEL_UNAVAILABLE` 을 반환한다.
+현재 단계는 Spring과 FastAPI 사이의 Image Inference Contract를 검증한다. Gemini Multimodal은 명시적으로 활성화한 Local MVP Provider이며, 비활성 상태이거나 호출에 실패하면 실제 분석 성공으로 위장하지 않고 안정된 Failure Code를 반환한다.
 
 ## Local Run
 
@@ -25,6 +25,22 @@ PETCARE_EXPERIMENTAL_DEMO_ENABLED=true
 
 Demo는 `DOG·CAT + SKIN` 요청만 받고 `EXPERIMENTAL_DEMO` Mode와 예시 후보를 반환한다. Score는 임상 확률이나 Model 성능이 아니며 실제 평가 Evidence로 사용할 수 없다.
 
+## Gemini Multimodal MVP
+
+Gemini Adapter는 기본 비활성화다. Local `dev` 환경에서 승인된 Sample Image로 확인할 때만 FastAPI Process에 다음 환경변수를 전달한다.
+
+```text
+PETCARE_GEMINI_ENABLED=true
+PETCARE_GEMINI_API_KEY=<local secret>
+PETCARE_GEMINI_MODEL=gemini-3.1-flash-lite
+```
+
+- API Key는 Git·Log·명령 출력에 남기지 않는다.
+- 실제 사용자 Image 전송과 운영 활성화는 별도 Privacy·비용·Secret Gate를 통과한 뒤 진행한다.
+- 응답은 Structured JSON Validator를 통과해야 하며, `confidence`는 임상 확률이나 검증된 정확도가 아니다.
+- Provider 인증·Rate limit·Timeout·Model 부재·Contract 불일치는 안정된 Failure Code로 축소한다.
+- Gemini 분석 성공 시 `GEMINI_MULTIMODAL` Mode와 Model·Version·Limitations를 보존한다.
+
 ## Endpoints
 
 - `GET /health`: Service Process 상태
@@ -34,7 +50,7 @@ Demo는 `DOG·CAT + SKIN` 요청만 받고 `EXPERIMENTAL_DEMO` Mode와 예시 �
 ## Test
 
 ```bash
-.venv/bin/python -m pytest -q
+PYTHONPATH=. .venv/bin/python -m pytest -q
 ```
 
 Model Loader를 추가할 때는 Dataset·License·Label Map·Model Version·Preprocessing·Threshold를 결속한 Manifest를 먼저 승인받아야 한다.

@@ -1,7 +1,6 @@
 package com.petcare.backend.domain.diagnosis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.petcare.backend.global.ai.GeminiService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
@@ -20,15 +19,13 @@ import static org.mockito.Mockito.when;
 class DiagnosisServiceTest {
 
     private final DiagnosisRecordMapper mapper = mock(DiagnosisRecordMapper.class);
-    private final GeminiService geminiService = mock(GeminiService.class);
     private final VisionInferenceClient visionInferenceClient = mock(VisionInferenceClient.class);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final DiagnosisService service = new DiagnosisService(
-            mapper, geminiService, objectMapper, new DiagnosisImageValidator(), visionInferenceClient);
+            mapper, objectMapper, new DiagnosisImageValidator(), visionInferenceClient);
 
     @Test
     void createsDiagnosisAndStoresCanonicalAnalysisFields() {
-        when(geminiService.isConfigured()).thenReturn(false);
         when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
                 VisionInferenceResult.unavailable("MODEL_UNAVAILABLE", invocation.getArgument(2)));
         doAnswer(invocation -> {
@@ -54,7 +51,6 @@ class DiagnosisServiceTest {
 
     @Test
     void preservesExperimentalDemoModeAndExamplePredictions() {
-        when(geminiService.isConfigured()).thenReturn(false);
         when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
                 new VisionInferenceResult(
                         "EXPERIMENTAL_DEMO",
@@ -87,8 +83,34 @@ class DiagnosisServiceTest {
     }
 
     @Test
+    void preservesGeminiMultimodalModeWithoutSecondTextProviderCall() {
+        when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
+                new VisionInferenceResult(
+                        "GEMINI_MULTIMODAL",
+                        "gemini-test",
+                        "test-version",
+                        List.of(new VisionInferenceResult.Prediction("피부 발적 소견", 72.5)),
+                        List.of("사진 한 장만 분석했습니다."),
+                        null,
+                        invocation.getArgument(2)));
+        doAnswer(invocation -> {
+            DiagnosisRecordDTO record = invocation.getArgument(0);
+            record.setId(111L);
+            return null;
+        }).when(mapper).insert(any());
+        when(mapper.findById(111L)).thenReturn(null);
+
+        DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
+                1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
+                "붉은 부위를 계속 긁습니다.", Map.of()), jpegImage());
+
+        assertThat(response.analysisMode()).isEqualTo("GEMINI_MULTIMODAL");
+        assertThat(response.ragReport())
+                .contains("AI 이미지 의심 소견 안내", "피부 발적 소견", "확정 진단이나 처방이 아니며");
+    }
+
+    @Test
     void treatsExplicitBleedingPhraseAsEmergency() {
-        when(geminiService.isConfigured()).thenReturn(false);
         when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
                 VisionInferenceResult.unavailable("MODEL_UNAVAILABLE", invocation.getArgument(2)));
         doAnswer(invocation -> {
