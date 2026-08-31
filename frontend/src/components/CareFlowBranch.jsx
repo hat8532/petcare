@@ -1,11 +1,65 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 export default function CareFlowBranch({ diagnosisResult, onNavigateTimeline, onNavigateHospital }) {
   const riskLevel = diagnosisResult?.riskLevel;
   const isEmergency = riskLevel === 'EMERGENCY';
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
+
+  useEffect(() => {
+    setIsEmergencyModalOpen(isEmergency);
+  }, [diagnosisResult?.diagnosisId, isEmergency]);
+
+  const navigateToEmergencyHospital = () => {
+    setIsEmergencyModalOpen(false);
+    onNavigateHospital?.();
+  };
 
   return (
     <section style={{ padding: '36px 0', background: '#f8fafc' }}>
+      {isEmergencyModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="emergency-diagnosis-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            display: 'grid',
+            placeItems: 'center',
+            padding: '20px',
+            background: 'rgba(15, 23, 42, 0.72)'
+          }}
+        >
+          <div
+            style={{
+              width: 'min(520px, 100%)',
+              padding: '28px',
+              border: '2px solid #fb7185',
+              borderRadius: '20px',
+              background: '#fff1f2',
+              boxShadow: '0 24px 60px rgba(15, 23, 42, 0.35)'
+            }}
+          >
+            <span className="badge badge-rose">EMERGENCY</span>
+            <h3 id="emergency-diagnosis-title" style={{ marginBottom: '10px' }}>
+              응급 위험 신호가 입력되었습니다.
+            </h3>
+            <p style={{ color: '#475569', lineHeight: 1.7 }}>
+              이 화면은 확정 진단이 아닙니다. 지체하지 말고 가까운 응급 동물병원에 연락한 뒤 병원의 안내에 따라 이동하세요.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '20px' }}>
+              <button type="button" onClick={navigateToEmergencyHospital} className="btn btn-danger">
+                주변 응급 동물병원 찾기
+              </button>
+              <button type="button" onClick={() => setIsEmergencyModalOpen(false)} className="btn btn-secondary">
+                결과 계속 확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="container">
         <div className="section-header">
           <span className="badge badge-indigo">SAFETY CARE FLOW</span>
@@ -38,7 +92,7 @@ export default function CareFlowBranch({ diagnosisResult, onNavigateTimeline, on
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
               {isEmergency ? (
-                <button type="button" onClick={onNavigateHospital} className="btn btn-danger">
+                <button type="button" onClick={navigateToEmergencyHospital} className="btn btn-danger">
                   주변 응급 동물병원 찾기
                 </button>
               ) : (

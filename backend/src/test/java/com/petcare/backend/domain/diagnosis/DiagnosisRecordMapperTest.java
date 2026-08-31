@@ -8,7 +8,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "spring.profiles.include=",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.url=jdbc:h2:mem:diagnosis-record-mapper-test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.h2.console.enabled=false"
+})
 @Transactional
 class DiagnosisRecordMapperTest {
 
