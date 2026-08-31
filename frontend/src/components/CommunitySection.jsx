@@ -11,32 +11,7 @@ export default function CommunitySection() {
   useEffect(() => {
     async function loadCommunity() {
       const data = await communityApi.getCommunityPosts();
-      if (data && data.length > 0) {
-        setPosts(data);
-      } else {
-        setPosts([
-          {
-            id: 1,
-            authorName: '초코마미',
-            petInfo: '초코 (푸들 4살)',
-            title: '귀 뒤쪽 피부 습진 AI 진단 리포트 첨부해요! 비슷한 증상 경험 있으신 분 계실까요?',
-            attachedReport: 'Vision AI: 농피증 (84.5%) · 위험도: CAUTION',
-            commentsCount: 8,
-            likesCount: 14,
-            timeAgo: '10분 전'
-          },
-          {
-            id: 2,
-            authorName: '냥냥이아빠',
-            petInfo: '나비 (코숏 2살)',
-            title: '눈물 눈꼽 심해서 AI 진단해봤더니 안구 결막염 나왔는데 소독 꿀팁 공유합니다.',
-            attachedReport: 'Vision AI: 급성 결막염 (78.2%) · 위험도: CAUTION',
-            commentsCount: 12,
-            likesCount: 29,
-            timeAgo: '1시간 전'
-          }
-        ]);
-      }
+      setPosts(data);
     }
     loadCommunity();
   }, []);
@@ -113,6 +88,12 @@ export default function CommunitySection() {
             </div>
 
 
+          </div>
+        )}
+
+        {posts.length === 0 && (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+            아직 작성된 글이 없습니다. 첫 글을 남겨보세요!
           </div>
         )}
 

@@ -59,6 +59,18 @@ public class DataInitializer implements CommandLineRunner {
                     .status("ACTIVE")
                     .build();
             userMapper.insert(user);
+
+            // posts.user_id가 users를 참조하므로 커뮤니티 씨앗 글의 두 번째 작성자도 실제로 만들어 둔다
+            UserDTO user2 = UserDTO.builder()
+                    .email("user2@petcare.com")
+                    .password(passwordEncoder.encode("1234"))
+                    .nickname("냥냥이아빠")
+                    .phone("010-2345-6789")
+                    .provider("LOCAL")
+                    .role("ROLE_USER")
+                    .status("ACTIVE")
+                    .build();
+            userMapper.insert(user2);
         }
 
         // 2. Initial Pet
@@ -73,6 +85,17 @@ public class DataInitializer implements CommandLineRunner {
                     .icon("🐶")
                     .build();
             petMapper.insert(pet);
+
+            PetDTO pet2 = PetDTO.builder()
+                    .userId(2L)
+                    .name("나비")
+                    .species("CAT")
+                    .breed("코숏")
+                    .age("2살")
+                    .weight("4.2kg")
+                    .icon("🐱")
+                    .build();
+            petMapper.insert(pet2);
         }
 
         // 3. Initial 24h Emergency Hospitals (Nationwide Key Regions)
@@ -200,26 +223,20 @@ public class DataInitializer implements CommandLineRunner {
 
         // 6. Initial Community Posts
         if (communityPostMapper.countAll() == 0) {
+            // posts 테이블은 작성자/반려동물을 id로 참조한다.
+            // 댓글수·좋아요수는 comments/post_likes에서 세고, timeAgo는 created_at으로 계산하므로 저장하지 않는다.
             communityPostMapper.insert(CommunityPostDTO.builder()
-                    .authorName("초코마미")
-                    .petInfo("초코 (푸들 4살)")
+                    .userId(1L)
+                    .petId(1L)
                     .title("귀 뒤쪽 피부 습진 AI 진단 리포트 첨부해요! 비슷한 증상 경험 있으신 분 계실까요?")
-                    .attachedReport("Vision AI: 농피증 (84.5%) · 위험도: CAUTION")
                     .content("3일 전부터 부어올라서 진단해봤더니 농피증이 나왔네요. 소독해주고 계신 분 계신가요?")
-                    .commentsCount(8)
-                    .likesCount(14)
-                    .timeAgo("10분 전")
                     .build());
 
             communityPostMapper.insert(CommunityPostDTO.builder()
-                    .authorName("냥냥이아빠")
-                    .petInfo("나비 (코숏 2살)")
+                    .userId(2L)
+                    .petId(2L)
                     .title("눈물 눈꼽 심해서 AI 진단해봤더니 안구 결막염 나왔는데 소독 꿀팁 공유합니다.")
-                    .attachedReport("Vision AI: 급성 결막염 (78.2%) · 위험도: CAUTION")
                     .content("인공눈물로 세정 후 약 넣어주니까 금방 나아지네요!")
-                    .commentsCount(12)
-                    .likesCount(29)
-                    .timeAgo("1시간 전")
                     .build());
         }
     }
