@@ -138,7 +138,8 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
           model: apiRes.model,
           modelVersion: apiRes.modelVersion,
           failureCode: apiRes.failureCode,
-          limitations: apiRes.limitations || []
+          limitations: apiRes.limitations || [],
+          createdAt: apiRes.createdAt
         });
         setIsAnalyzing(false);
         return;
@@ -721,16 +722,28 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                   <span className={`badge ${analysisResult.riskBadgeClass}`} style={{ fontSize: '14px', padding: '6px 14px' }}>
                     위험도: {analysisResult.riskLabel}
                   </span>
-                  <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>2026.08.06 진단</span>
+                  <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>
+                    {analysisResult.createdAt
+                      ? new Date(analysisResult.createdAt).toLocaleDateString('ko-KR')
+                      : '방금'} 분석
+                  </span>
                 </div>
 
                 <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-                  AI 진단 결과 리포트
+                  {analysisResult.analysisMode === 'GEMINI_MULTIMODAL'
+                    ? 'AI 이미지 의심 소견 안내'
+                    : 'AI 진단 결과 리포트'}
                 </h3>
 
                 {analysisResult.analysisMode === 'EXPERIMENTAL_DEMO' && (
                   <div role="alert" style={{ marginBottom: '16px', padding: '12px', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: '10px', color: '#9a3412', fontSize: '13px', fontWeight: '700' }}>
                     실험용 Demo 결과입니다. 실제 AI Model 추론이나 수의학적 진단 결과가 아닙니다.
+                  </div>
+                )}
+
+                {analysisResult.analysisMode === 'GEMINI_MULTIMODAL' && (
+                  <div role="alert" style={{ marginBottom: '16px', padding: '12px', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '10px', color: '#1e40af', fontSize: '13px', fontWeight: '700' }}>
+                    Image에서 관찰된 의심 소견입니다. Model confidence는 질환 확률이나 확정 진단이 아닙니다.
                   </div>
                 )}
 
@@ -754,7 +767,9 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
                   <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px', fontWeight: '700' }}>
                     {analysisResult.analysisMode === 'EXPERIMENTAL_DEMO'
                       ? '📊 결과 표시 구조 예시 (임상 확률 아님)'
-                      : '📊 의심 질환 Top 3'}
+                      : analysisResult.analysisMode === 'GEMINI_MULTIMODAL'
+                        ? '📊 AI 이미지 소견 (Model confidence · 임상 확률 아님)'
+                        : '📊 의심 질환 Top 3'}
                   </div>
                   {analysisResult.diseases.map((d, idx) => (
                     <div key={idx} style={{ marginBottom: '10px' }}>
