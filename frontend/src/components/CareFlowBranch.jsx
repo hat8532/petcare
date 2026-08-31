@@ -36,15 +36,12 @@ export default function CareFlowBranch({ diagnosisResult, onNavigateTimeline, on
         return;
       }
 
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-      if (event.shiftKey && document.activeElement === firstElement) {
-        event.preventDefault();
-        lastElement.focus();
-      } else if (!event.shiftKey && document.activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
-      }
+      event.preventDefault();
+      const currentIndex = focusableElements.indexOf(document.activeElement);
+      const nextIndex = event.shiftKey
+        ? (currentIndex <= 0 ? focusableElements.length - 1 : currentIndex - 1)
+        : (currentIndex < 0 || currentIndex === focusableElements.length - 1 ? 0 : currentIndex + 1);
+      focusableElements[nextIndex].focus();
     };
 
     document.addEventListener('keydown', handleModalKeyDown);
