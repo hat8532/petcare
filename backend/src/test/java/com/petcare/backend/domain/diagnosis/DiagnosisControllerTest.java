@@ -105,6 +105,9 @@ class DiagnosisControllerTest {
                 List.of(new DiagnosisResultResponse.DiseasePrediction("피부염", 72.5)),
                 "경과를 관찰하세요.", "RULE_FALLBACK", null, null,
                 "VISION_DISABLED", List.of("제한"), "request-001",
+                List.of("NO_RED_FLAG_REPORTED"),
+                List.of("MONITOR_AND_RECORD"),
+                List.of("변화를 기록하세요."),
                 LocalDateTime.of(2026, 8, 27, 10, 0));
     }
 

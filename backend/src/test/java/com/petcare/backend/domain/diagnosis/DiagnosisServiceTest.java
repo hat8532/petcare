@@ -22,7 +22,8 @@ class DiagnosisServiceTest {
     private final VisionInferenceClient visionInferenceClient = mock(VisionInferenceClient.class);
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private final DiagnosisService service = new DiagnosisService(
-            mapper, objectMapper, new DiagnosisImageValidator(), visionInferenceClient);
+            mapper, objectMapper, new DiagnosisImageValidator(), visionInferenceClient,
+            new DiagnosisSafetyTriage());
 
     @Test
     void createsDiagnosisAndStoresCanonicalAnalysisFields() {
@@ -43,10 +44,12 @@ class DiagnosisServiceTest {
         verify(mapper).insert(captor.capture());
         assertThat(response.diagnosisId()).isEqualTo(108L);
         assertThat(captor.getValue().getSymptomsJson()).isEqualTo("[\"가려움/긁음\"]");
-        assertThat(captor.getValue().getDiseasesJson()).contains("diseaseName", "probability");
+        assertThat(captor.getValue().getDiseasesJson())
+                .contains("diagnosis-analysis@1", "RULE_FALLBACK", "MODEL_UNAVAILABLE");
         assertThat(captor.getValue().getReportContent()).isNotBlank();
         assertThat(response.analysisMode()).isEqualTo("RULE_FALLBACK");
         assertThat(response.failureCode()).isEqualTo("MODEL_UNAVAILABLE");
+        assertThat(response.visionTopDiseases()).isEmpty();
     }
 
     @Test
@@ -72,14 +75,15 @@ class DiagnosisServiceTest {
                 "구조 검증용 피부 증상 설명입니다.", Map.of()), jpegImage());
 
         assertThat(response.analysisMode()).isEqualTo("EXPERIMENTAL_DEMO");
-        assertThat(response.riskLevel()).isEqualTo("CAUTION");
+        assertThat(response.riskLevel()).isEqualTo("OBSERVATION");
         assertThat(response.model()).isEqualTo("petcare-contract-demo");
         assertThat(response.visionTopDiseases())
                 .extracting(DiagnosisResultResponse.DiseasePrediction::diseaseName)
                 .containsExactly("예시 후보 1 (실제 판정 아님)");
         assertThat(response.limitations()).contains("실제 Vision Model 추론 결과가 아닙니다.");
         assertThat(response.ragReport())
-                .contains("실험용 진단 리포트 구조 예시", "실제 AI Model 추론이나 수의학적 진단 결과가 아닙니다.");
+                .contains("AI 이미지 의심 소견", "실제 Vision Model 추론 결과가 아닙니다.",
+                        "확정 진단이나 처방이 아니며");
     }
 
     @Test
@@ -106,7 +110,7 @@ class DiagnosisServiceTest {
 
         assertThat(response.analysisMode()).isEqualTo("GEMINI_MULTIMODAL");
         assertThat(response.ragReport())
-                .contains("AI 이미지 의심 소견 안내", "피부 발적 소견", "확정 진단이나 처방이 아니며");
+                .contains("AI 이미지 의심 소견", "피부 발적 소견", "확정 진단이나 처방이 아니며");
     }
 
     @Test
@@ -125,6 +129,33 @@ class DiagnosisServiceTest {
                 "상처에서 피가 납니다.", Map.of()), jpegImage());
 
         assertThat(response.riskLevel()).isEqualTo("EMERGENCY");
+    }
+
+    @Test
+    void providerCannotLowerDeterministicEmergencyTriage() {
+        when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
+                new VisionInferenceResult(
+                        "GEMINI_MULTIMODAL",
+                        "gemini-test",
+                        "test-version",
+                        List.of(new VisionInferenceResult.Prediction("경미한 피부 발적", 45.0)),
+                        List.of(),
+                        null,
+                        invocation.getArgument(2)));
+        doAnswer(invocation -> {
+            DiagnosisRecordDTO record = invocation.getArgument(0);
+            record.setId(112L);
+            return null;
+        }).when(mapper).insert(any());
+        when(mapper.findById(112L)).thenReturn(null);
+
+        DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
+                1L, "초코", "DOG", "SKIN", null, List.of("통증/예민"),
+                "호흡 곤란과 청색증이 있습니다.", Map.of()), jpegImage());
+
+        assertThat(response.riskLevel()).isEqualTo("EMERGENCY");
+        assertThat(response.riskReasons()).contains("RED_FLAG_REPORTED");
+        assertThat(response.actionCodes()).contains("SEEK_EMERGENCY_VET_NOW");
     }
 
     @Test

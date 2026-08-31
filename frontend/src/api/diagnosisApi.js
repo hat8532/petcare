@@ -64,6 +64,9 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  * @property {string|null} failureCode
  * @property {string[]} limitations
  * @property {string|null} requestId
+ * @property {string[]} riskReasons
+ * @property {string[]} actionCodes
+ * @property {string[]} actionGuidance
  * @property {string} createdAt
  */
 

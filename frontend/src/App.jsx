@@ -25,6 +25,7 @@ export default function App() {
   const [pets, setPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
   const [editingPet, setEditingPet] = useState(null);
+  const [latestDiagnosis, setLatestDiagnosis] = useState(null);
 
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('petcare_user');
@@ -55,6 +56,10 @@ export default function App() {
     }
     loadPets();
   }, [user, isOAuth2Callback]);
+
+  useEffect(() => {
+    setLatestDiagnosis(null);
+  }, [selectedPet?.id]);
 
   const handlePetAdded = (newPet) => {
     setPets((prev) => [...prev, newPet]);
@@ -112,16 +117,22 @@ export default function App() {
                 AI 반려동물 질병 진단 스튜디오
               </h2>
               <p style={{ fontSize: '15px', color: '#475569', marginTop: '6px' }}>
-                Vision AI 분류 및 Gemini RAG 수의학 리포트가 실시간 생성됩니다.
+                환부 Image 소견과 입력 기반 Safety Triage 결과를 구분해 안내합니다.
               </p>
             </div>
             <DiagnosisDropzone
+              key={selectedPet?.id || 'no-pet'}
               selectedPet={selectedPet}
               onNavigateTimeline={() => setActiveTab('timeline')}
               onNavigateHospital={() => setActiveTab('hospitals')}
+              onDiagnosisResult={setLatestDiagnosis}
             />
             <div style={{ marginTop: '40px' }}>
-              <CareFlowBranch />
+              <CareFlowBranch
+                diagnosisResult={latestDiagnosis}
+                onNavigateTimeline={() => setActiveTab('timeline')}
+                onNavigateHospital={() => setActiveTab('hospitals')}
+              />
             </div>
           </div>
         );
