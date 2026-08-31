@@ -4,8 +4,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.util.Base64;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DiagnosisImageValidatorTest {
@@ -16,18 +17,45 @@ class DiagnosisImageValidatorTest {
     void acceptsJpegSignature() {
         MockMultipartFile image = new MockMultipartFile(
                 "image", "lesion.jpg", "image/jpeg",
-                new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00});
+                DiagnosisTestImages.jpegBytes(2, 2));
 
-        assertThatCode(() -> validator.validate(image)).doesNotThrowAnyException();
+        ValidatedDiagnosisImage validated = validator.validate(image);
+
+        assertThat(validated.contentType()).isEqualTo("image/jpeg");
+        assertThat(validated.safeFilename()).isEqualTo("diagnosis-image.jpg");
+        assertThat(validated.width()).isEqualTo(2);
+        assertThat(validated.height()).isEqualTo(2);
     }
 
     @Test
-    void acceptsWebpSignature() {
+    void decodesWebpAndNormalizesItToMetadataFreePng() {
+        byte[] webp = Base64.getDecoder().decode(
+                "UklGRjoAAABXRUJQVlA4IC4AAABQAQCdASoCAAIAAgA0JQBOgC6gAP7jyNpi7Bks5XUAhvdGGqTyzOFeyxGGdYAA");
         MockMultipartFile image = new MockMultipartFile(
-                "image", "lesion.webp", "image/webp",
-                new byte[]{'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P'});
+                "image", "lesion.webp", "image/webp", webp);
 
-        assertThatCode(() -> validator.validate(image)).doesNotThrowAnyException();
+        ValidatedDiagnosisImage validated = validator.validate(image);
+
+        assertThat(validated.width()).isEqualTo(2);
+        assertThat(validated.height()).isEqualTo(2);
+        assertThat(validated.contentType()).isEqualTo("image/png");
+        assertThat(validated.extension()).isEqualTo("png");
+        assertThat(validated.bytes()).startsWith(
+                (byte) 0x89, (byte) 'P', (byte) 'N', (byte) 'G');
+    }
+
+    @Test
+    void rejectsWebpHeaderWithoutDecodableImageData() {
+        byte[] webp = new byte[30];
+        System.arraycopy(new byte[]{'R', 'I', 'F', 'F'}, 0, webp, 0, 4);
+        System.arraycopy(new byte[]{'W', 'E', 'B', 'P'}, 0, webp, 8, 4);
+        System.arraycopy(new byte[]{'V', 'P', '8', 'X'}, 0, webp, 12, 4);
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "lesion.webp", "image/webp", webp);
+
+        assertThatThrownBy(() -> validator.validate(image))
+                .isInstanceOfSatisfying(DiagnosisImageException.class,
+                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -55,6 +83,28 @@ class DiagnosisImageValidatorTest {
         MockMultipartFile image = new MockMultipartFile(
                 "image", "large.png", "image/png",
                 new byte[(int) DiagnosisImageValidator.MAX_IMAGE_BYTES + 1]);
+
+        assertThatThrownBy(() -> validator.validate(image))
+                .isInstanceOfSatisfying(DiagnosisImageException.class,
+                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE));
+    }
+
+    @Test
+    void rejectsTruncatedJpegEvenWhenSignatureMatches() {
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "truncated.jpg", "image/jpeg",
+                new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00});
+
+        assertThatThrownBy(() -> validator.validate(image))
+                .isInstanceOfSatisfying(DiagnosisImageException.class,
+                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void rejectsImageWithExcessiveDimensions() {
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "wide.png", "image/png",
+                DiagnosisTestImages.pngBytes(8_001, 1));
 
         assertThatThrownBy(() -> validator.validate(image))
                 .isInstanceOfSatisfying(DiagnosisImageException.class,

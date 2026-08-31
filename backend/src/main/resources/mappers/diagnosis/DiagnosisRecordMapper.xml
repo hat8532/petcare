@@ -3,33 +3,60 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.petcare.backend.domain.diagnosis.DiagnosisRecordMapper">
 
-    <select id="findByPetId" resultType="com.petcare.backend.domain.diagnosis.DiagnosisRecordDTO">
-        SELECT id, pet_id AS petId, affected_area AS affectedArea,
-               symptoms_json AS symptomsJson, image_url AS imageUrl, description,
-               risk_level AS riskLevel, vision_result_json AS diseasesJson,
-               rag_report AS reportContent, created_at AS createdAt
-        FROM diagnosis_records
-        WHERE pet_id = #{petId}
-        ORDER BY id DESC
+    <select id="findOwnedPet" resultType="com.petcare.backend.domain.diagnosis.DiagnosisPetContext">
+        SELECT u.id AS userId, p.id AS petId, p.name AS petName, p.species AS petSpecies
+        FROM pets p
+        JOIN users u ON u.id = p.user_id
+        WHERE p.id = #{petId}
+          AND u.email = #{email}
     </select>
 
-    <select id="findById" resultType="com.petcare.backend.domain.diagnosis.DiagnosisRecordDTO">
-        SELECT id, pet_id AS petId, affected_area AS affectedArea,
-               symptoms_json AS symptomsJson, image_url AS imageUrl, description,
-               risk_level AS riskLevel, vision_result_json AS diseasesJson,
-               rag_report AS reportContent, created_at AS createdAt
-        FROM diagnosis_records
-        WHERE id = #{id}
+    <select id="findByPetIdAndOwner" resultType="com.petcare.backend.domain.diagnosis.DiagnosisRecordDTO">
+        SELECT dr.id, dr.user_id AS userId, dr.pet_id AS petId, dr.affected_area AS affectedArea,
+               dr.symptoms_json AS symptomsJson, dr.image_url AS imageUrl, dr.description,
+               dr.risk_level AS riskLevel, dr.risk_label AS riskLabel, dr.vision_result_json AS diseasesJson,
+               dr.rag_report AS reportContent, dr.created_at AS createdAt
+        FROM diagnosis_records dr
+        JOIN pets p ON p.id = dr.pet_id
+        JOIN users u ON u.id = p.user_id
+        WHERE dr.pet_id = #{petId}
+          AND u.email = #{email}
+          AND dr.user_id = u.id
+        ORDER BY dr.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByPetIdAndOwner" resultType="long">
+        SELECT COUNT(*)
+        FROM diagnosis_records dr
+        JOIN pets p ON p.id = dr.pet_id
+        JOIN users u ON u.id = p.user_id
+        WHERE dr.pet_id = #{petId}
+          AND u.email = #{email}
+          AND dr.user_id = u.id
+    </select>
+
+    <select id="findByIdAndOwner" resultType="com.petcare.backend.domain.diagnosis.DiagnosisRecordDTO">
+        SELECT dr.id, dr.user_id AS userId, dr.pet_id AS petId, dr.affected_area AS affectedArea,
+               dr.symptoms_json AS symptomsJson, dr.image_url AS imageUrl, dr.description,
+               dr.risk_level AS riskLevel, dr.risk_label AS riskLabel, dr.vision_result_json AS diseasesJson,
+               dr.rag_report AS reportContent, dr.created_at AS createdAt
+        FROM diagnosis_records dr
+        JOIN pets p ON p.id = dr.pet_id
+        JOIN users u ON u.id = p.user_id
+        WHERE dr.id = #{id}
+          AND u.email = #{email}
+          AND dr.user_id = u.id
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO diagnosis_records (
-            pet_id, affected_area, symptoms_json, image_url, description,
-            risk_level, vision_result_json, rag_report
+            user_id, pet_id, affected_area, symptoms_json, image_url, description,
+            risk_level, risk_label, vision_result_json, rag_report
         )
         VALUES (
-            #{petId}, #{affectedArea}, #{symptomsJson}, #{imageUrl}, #{description},
-            #{riskLevel}, #{diseasesJson}, #{reportContent}
+            #{userId}, #{petId}, #{affectedArea}, #{symptomsJson}, #{imageUrl}, #{description},
+            #{riskLevel}, #{riskLabel}, #{diseasesJson}, #{reportContent}
         )
     </insert>
 

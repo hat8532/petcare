@@ -38,7 +38,7 @@ public record DiagnosisResultResponse(
                 record.getPetId(),
                 record.getAffectedArea(),
                 record.getDescription(),
-                record.getImageUrl(),
+                imageEndpoint(record),
                 record.getRiskLevel(),
                 record.getRiskLabel() == null ? riskLabelOf(record.getRiskLevel()) : record.getRiskLabel(),
                 analysis.predictions(),
@@ -54,6 +54,12 @@ public record DiagnosisResultResponse(
                 analysis.actionGuidance(),
                 record.getCreatedAt()
         );
+    }
+
+    private static String imageEndpoint(DiagnosisRecordDTO record) {
+        return record.getId() == null || record.getImageUrl() == null || record.getImageUrl().isBlank()
+                ? null
+                : "/api/v1/diagnosis/" + record.getId() + "/image";
     }
 
     private static String riskLabelOf(String riskLevel) {

@@ -7,7 +7,23 @@ import java.util.List;
 
 @Mapper
 public interface DiagnosisRecordMapper {
-    List<DiagnosisRecordDTO> findByPetId(@Param("petId") Long petId);
-    DiagnosisRecordDTO findById(@Param("id") Long id);
+    DiagnosisPetContext findOwnedPet(
+            @Param("petId") Long petId,
+            @Param("email") String email);
+
+    List<DiagnosisRecordDTO> findByPetIdAndOwner(
+            @Param("petId") Long petId,
+            @Param("email") String email,
+            @Param("limit") int limit,
+            @Param("offset") long offset);
+
+    long countByPetIdAndOwner(
+            @Param("petId") Long petId,
+            @Param("email") String email);
+
+    DiagnosisRecordDTO findByIdAndOwner(
+            @Param("id") Long id,
+            @Param("email") String email);
+
     void insert(DiagnosisRecordDTO record);
 }

@@ -77,6 +77,7 @@ const request = async (endpoint, options = {}) => {
   const {
     auth = true,
     retryOnUnauthorized = true,
+    responseType = 'body',
     headers: additionalHeaders,
     ...fetchOptions
   } = options;
@@ -92,7 +93,9 @@ const request = async (endpoint, options = {}) => {
     }
   }
 
-  const responseBody = await readResponseBody(response);
+  const responseBody = response.ok && responseType === 'blob'
+    ? await response.blob()
+    : await readResponseBody(response);
   if (!response.ok) {
     throw new HttpClientError(
       responseBody?.message || `API 요청에 실패했습니다. (${response.status})`,
@@ -112,6 +115,7 @@ const requestWithJsonBody = (method, endpoint, body, options = {}) => request(en
 
 export const httpClient = Object.freeze({
   get: (endpoint, options) => request(endpoint, options),
+  getBlob: (endpoint, options = {}) => request(endpoint, { ...options, responseType: 'blob' }),
   post: (endpoint, body, options) => requestWithJsonBody('POST', endpoint, body, options),
   // FormData의 multipart boundary는 Browser가 생성하므로 Content-Type을 직접 지정하지 않는다.
   postForm: (endpoint, formData, options = {}) => request(endpoint, {

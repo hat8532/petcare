@@ -16,6 +16,7 @@ public class DiagnosisService {
     private final DiagnosisRecordMapper diagnosisRecordMapper;
     private final ObjectMapper objectMapper;
     private final DiagnosisImageValidator diagnosisImageValidator;
+    private final DiagnosisImageStorage diagnosisImageStorage;
     private final VisionInferenceClient visionInferenceClient;
     private final DiagnosisSafetyTriage safetyTriage;
 
@@ -23,11 +24,13 @@ public class DiagnosisService {
             DiagnosisRecordMapper diagnosisRecordMapper,
             ObjectMapper objectMapper,
             DiagnosisImageValidator diagnosisImageValidator,
+            DiagnosisImageStorage diagnosisImageStorage,
             VisionInferenceClient visionInferenceClient,
             DiagnosisSafetyTriage safetyTriage) {
         this.diagnosisRecordMapper = diagnosisRecordMapper;
         this.objectMapper = objectMapper;
         this.diagnosisImageValidator = diagnosisImageValidator;
+        this.diagnosisImageStorage = diagnosisImageStorage;
         this.visionInferenceClient = visionInferenceClient;
         this.safetyTriage = safetyTriage;
     }
@@ -45,42 +48,111 @@ public class DiagnosisService {
         return symptoms;
     }
 
-    public DiagnosisResultResponse getDiagnosis(Long diagnosisId) {
-        DiagnosisRecordDTO record = diagnosisRecordMapper.findById(diagnosisId);
+    public DiagnosisResultResponse getDiagnosis(Long diagnosisId, String ownerEmail) {
+        DiagnosisRecordDTO record = diagnosisRecordMapper.findByIdAndOwner(diagnosisId, ownerEmail);
         if (record == null) {
             throw new DiagnosisNotFoundException();
         }
         return DiagnosisResultResponse.from(record, objectMapper);
     }
 
-    public DiagnosisResultResponse analyzeDiagnosis(DiagnosisAnalyzeRequest request, MultipartFile image) {
-        diagnosisImageValidator.validate(image);
+    public DiagnosisResultResponse analyzeDiagnosis(
+            DiagnosisAnalyzeRequest request,
+            MultipartFile image,
+            String ownerEmail) {
+        DiagnosisPetContext petContext = requireOwnedPet(request.petId(), ownerEmail);
+        ValidatedDiagnosisImage validatedImage = diagnosisImageValidator.validate(image);
 
-        DiagnosisSafetyTriage.TriageResult triageResult = safetyTriage.evaluate(request);
+        DiagnosisAnalyzeRequest trustedRequest = trustedRequest(request, petContext);
+        DiagnosisSafetyTriage.TriageResult triageResult = safetyTriage.evaluate(trustedRequest);
         String requestId = VisionInferenceClient.newRequestId();
-        VisionInferenceResult visionResult = visionInferenceClient.infer(request, image, requestId);
+        VisionInferenceResult visionResult = visionInferenceClient.infer(trustedRequest, validatedImage, requestId);
         String storedAnalysisJson = writeJson(StoredAnalysis.from(visionResult, triageResult));
+        String imageKey = diagnosisImageStorage.save(validatedImage, petContext.userId());
 
         DiagnosisRecordDTO record = DiagnosisRecordDTO.builder()
-                .petId(request.petId())
-                .affectedArea(request.affectedArea())
-                .symptomsJson(writeJson(request.symptoms()))
-                .description(request.description())
+                .userId(petContext.userId())
+                .petId(petContext.petId())
+                .affectedArea(trustedRequest.affectedArea())
+                .symptomsJson(writeJson(trustedRequest.symptoms()))
+                .imageUrl(imageKey)
+                .description(trustedRequest.description())
                 .riskLevel(triageResult.riskLevel().name())
                 .riskLabel(triageResult.riskLevel().label())
                 .diseasesJson(storedAnalysisJson)
-                .reportContent(buildSafeReport(request, visionResult, triageResult))
+                .reportContent(buildSafeReport(trustedRequest, visionResult, triageResult))
                 .build();
 
-        diagnosisRecordMapper.insert(record);
-        DiagnosisRecordDTO savedRecord = diagnosisRecordMapper.findById(record.getId());
+        try {
+            diagnosisRecordMapper.insert(record);
+        } catch (RuntimeException exception) {
+            diagnosisImageStorage.deleteQuietly(imageKey);
+            throw exception;
+        }
+        DiagnosisRecordDTO savedRecord = diagnosisRecordMapper.findByIdAndOwner(record.getId(), ownerEmail);
         return DiagnosisResultResponse.from(savedRecord == null ? record : savedRecord, objectMapper);
     }
 
-    public List<DiagnosisResultResponse> getDiagnosisHistoryByPet(Long petId) {
-        return diagnosisRecordMapper.findByPetId(petId).stream()
+    public DiagnosisImageResource getDiagnosisImage(Long diagnosisId, String ownerEmail) {
+        DiagnosisRecordDTO record = diagnosisRecordMapper.findByIdAndOwner(diagnosisId, ownerEmail);
+        if (record == null || record.getImageUrl() == null || record.getImageUrl().isBlank()) {
+            throw new DiagnosisNotFoundException();
+        }
+        return diagnosisImageStorage.read(record.getImageUrl());
+    }
+
+    public DiagnosisHistoryPage getDiagnosisHistoryByPet(
+            Long petId,
+            String ownerEmail,
+            int page,
+            int size) {
+        requireOwnedPet(petId, ownerEmail);
+        if (page < 0) {
+            throw new DiagnosisRequestException("page는 0 이상이어야 합니다.");
+        }
+        if (size < 1 || size > 20) {
+            throw new DiagnosisRequestException("size는 1 이상 20 이하여야 합니다.");
+        }
+
+        long offset;
+        try {
+            offset = Math.multiplyExact((long) page, size);
+        } catch (ArithmeticException exception) {
+            throw new DiagnosisRequestException("요청한 page 범위가 너무 큽니다.");
+        }
+
+        long totalElements = diagnosisRecordMapper.countByPetIdAndOwner(petId, ownerEmail);
+        List<DiagnosisResultResponse> content = diagnosisRecordMapper
+                .findByPetIdAndOwner(petId, ownerEmail, size, offset).stream()
                 .map(record -> DiagnosisResultResponse.from(record, objectMapper))
                 .toList();
+        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / size);
+        return new DiagnosisHistoryPage(content, page, size, totalElements, totalPages);
+    }
+
+    private DiagnosisPetContext requireOwnedPet(Long petId, String ownerEmail) {
+        DiagnosisPetContext context = diagnosisRecordMapper.findOwnedPet(petId, ownerEmail);
+        if (context == null) {
+            throw DiagnosisAccessException.petNotFound();
+        }
+        return context;
+    }
+
+    private DiagnosisAnalyzeRequest trustedRequest(
+            DiagnosisAnalyzeRequest request,
+            DiagnosisPetContext petContext) {
+        String trustedSpecies = petContext.petSpecies() == null || petContext.petSpecies().isBlank()
+                ? "UNKNOWN"
+                : petContext.petSpecies();
+        return new DiagnosisAnalyzeRequest(
+                petContext.petId(),
+                petContext.petName(),
+                trustedSpecies,
+                request.affectedArea(),
+                request.customAreaText(),
+                request.symptoms(),
+                request.description(),
+                Map.of());
     }
 
     private String buildSafeReport(

@@ -13,9 +13,9 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.client.ResourceAccessException;
 
-import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.UUID;
 
 @Component
@@ -24,6 +24,7 @@ public class VisionInferenceClient {
     private final boolean enabled;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final VisionInferenceResultValidator resultValidator;
 
     public VisionInferenceClient(
             @Value("${diagnosis.vision.enabled:false}") boolean enabled,
@@ -31,6 +32,7 @@ public class VisionInferenceClient {
             ObjectMapper objectMapper) {
         this.enabled = enabled;
         this.objectMapper = objectMapper;
+        this.resultValidator = new VisionInferenceResultValidator();
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(3_000);
@@ -43,7 +45,7 @@ public class VisionInferenceClient {
 
     public VisionInferenceResult infer(
             DiagnosisAnalyzeRequest request,
-            MultipartFile image,
+            ValidatedDiagnosisImage image,
             String requestId) {
         if (!enabled) {
             return VisionInferenceResult.unavailable("VISION_DISABLED", requestId);
@@ -52,7 +54,7 @@ public class VisionInferenceClient {
         try {
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             HttpHeaders imageHeaders = new HttpHeaders();
-            imageHeaders.setContentType(MediaType.parseMediaType(image.getContentType()));
+            imageHeaders.setContentType(MediaType.parseMediaType(image.contentType()));
             body.add("image", new HttpEntity<>(imageResource(image), imageHeaders));
             body.add("petId", request.petId().toString());
             body.add("species", request.petSpecies());
@@ -68,23 +70,24 @@ public class VisionInferenceClient {
                     .retrieve()
                     .body(VisionInferenceResult.class);
 
-            return result == null
-                    ? VisionInferenceResult.unavailable("INVALID_PROVIDER_RESPONSE", requestId)
-                    : result;
+            return resultValidator.validate(result, requestId);
         } catch (RestClientResponseException exception) {
             return VisionInferenceResult.unavailable(readFailureCode(exception), requestId);
+        } catch (ResourceAccessException exception) {
+            String failureCode = hasCause(exception, SocketTimeoutException.class)
+                    ? "INFERENCE_TIMEOUT"
+                    : "PROVIDER_UNAVAILABLE";
+            return VisionInferenceResult.unavailable(failureCode, requestId);
         } catch (Exception exception) {
             return VisionInferenceResult.unavailable("PROVIDER_UNAVAILABLE", requestId);
         }
     }
 
-    private ByteArrayResource imageResource(MultipartFile image) throws IOException {
-        byte[] bytes = image.getBytes();
-        String filename = image.getOriginalFilename() == null ? "diagnosis-image" : image.getOriginalFilename();
-        return new ByteArrayResource(bytes) {
+    private ByteArrayResource imageResource(ValidatedDiagnosisImage image) {
+        return new ByteArrayResource(image.bytes()) {
             @Override
             public String getFilename() {
-                return filename;
+                return image.safeFilename();
             }
         };
     }
@@ -94,7 +97,7 @@ public class VisionInferenceClient {
             JsonNode root = objectMapper.readTree(exception.getResponseBodyAsString());
             JsonNode failureCode = root.path("detail").path("failureCode");
             if (failureCode.isTextual()) {
-                return failureCode.asText();
+                return resultValidator.normalizeFailureCode(failureCode.asText());
             }
         } catch (Exception ignored) {
             // Provider가 Contract 밖의 Body를 반환하면 안전한 공통 실패 Code로 축소한다.
@@ -102,6 +105,17 @@ public class VisionInferenceClient {
         return exception.getStatusCode().value() == 504
                 ? "INFERENCE_TIMEOUT"
                 : "PROVIDER_UNAVAILABLE";
+    }
+
+    private boolean hasCause(Throwable throwable, Class<? extends Throwable> expectedType) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (expectedType.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     public static String newRequestId() {

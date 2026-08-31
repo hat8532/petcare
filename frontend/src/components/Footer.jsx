@@ -24,7 +24,7 @@ export default function Footer() {
               🐾 PetCare<span className="text-gradient-emerald">AI</span>
             </div>
             <p style={{ lineHeight: '1.6', fontSize: '12.5px', color: '#cbd5e1', maxWidth: '280px' }}>
-              Generative AI & Vision AI 기반 반려동물 질병 진단 및 24시 응급 동물병원 통합 헬스케어 플랫폼
+              환부 Image·증상 기록, 입력 기반 Safety Triage, 검증 가능한 AI Provider 계약을 연결하는 반려동물 헬스케어 프로젝트
             </p>
           </div>
 
@@ -32,9 +32,9 @@ export default function Footer() {
           <div>
             <div style={{ fontWeight: '800', color: '#ffffff', fontSize: '14px', marginBottom: '14px' }}>주요 서비스</div>
             <ul style={{ listStyle: 'none', lineHeight: '2.1', fontSize: '12.5px', color: '#94a3b8', padding: 0, margin: 0 }}>
-              <li>• AI 질병 진단 (Vision AI + Gemini)</li>
+              <li>• Image 입력·Safety Triage</li>
               <li>• Before/After 경과 타임라인</li>
-              <li>• 위치 기반 24시 응급 동물병원 지도</li>
+              <li>• 출처 검증형 응급 병원 연결</li>
               <li>• 실시간 펫 헬스 뉴스 (6h 캐시)</li>
             </ul>
           </div>
@@ -44,8 +44,8 @@ export default function Footer() {
             <div style={{ fontWeight: '800', color: '#ffffff', fontSize: '14px', marginBottom: '14px' }}>기술 아키텍처</div>
             <ul style={{ listStyle: 'none', lineHeight: '2.1', fontSize: '12.5px', color: '#94a3b8', padding: 0, margin: 0 }}>
               <li>• Spring Boot 3.5 & MyBatis</li>
-              <li>• Google Gemini 2.0 Flash API</li>
-              <li>• Custom PyTorch Vision AI</li>
+              <li>• FastAPI Provider Contract</li>
+              <li>• Model 평가 상태·출처 기록</li>
               <li>• Haversine Spatial Query</li>
             </ul>
           </div>
@@ -53,13 +53,13 @@ export default function Footer() {
           {/* Col 4: Emergency Center */}
           <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid #1e293b', borderRadius: '16px', padding: '18px' }}>
             <div style={{ fontWeight: '800', color: '#fb7185', fontSize: '13px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>🚨</span> 응급 동물병원 핫라인
+              <span>🚨</span> 응급 상황 안내
             </div>
             <p style={{ fontSize: '11.5px', lineHeight: '1.5', marginBottom: '10px', color: '#cbd5e1' }}>
               호흡곤란, 출혈, 각막 궤양 발생 시 지체 없이 24시 응급 센터로 이동하세요.
             </p>
             <div style={{ fontWeight: '900', color: '#f43f5e', fontSize: '16px', fontFamily: 'Outfit, sans-serif' }}>
-              전국 24시 센터: 1588-0000
+              이동 전 병원에 전화해 진료 가능 여부를 확인하세요.
             </div>
           </div>
         </div>

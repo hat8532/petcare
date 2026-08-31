@@ -39,7 +39,7 @@ export default function HeroSection({ onStartDiagnosis, onFindHospital, onNaviga
         }}>
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#059669' }} className="animate-pulse-glow" />
           <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#047857', letterSpacing: '-0.01em' }}>
-            ✨ Vision AI & Gemini 2.0 수의학 스마트 헬스케어
+            Image Validation · Safety Triage · Provider Contract
           </span>
         </div>
 
@@ -65,8 +65,8 @@ export default function HeroSection({ onStartDiagnosis, onFindHospital, onNaviga
           margin: '0 auto 40px auto',
           fontWeight: '400'
         }}>
-          강아지·고양이부터 <strong style={{ color: '#059669', fontWeight: '700' }}>토끼, 햄스터, 앵무새, 파충류까지</strong>.<br />
-          피부·안구 환부 분석, <strong style={{ color: '#059669', fontWeight: '700' }}>경과 관찰 타임라인</strong>, 위험도 판정 시 <strong style={{ color: '#e11d48', fontWeight: '700' }}>24시 응급병원 연결</strong>까지 일괄 지원합니다.
+          등록된 반려동물의 환부 Image와 증상을 기록하고,<br />
+          <strong style={{ color: '#059669', fontWeight: '700' }}>입력 기반 Safety Triage</strong>와 검증된 Provider 응답을 구분해 안내합니다.
         </p>
 
         {/* 4. Action Buttons */}
@@ -84,7 +84,7 @@ export default function HeroSection({ onStartDiagnosis, onFindHospital, onNaviga
             className="btn-neutral-secondary"
             style={{ fontSize: '15.5px', padding: '15px 24px', borderColor: '#4f46e5', color: '#4f46e5' }}
           >
-            <span>🤖</span> 일상 펫 케어 AI 챗봇
+            <span>📊</span> 반려동물 건강 대시보드
           </button>
 
           <button 
@@ -92,7 +92,7 @@ export default function HeroSection({ onStartDiagnosis, onFindHospital, onNaviga
             className="btn-neutral-secondary"
             style={{ fontSize: '15.5px', padding: '15px 24px' }}
           >
-            <span>🏥</span> 24시 응급병원 찾기
+            <span>🏥</span> 공식 병원 검색 안내
           </button>
         </div>
 
@@ -122,11 +122,11 @@ export default function HeroSection({ onStartDiagnosis, onFindHospital, onNaviga
               <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#34d399' }}></span>
             </div>
             <div style={{ fontSize: '11.5px', fontWeight: '600', color: '#64748b', background: '#ffffff', border: '1px solid #e2e8f0', padding: '4px 14px', borderRadius: '8px' }}>
-              🔒 petcare.ai/studio/live-vision-scanner
+              🔒 petcare.ai/diagnosis/safety-report
             </div>
             <div style={{ fontSize: '11.5px', fontWeight: '800', color: '#059669', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#059669' }} className="animate-pulse-glow" />
-              LIVE CONNECTED
+              CONTRACT CHECKED
             </div>
           </div>
 
@@ -140,10 +140,10 @@ export default function HeroSection({ onStartDiagnosis, onFindHospital, onNaviga
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '28px' }}>🐰</span>
+                    <span style={{ fontSize: '28px' }}>🐶</span>
                     <div>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>콩이 (드워프 토끼 2살)</div>
-                      <div style={{ fontSize: '11.5px', color: '#64748b' }}>환부: 귀 뒤쪽 피부 · 수의학 RAG 실시간 검증</div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>초코 (등록 반려동물)</div>
+                      <div style={{ fontSize: '11.5px', color: '#64748b' }}>환부·증상 입력 · Image 형식·크기 검증 완료</div>
                     </div>
                   </div>
                   <span style={{ fontSize: '11px', fontWeight: '800', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', padding: '4px 12px', borderRadius: '9999px' }}>
@@ -154,32 +154,32 @@ export default function HeroSection({ onStartDiagnosis, onFindHospital, onNaviga
                 {/* Progress Bar */}
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', fontWeight: '700', marginBottom: '6px' }}>
-                    <span style={{ color: '#0f172a' }}>1위 의심 질환: 농피증 / 세균성 피부염</span>
-                    <span style={{ color: '#059669' }}>84.5%</span>
+                    <span style={{ color: '#0f172a' }}>AI Image 의심 소견</span>
+                    <span style={{ color: '#64748b' }}>검증 결과가 있을 때만 표시</span>
                   </div>
                   <div style={{ height: '8px', width: '100%', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: '84.5%', background: 'linear-gradient(90deg, #059669, #0d9488)', borderRadius: '4px' }}></div>
+                    <div style={{ height: '100%', width: '0%', background: 'linear-gradient(90deg, #059669, #0d9488)', borderRadius: '4px' }}></div>
                   </div>
                 </div>
 
                 <p style={{ fontSize: '12.5px', color: '#475569', lineHeight: '1.55', margin: 0 }}>
-                  💡 <strong>Gemini 가이드:</strong> 2차 감염 방지를 위한 넥카라 착용 + 미온수 세정 후 3일 간 경과 관찰 권장.
+                  <strong>Safety 안내:</strong> Provider 실패 시 질환명·확률을 만들지 않고 입력 기반 위험도와 다음 행동만 표시합니다.
                 </p>
               </div>
 
               {/* Stats Item */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ background: '#ffffff', borderRadius: '16px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-subtle)' }}>
-                  <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748b' }}>Vision AI 파인튜닝 정확도</div>
+                  <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748b' }}>AI Model 성능 평가</div>
                   <div style={{ fontSize: '24px', fontWeight: '900', color: '#059669', marginTop: '2px' }}>
-                    94.8% <span style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '600' }}>(SOTA)</span>
+                    평가 전 <span style={{ fontSize: '11.5px', color: '#94a3b8', fontWeight: '600' }}>(Dataset 승인 대기)</span>
                   </div>
                 </div>
 
                 <div style={{ background: '#ffffff', borderRadius: '16px', padding: '16px', border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-subtle)' }}>
-                  <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748b' }}>근처 24시 응급병원 자동 연동</div>
+                  <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748b' }}>응급 동물병원 정보 안전 기준</div>
                   <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#0f172a', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>📍</span> 24시 웨스턴 동물의료센터 (0.52km)
+                    <span>📍</span> 출처가 검증된 정보만 표시
                   </div>
                 </div>
               </div>
@@ -191,20 +191,20 @@ export default function HeroSection({ onStartDiagnosis, onFindHospital, onNaviga
         {/* 6. Counter Stats Grid at Bottom */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginTop: '48px', paddingTop: '32px', borderTop: '1px solid #f1f5f9' }}>
           <div>
-            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a' }}>6종</div>
-            <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>다양한 반려동물 종 지원</div>
+            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a' }}>10MB</div>
+            <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>JPEG·PNG·WEBP 입력 제한</div>
           </div>
           <div>
-            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a' }}>15,000+</div>
-            <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>Gemini RAG 수의학 임상 가이드</div>
+            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a' }}>3단계</div>
+            <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>관찰·주의·응급 Safety Triage</div>
           </div>
           <div>
-            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a' }}>1,450+</div>
-            <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>전국 24시 응급 동물병원</div>
+            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a' }}>5건</div>
+            <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>페이지별 진단 이력 조회</div>
           </div>
           <div>
-            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a' }}>3초</div>
-            <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>실시간 AI 진단 리포트 생성</div>
+            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a' }}>20초</div>
+            <div style={{ fontSize: '12.5px', color: '#64748b', fontWeight: '600', marginTop: '2px' }}>Frontend 분석 timeout 안내</div>
           </div>
         </div>
 
@@ -212,4 +212,3 @@ export default function HeroSection({ onStartDiagnosis, onFindHospital, onNaviga
     </section>
   );
 }
-

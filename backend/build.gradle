@@ -30,6 +30,8 @@ dependencies {
 	implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+	// JDK ImageIO가 지원하지 않는 WebP도 decode한 뒤 안전한 PNG로 정규화한다.
+	implementation 'com.twelvemonkeys.imageio:imageio-webp:3.14.0'
 	// JWT
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
