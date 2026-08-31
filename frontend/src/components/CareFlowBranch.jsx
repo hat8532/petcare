@@ -216,40 +216,149 @@ export default function CareFlowBranch({ diagnosisResult, onNavigateTimeline, lo
     : null;
 
   return (
-    <section id="diagnosis-care-flow" style={{ padding: '36px 0', background: '#f8fafc' }}>
+    <section id="diagnosis-care-flow" style={{ padding: '60px 0', background: '#f8fafc' }}>
       {emergencyModal}
 
       <div className="container">
-        <div className="section-header">
-          <span className="badge badge-indigo">SAFETY CARE FLOW</span>
-          <h2>위험도에 따른 다음 행동</h2>
-          <p>사용자가 임의로 분기를 고르는 대신, 가장 최근 Safety Triage 결과와 연결됩니다.</p>
+        <div className="section-header" style={{ marginBottom: '32px', textAlign: 'center' }}>
+          <span className="badge badge-indigo" style={{ marginBottom: '12px' }}>SMART BRANCHING SYSTEM</span>
+          <h2 style={{ margin: '10px 0 6px', color: '#0f172a', fontSize: '30px', fontWeight: '900' }}>위험도 판정에 따른 동적 헬스케어 루프</h2>
+          <p style={{ margin: 0, color: '#475569', fontSize: '14.5px' }}>가장 최근 Safety Triage 결과에 맞춰 관찰 또는 응급 경로를 자동으로 안내합니다.</p>
         </div>
 
         {!diagnosisResult ? (
-          <div className="glass-card" style={{ padding: '28px', textAlign: 'center', color: '#64748b' }}>
-            진단 결과가 생성되면 OBSERVATION·CAUTION·EMERGENCY에 맞는 경로가 표시됩니다.
+          <div className="glass-card" style={{ padding: '40px', maxWidth: '900px', margin: '0 auto', background: '#ffffff' }}>
+            <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+              <span className="badge badge-indigo" style={{ fontSize: '13px' }}>진단 결과 연결 대기</span>
+              <h3 style={{ margin: '14px 0 8px', fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
+                진단이 완료되면 알맞은 케어 경로가 열립니다.
+              </h3>
+              <p style={{ margin: 0, color: '#64748b', lineHeight: 1.7 }}>
+                사용자가 경로를 임의로 고르지 않고 실제 위험도 결과에 따라 자동 분기됩니다.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '16px' }}>
+              <article style={{ padding: '22px', borderRadius: '18px', border: '1px solid #a7f3d0', background: '#f0fdf4' }}>
+                <span className="badge badge-emerald">OBSERVATION · CAUTION</span>
+                <h4 style={{ margin: '14px 0 8px', color: '#047857', fontSize: '17px' }}>경과 관찰 경로</h4>
+                <p style={{ margin: 0, color: '#475569', fontSize: '13px', lineHeight: 1.7 }}>
+                  리포트를 확인하고 같은 반려동물·같은 환부의 다음 기록으로 이동합니다.
+                </p>
+              </article>
+              <article style={{ padding: '22px', borderRadius: '18px', border: '1px solid #fecdd3', background: '#fff1f2' }}>
+                <span className="badge badge-rose">EMERGENCY</span>
+                <h4 style={{ margin: '14px 0 8px', color: '#be123c', fontSize: '17px' }}>즉시 병원 확인 경로</h4>
+                <p style={{ margin: 0, color: '#475569', fontSize: '13px', lineHeight: 1.7 }}>
+                  응급 안내를 우선 표시하고 출처가 검증된 24시 병원만 조회합니다.
+                </p>
+              </article>
+            </div>
           </div>
         ) : (
           <div
             className="glass-card"
             style={{
-              padding: '30px',
+              padding: '40px',
+              maxWidth: '900px',
+              margin: '0 auto',
               border: isEmergency ? '2px solid #fb7185' : '2px solid #6ee7b7',
-              background: isEmergency ? '#fff1f2' : '#f0fdf4'
+              background: '#ffffff'
             }}
           >
-            <span className={`badge ${isEmergency ? 'badge-rose' : riskLevel === 'CAUTION' ? 'badge-amber' : 'badge-emerald'}`}>
-              {diagnosisResult.riskLabel}
-            </span>
-            <h3 style={{ marginBottom: '8px' }}>
-              {isEmergency ? '응급 동물병원에 연락하고 이동하세요.' : '증상을 기록하고 필요 시 수의사와 상담하세요.'}
-            </h3>
-            <ul style={{ lineHeight: 1.8 }}>
-              {(diagnosisResult.actionGuidance || []).map((guidance) => <li key={guidance}>{guidance}</li>)}
-            </ul>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+              <span className={`badge ${isEmergency ? 'badge-rose' : riskLevel === 'CAUTION' ? 'badge-amber' : 'badge-emerald'}`} style={{ fontSize: '14px' }}>
+                위험도: {diagnosisResult.riskLabel}
+              </span>
+              <span style={{ color: '#64748b', fontSize: '13px', fontWeight: '600' }}>
+                진단 #{diagnosisResult.diagnosisId} 결과에 연결됨
+              </span>
+            </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '18px' }}>
+            <h3 style={{ margin: '0 0 22px', fontSize: '22px', fontWeight: '800', color: isEmergency ? '#be123c' : '#0f172a' }}>
+              {isEmergency
+                ? '타임라인 생략 → 주변 응급 동물병원 확인'
+                : '진단 리포트 확인 → 같은 환부 경과 기록'}
+            </h3>
+
+            <div className="grid-3" style={{ marginTop: '20px' }}>
+              {(isEmergency ? [
+                {
+                  icon: '!',
+                  title: '응급 안내 확인',
+                  description: '확정 진단이 아닌 위험 신호 안내임을 확인하고 지체 없이 병원에 연락합니다.'
+                },
+                {
+                  icon: '◎',
+                  title: '현재 위치 조회',
+                  description: 'Browser 위치를 이번 조회에만 사용해 출처가 검증된 24시 병원을 찾습니다.'
+                },
+                {
+                  icon: '↗',
+                  title: '전화 후 이동',
+                  description: '표시된 전화번호와 공식 지도로 운영 여부를 다시 확인한 뒤 이동합니다.'
+                }
+              ] : [
+                {
+                  icon: '1',
+                  title: '진단 리포트 확인',
+                  description: '입력한 증상과 Safety Triage 결과, 다음 행동 안내를 함께 확인합니다.'
+                },
+                {
+                  icon: '2',
+                  title: '경과 관찰',
+                  description: '증상 변화를 기록하고 악화되거나 새 위험 신호가 생기는지 살핍니다.'
+                },
+                {
+                  icon: '3',
+                  title: '같은 환부 재기록',
+                  description: '같은 반려동물·같은 환부를 다시 촬영해 실제 비교 기록을 준비합니다.'
+                }
+              ]).map((step) => (
+                <article
+                  key={step.title}
+                  style={{
+                    minHeight: '150px',
+                    padding: '20px',
+                    borderRadius: 'var(--radius-md)',
+                    border: `1px solid ${isEmergency ? '#fecdd3' : '#d1fae5'}`,
+                    background: isEmergency ? '#fff1f2' : '#f0fdf4'
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: 'grid',
+                      placeItems: 'center',
+                      width: '32px',
+                      height: '32px',
+                      marginBottom: '12px',
+                      borderRadius: '10px',
+                      background: isEmergency ? '#e11d48' : '#059669',
+                      color: '#ffffff',
+                      fontWeight: '900'
+                    }}
+                  >
+                    {step.icon}
+                  </span>
+                  <div style={{ marginBottom: '6px', color: isEmergency ? '#be123c' : '#047857', fontSize: '15px', fontWeight: '800' }}>
+                    {step.title}
+                  </div>
+                  <div style={{ color: '#475569', fontSize: '12.5px', lineHeight: 1.65 }}>{step.description}</div>
+                </article>
+              ))}
+            </div>
+
+            {(diagnosisResult.actionGuidance || []).length > 0 && (
+              <div style={{ marginTop: '22px', padding: '18px 20px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <strong style={{ color: '#0f172a', fontSize: '14px' }}>이번 결과의 행동 안내</strong>
+                <ul style={{ margin: '10px 0 0', paddingLeft: '20px', color: '#475569', fontSize: '13px', lineHeight: 1.8 }}>
+                  {diagnosisResult.actionGuidance.map((guidance) => <li key={guidance}>{guidance}</li>)}
+                </ul>
+              </div>
+            )}
+
+            <div className="care-flow-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '18px' }}>
               {isEmergency ? (
                 <button type="button" onClick={() => setIsEmergencyModalOpen(true)} className="btn btn-danger">
                   현재 위치로 응급 병원 조회
@@ -257,7 +366,7 @@ export default function CareFlowBranch({ diagnosisResult, onNavigateTimeline, lo
               ) : (
                 <>
                   <button type="button" onClick={() => onNavigateTimeline?.(diagnosisResult)} className="btn btn-primary">
-                    3일 뒤 경과 기록하기
+                    다음 경과 기록 준비하기
                   </button>
                   <button type="button" onClick={() => setIsEmergencyModalOpen(true)} className="btn btn-secondary">
                     현재 위치로 주변 병원 조회
@@ -266,8 +375,8 @@ export default function CareFlowBranch({ diagnosisResult, onNavigateTimeline, lo
               )}
             </div>
             {!isEmergency && (
-              <p style={{ marginBottom: 0, color: '#9a3412', fontSize: '13px' }}>
-                증상이 악화되거나 새로운 위험 신호가 생기면 3일을 기다리지 말고 동물병원에 문의하세요.
+              <p style={{ margin: '18px 0 0', color: '#9a3412', fontSize: '13px', lineHeight: 1.6 }}>
+                증상이 악화되거나 새로운 위험 신호가 생기면 즉시 동물병원에 문의하세요.
               </p>
             )}
           </div>

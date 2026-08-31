@@ -1,16 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { diagnosisApi } from '../api/diagnosisApi';
+import AiBenchmarkModal from './AiBenchmarkModal';
 import DiagnosisFailureDialog from './DiagnosisFailureDialog';
 
 const AREA_OPTIONS = [
-  { id: 'SKIN', label: '피부/모피' },
-  { id: 'EYE', label: '안구/눈' },
-  { id: 'EAR', label: '귀/귓바퀴' },
-  { id: 'MOUTH', label: '구강/치아' },
-  { id: 'PAW_LIMB', label: '발/관절' },
-  { id: 'NOSE_RESPIRATORY', label: '코/호흡기' },
-  { id: 'ABDOMEN', label: '배/소화기' },
-  { id: 'CUSTOM', label: '직접 입력' }
+  { id: 'SKIN', label: '피부/모피', icon: '🐾' },
+  { id: 'EYE', label: '안구/눈', icon: '👁️' },
+  { id: 'EAR', label: '귀/귓바퀴', icon: '👂' },
+  { id: 'MOUTH', label: '구강/치아', icon: '🦷' },
+  { id: 'PAW_LIMB', label: '발/관절', icon: '🐾' },
+  { id: 'NOSE_RESPIRATORY', label: '코/호흡기', icon: '👃' },
+  { id: 'ABDOMEN', label: '배/소화기', icon: '🩺' },
+  { id: 'CUSTOM', label: '직접 입력', icon: '✏️' }
 ];
 
 const HISTORY_PAGE_SIZE = 5;
@@ -61,6 +62,8 @@ export default function DiagnosisDropzone({
   const [description, setDescription] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [isBenchmarkOpen, setIsBenchmarkOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState('');
@@ -154,6 +157,7 @@ export default function DiagnosisDropzone({
   }, [loadHistory]);
 
   const selectImage = (file) => {
+    setIsDragging(false);
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       setAnalysisError('JPEG, PNG 또는 WEBP Image만 선택할 수 있습니다.');
@@ -269,13 +273,14 @@ export default function DiagnosisDropzone({
   };
 
   return (
-    <section id="diagnosis-section" style={{ padding: '60px 0', background: '#fff' }}>
+    <section id="diagnosis-section" style={{ padding: '60px 0', background: '#ffffff' }}>
       <DiagnosisFailureDialog
         failure={analysisFailure}
         isRetrying={isAnalyzing}
         onRetry={handleRunDiagnosis}
         onClose={closeAnalysisFailure}
       />
+      <AiBenchmarkModal isOpen={isBenchmarkOpen} onClose={() => setIsBenchmarkOpen(false)} />
       <style>{`
         @media print {
           body * { visibility: hidden !important; }
@@ -289,24 +294,71 @@ export default function DiagnosisDropzone({
           }
           .diagnosis-no-print { display: none !important; }
         }
+        @media (max-width: 720px) {
+          .diagnosis-area-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .diagnosis-pet-grid { grid-template-columns: 1fr !important; }
+          .diagnosis-result-actions { flex-direction: column !important; }
+          .diagnosis-result-actions .btn, .care-flow-actions .btn {
+            width: 100% !important;
+            padding-right: 14px !important;
+            padding-left: 14px !important;
+            white-space: normal !important;
+          }
+          .diagnosis-evaluation-footer { align-items: flex-start !important; flex-direction: column !important; }
+        }
       `}</style>
       <div className="container">
         <div className="section-header" style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <span className="badge badge-emerald">AI DIAGNOSIS PIPELINE</span>
-          <h2>반려동물 AI 질병 진단</h2>
-          <p>환부 Image와 증상을 분석하되, 결과를 확정 진단이나 처방으로 표시하지 않습니다.</p>
+          <span style={{ fontSize: '12px', fontWeight: '800', color: '#047857', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '4px 14px', borderRadius: '9999px' }}>
+            AI DIAGNOSIS PIPELINE
+          </span>
+          <h2 style={{ fontSize: '32px', fontWeight: '900', color: '#0f172a', marginTop: '10px' }}>
+            반려동물 AI 질병 진단 스튜디오
+          </h2>
+          <p style={{ fontSize: '15px', color: '#475569', marginTop: '6px' }}>
+            환부 Image와 증상을 입력하면 검증된 AI 소견과 입력 기반 Safety Triage를 구분해 안내합니다.
+          </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '28px' }}>
-          <div className="glass-card" style={{ padding: '28px' }}>
-            <h3 style={{ marginTop: 0 }}>진단 입력</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '28px' }}>
+          <div className="glass-card" style={{ padding: '32px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '20px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>📋</span> 진단 정보 및 환부 Image 등록
+            </h3>
 
             <fieldset style={{ border: 0, padding: 0, margin: '0 0 18px' }}>
-              <legend style={{ display: 'block', width: '100%', fontWeight: 700, marginBottom: '8px' }}>
-                0. 등록된 반려동물 선택
-              </legend>
+              <legend className="sr-only">0. 등록된 반려동물 선택</legend>
+              <div style={{
+                background: selectedPet ? '#f8fafc' : '#fffbeb',
+                border: selectedPet ? '1px solid #e2e8f0' : '1px solid #fde68a',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                marginBottom: pets.length > 1 ? '12px' : 0
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                  <span style={{ fontSize: '24px' }}>{selectedPet?.icon || '🐾'}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>
+                      {selectedPet ? selectedPet.name : '등록된 반려동물 선택 필요'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      {selectedPet
+                        ? `${selectedPet.species || '종 미지정'} · ${selectedPet.breed || '품종 미지정'}`
+                        : '로그인 후 진단할 반려동물을 선택하거나 등록하세요.'}
+                    </div>
+                  </div>
+                </div>
+                <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: '800', padding: '4px 10px', borderRadius: '9999px', background: selectedPet ? '#ecfdf5' : '#fef3c7', color: selectedPet ? '#047857' : '#b45309', border: selectedPet ? '1px solid #a7f3d0' : '1px solid #fde68a' }}>
+                  {selectedPet ? '진단 대상' : '미선택'}
+                </span>
+              </div>
+
               {pets.length > 0 ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
+                <div className="diagnosis-pet-grid" style={{ display: pets.length > 1 ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
                   {pets.map((pet) => {
                     const isSelected = selectedPet?.id === pet.id;
                     return (
@@ -316,13 +368,14 @@ export default function DiagnosisDropzone({
                         aria-pressed={isSelected}
                         onClick={() => onSelectPet?.(pet)}
                         style={{
-                          padding: '12px',
+                          padding: '10px 12px',
                           borderRadius: '12px',
-                          border: isSelected ? '2px solid #10b981' : '1px solid #cbd5e1',
-                          background: isSelected ? '#ecfdf5' : '#fff',
+                          border: isSelected ? '2px solid #10b981' : '1px solid #e2e8f0',
+                          background: isSelected ? '#ecfdf5' : '#f8fafc',
                           color: '#0f172a',
                           textAlign: 'left',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          fontFamily: 'inherit'
                         }}
                       >
                         <strong>{pet.icon || '🐾'} {pet.name}</strong>
@@ -334,7 +387,7 @@ export default function DiagnosisDropzone({
                   })}
                 </div>
               ) : (
-                <div style={{ padding: '14px', borderRadius: '12px', background: '#fff7ed' }}>
+                <div style={{ marginTop: '12px', padding: '14px', borderRadius: '12px', background: '#fff7ed', border: '1px solid #fed7aa' }}>
                   <p style={{ margin: '0 0 10px', color: '#9a3412' }}>
                     {isAuthenticated ? '진단할 반려동물을 먼저 등록해 주세요.' : '로그인 후 등록된 반려동물을 선택할 수 있습니다.'}
                   </p>
@@ -349,9 +402,11 @@ export default function DiagnosisDropzone({
               )}
             </fieldset>
 
-            <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-              <legend style={{ display: 'block', width: '100%', fontWeight: 700, marginBottom: '8px' }}>1. 환부 선택</legend>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
+            <fieldset style={{ border: 0, padding: 0, margin: '0 0 20px' }}>
+              <legend style={{ display: 'block', width: '100%', fontSize: '13px', color: '#475569', marginBottom: '8px', fontWeight: '700' }}>
+                1. 환부 카테고리 선택
+              </legend>
+              <div className="diagnosis-area-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '8px' }}>
               {AREA_OPTIONS.map((area) => (
                 <button
                   key={area.id}
@@ -362,34 +417,40 @@ export default function DiagnosisDropzone({
                     setSelectedSymptoms([]);
                   }}
                   style={{
-                    padding: '9px 4px',
-                    borderRadius: '10px',
-                    border: affectedArea === area.id ? '2px solid #10b981' : '1px solid #cbd5e1',
-                    background: affectedArea === area.id ? '#ecfdf5' : '#fff',
+                    padding: '10px 4px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: affectedArea === area.id ? '2px solid #10b981' : '1px solid #e2e8f0',
+                    background: affectedArea === area.id ? '#ecfdf5' : '#f8fafc',
                     color: affectedArea === area.id ? '#047857' : '#475569',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    textAlign: 'center',
+                    fontFamily: 'inherit'
                   }}
                 >
-                  {area.label}
+                  <div>{area.icon}</div>
+                  <div style={{ marginTop: '2px' }}>{area.label}</div>
                 </button>
               ))}
               </div>
-            </fieldset>
-            {affectedArea === 'CUSTOM' && (
-              <label style={{ display: 'block' }}>
-                <span className="sr-only">직접 입력한 환부 이름</span>
+
+              {affectedArea === 'CUSTOM' && (
                 <input
                   value={customAreaText}
                   onChange={(event) => setCustomAreaText(event.target.value)}
                   maxLength={100}
-                  placeholder="환부 이름을 입력해 주세요."
-                  style={{ width: '100%', padding: '10px', marginBottom: '12px' }}
+                  aria-label="직접 입력한 환부 이름"
+                  placeholder="예: 오른쪽 꼬리 끝 부위, 목 뒤쪽 관절 등"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid #10b981', background: '#ecfdf5', fontSize: '13px', outline: 'none' }}
                 />
-              </label>
-            )}
+              )}
+            </fieldset>
 
-            <fieldset style={{ border: 0, padding: 0, margin: '16px 0 0' }}>
-              <legend style={{ display: 'block', width: '100%', fontWeight: 700, marginBottom: '8px' }}>2. 증상 선택</legend>
+            <fieldset style={{ border: 0, padding: 0, margin: '0 0 20px' }}>
+              <legend style={{ display: 'block', width: '100%', fontSize: '13px', color: '#475569', marginBottom: '8px', fontWeight: '700' }}>
+                2. 부위별 주요 증상 선택 (복수 선택)
+              </legend>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', minHeight: '34px' }}>
               {(symptomOptions[affectedArea] || []).map((symptom) => (
                 <button
@@ -398,11 +459,15 @@ export default function DiagnosisDropzone({
                   aria-pressed={selectedSymptoms.includes(symptom)}
                   onClick={() => toggleSymptom(symptom)}
                   style={{
-                    padding: '6px 12px',
-                    borderRadius: '999px',
+                    padding: '6px 14px',
+                    borderRadius: 'var(--radius-full)',
                     border: selectedSymptoms.includes(symptom) ? '1px solid #059669' : '1px solid #cbd5e1',
-                    background: selectedSymptoms.includes(symptom) ? '#ecfdf5' : '#f8fafc',
-                    cursor: 'pointer'
+                    background: selectedSymptoms.includes(symptom) ? '#ecfdf5' : '#f1f5f9',
+                    color: selectedSymptoms.includes(symptom) ? '#047857' : '#475569',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    fontFamily: 'inherit'
                   }}
                 >
                   {selectedSymptoms.includes(symptom) ? '✓ ' : '+ '}{symptom}
@@ -412,50 +477,88 @@ export default function DiagnosisDropzone({
               </div>
             </fieldset>
 
-            <label htmlFor="diagnosis-image" style={{ display: 'block', fontWeight: 700, margin: '16px 0 8px' }}>3. 환부 Image</label>
-            <input
-              id="diagnosis-image"
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(event) => selectImage(event.target.files?.[0])}
-              style={{ display: 'none' }}
-            />
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label="환부 Image 선택 또는 끌어 놓기"
-              onClick={() => fileInputRef.current?.click()}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') fileInputRef.current?.click();
-              }}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                selectImage(event.dataTransfer.files?.[0]);
-              }}
-              style={{ padding: '14px', border: '2px dashed #cbd5e1', borderRadius: '14px', textAlign: 'center', cursor: 'pointer' }}
-            >
-              {imagePreview ? (
-                <img src={imagePreview} alt="선택한 환부" style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '10px' }} />
-              ) : (
-                <div style={{ padding: '48px 10px', color: '#64748b' }}>JPEG·PNG·WEBP, 최대 10MB</div>
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
+                <label htmlFor="diagnosis-image" style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>
+                  3. 환부 Image 등록 <span style={{ color: '#059669' }}>*</span>
+                </label>
+                {imageFile && (
+                  <span style={{ fontSize: '11px', color: '#059669', fontWeight: '700', background: '#ecfdf5', padding: '2px 8px', borderRadius: '6px' }}>
+                    ✓ 사용자 Image 선택됨
+                  </span>
+                )}
+              </div>
+              <input
+                id="diagnosis-image"
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => selectImage(event.target.files?.[0])}
+                style={{ display: 'none' }}
+              />
+              <label
+                htmlFor="diagnosis-image"
+                className={`photo-upload-container ${isDragging ? 'drag-over' : ''}`}
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  selectImage(event.dataTransfer.files?.[0]);
+                }}
+                style={{ display: 'block', padding: '18px' }}
+              >
+                <div style={{ position: 'relative', width: '100%', height: '160px', borderRadius: '12px', overflow: 'hidden', marginBottom: '12px', background: 'linear-gradient(135deg, #ecfdf5 0%, #f8fafc 100%)', border: '1px solid #e2e8f0' }}>
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="선택한 환부" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: '#64748b' }}>
+                      <div>
+                        <div style={{ fontSize: '42px', marginBottom: '6px' }}>📸</div>
+                        <strong style={{ display: 'block', color: '#334155', fontSize: '14px' }}>환부가 선명하게 보이는 Image를 등록하세요.</strong>
+                        <span style={{ display: 'block', marginTop: '4px', fontSize: '12px' }}>JPEG·PNG·WEBP · 최대 10MB</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <span className="photo-btn-gradient" style={{ padding: '9px 18px', fontSize: '13px' }}>
+                  <span>📸</span> {imageFile ? 'Image 변경하기' : '환부 Image 업로드'}
+                </span>
+                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '10px', fontWeight: '500', overflowWrap: 'anywhere' }}>
+                  {imageFile?.name ? `📄 첨부된 File: ${imageFile.name}` : '클릭하거나 이 영역으로 Image를 끌어 놓으세요.'}
+                </div>
+              </label>
+              {imageFile && (
+                <button type="button" onClick={clearImage} className="btn btn-secondary" style={{ marginTop: '8px', padding: '8px 14px', fontSize: '12px' }}>
+                  선택한 Image 제거
+                </button>
               )}
-              <div style={{ marginTop: '8px', fontSize: '13px' }}>{imageFile?.name || '클릭하거나 Image를 끌어 놓으세요.'}</div>
             </div>
-            {imageFile && <button type="button" onClick={clearImage} className="btn btn-secondary" style={{ marginTop: '8px' }}>Image 제거</button>}
 
-            <label htmlFor="diagnosis-description" style={{ display: 'block', fontWeight: 700, margin: '16px 0 8px' }}>4. 상세 증상 설명</label>
-            <textarea
-              id="diagnosis-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              maxLength={2000}
-              rows={4}
-              placeholder="언제부터, 얼마나 자주, 어떤 변화가 있었는지 작성해 주세요."
-              style={{ width: '100%', padding: '10px', resize: 'vertical' }}
-            />
-            <div style={{ textAlign: 'right', fontSize: '11px', color: '#64748b' }}>{description.length}/2000</div>
+            <div style={{ marginBottom: '24px' }}>
+              <label htmlFor="diagnosis-description" style={{ display: 'block', fontSize: '13px', color: '#475569', marginBottom: '8px', fontWeight: '700' }}>
+                4. 상세 증상 설명
+              </label>
+              <textarea
+                id="diagnosis-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                maxLength={2000}
+                rows={4}
+                placeholder="언제부터, 얼마나 자주, 어떤 변화가 있었는지 작성해 주세요."
+                style={{ width: '100%', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 'var(--radius-sm)', color: '#0f172a', padding: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', resize: 'vertical' }}
+              />
+              <div style={{ textAlign: 'right', fontSize: '11px', color: '#64748b' }}>{description.length}/2000</div>
+            </div>
 
             <button
               type="button"
@@ -463,42 +566,83 @@ export default function DiagnosisDropzone({
               disabled={isAnalyzing || !canAnalyze}
               aria-busy={isAnalyzing}
               className="btn-diagnosis-glow"
-              style={{ marginTop: '12px' }}
             >
-              {isAnalyzing ? 'Image와 증상 분석 중…' : 'AI 질병 진단 실행하기'}
+              {isAnalyzing ? (
+                <>
+                  <span className="animate-pulse-glow" style={{ fontSize: '20px' }}>🤖</span>
+                  <span>Image와 증상 분석 중…</span>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: '20px' }}>✨</span>
+                  <span>AI 질병 진단 실행하기</span>
+                  <span style={{ fontSize: '11.5px', background: 'rgba(255, 255, 255, 0.22)', padding: '4px 12px', borderRadius: '9999px', fontWeight: '800', marginLeft: 'auto', border: '1px solid rgba(255, 255, 255, 0.3)' }}>
+                    안전 검증 포함
+                  </span>
+                </>
+              )}
             </button>
             <div aria-live="polite" aria-atomic="true">
               {analysisError && <p role="alert" style={{ color: '#dc2626', fontWeight: 700 }}>{analysisError}</p>}
             </div>
           </div>
 
-          <div id="diagnosis-print-report" className="glass-card" style={{ padding: '28px' }} aria-live="polite">
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>진단 결과</h3>
-              {analysisResult && (
-                <button type="button" onClick={printDiagnosisReport} className="btn btn-secondary diagnosis-no-print">
-                  PDF 저장·인쇄
-                </button>
-              )}
-            </div>
-            {!analysisResult && !isAnalyzing && <p style={{ color: '#64748b' }}>진단을 실행하거나 아래 이력에서 결과를 선택해 주세요.</p>}
-            {isAnalyzing && <p role="status">Provider 응답과 Safety Triage를 검증하고 있습니다.</p>}
+          <div id="diagnosis-print-report" className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', justifyContent: analysisResult ? 'flex-start' : 'center', minHeight: '640px' }} aria-live="polite">
+            {isAnalyzing && (
+              <div style={{ textAlign: 'center', padding: '60px 20px' }} role="status">
+                <div style={{ fontSize: '48px', marginBottom: '16px' }} className="animate-pulse-glow">🔍</div>
+                <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>환부 Image와 증상 분석 중</h4>
+                <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '24px' }}>
+                  Image 형식·Provider 응답·Safety Triage를 순서대로 검증하고 있습니다.
+                </p>
+                <div style={{ width: '80%', height: '6px', background: '#e2e8f0', borderRadius: '3px', margin: '0 auto', overflow: 'hidden' }}>
+                  <div style={{ width: '70%', height: '100%', background: 'linear-gradient(90deg, #059669, #0891b2)', borderRadius: '3px' }} className="animate-pulse-glow" />
+                </div>
+              </div>
+            )}
+
+            {!analysisResult && !isAnalyzing && (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
+                <div style={{ width: '84px', height: '84px', borderRadius: '26px', display: 'grid', placeItems: 'center', margin: '0 auto 18px', fontSize: '42px', background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', border: '1px solid #a7f3d0' }}>
+                  🩺
+                </div>
+                <h4 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>진단 결과를 기다리는 중</h4>
+                <p style={{ fontSize: '13px', lineHeight: '1.7' }}>
+                  좌측 양식을 작성해 진단을 실행하거나<br />아래 이력에서 저장된 결과를 선택해 주세요.
+                </p>
+                <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', marginTop: '18px', padding: '8px 14px', borderRadius: '9999px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: '700', color: '#475569' }}>
+                  <span style={{ color: '#059669' }}>●</span> 확정 진단·처방이 아닌 보조 안내
+                </div>
+                {analysisError && (
+                  <p role="alert" style={{ marginTop: '14px', color: '#dc2626', fontWeight: '700' }}>{analysisError}</p>
+                )}
+              </div>
+            )}
 
             {analysisResult && (
               <div className="fade-in">
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
-                  <span className={`badge ${riskBadgeClass(analysisResult.riskLevel)}`}>
-                    {analysisResult.riskLabel}
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
+                  <span className={`badge ${riskBadgeClass(analysisResult.riskLevel)}`} style={{ fontSize: '14px', padding: '6px 14px' }}>
+                    위험도: {analysisResult.riskLabel}
                   </span>
-                  <span style={{ color: '#64748b', fontSize: '12px' }}>{formatDate(analysisResult.createdAt)}</span>
+                  <div className="diagnosis-no-print" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ color: '#64748b', fontSize: '12px' }}>{formatDate(analysisResult.createdAt)}</span>
+                    <button type="button" onClick={printDiagnosisReport} className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '12px' }}>
+                      PDF 저장·인쇄
+                    </button>
+                  </div>
                 </div>
 
-                <div style={{ marginTop: '14px', padding: '12px', background: '#f8fafc', borderRadius: '10px', fontSize: '12px' }}>
+                <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
+                  {analysisResult.analysisMode === 'GEMINI_MULTIMODAL' ? 'AI Image 의심 소견 안내' : '진단 분석 결과 리포트'}
+                </h3>
+
+                <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '10px', fontSize: '12px', color: '#475569' }}>
                   <strong>분석 Mode:</strong> {analysisResult.analysisMode || 'UNKNOWN'}
                   {analysisResult.model && <span> · <strong>Model:</strong> {analysisResult.model} {analysisResult.modelVersion || ''}</span>}
                   {analysisResult.failureCode && (
-                    <div style={{ color: '#b45309', marginTop: '4px' }}>
-                      Image 분석 상태: {analysisResult.failureCode}
+                    <div style={{ color: '#b45309', marginTop: '6px' }}>
+                      <strong>Image 분석 상태:</strong> {analysisResult.failureCode}
                       {RETRYABLE_FAILURE_CODES.has(analysisResult.failureCode) && (
                         <button
                           type="button"
@@ -517,79 +661,95 @@ export default function DiagnosisDropzone({
                   )}
                 </div>
 
-                <h4>환부 Image</h4>
-                {resultImageUrl ? (
-                  <img
-                    src={resultImageUrl}
-                    alt={`${selectedPet?.name || '반려동물'}의 진단 환부`}
-                    style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', borderRadius: '12px', background: '#f8fafc' }}
-                  />
-                ) : (
-                  <p style={{ padding: '12px', background: '#f8fafc', borderRadius: '10px', color: '#64748b' }}>
-                    {storedImageError || '이 기록에는 다시 표시할 수 있는 보관 Image 주소가 없습니다.'}
-                  </p>
-                )}
-
-                <h4>AI 이미지 의심 소견</h4>
-                {findings.length > 0 ? findings.map((finding) => (
-                  <div key={`${finding.diseaseName}-${finding.probability}`} style={{ marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-                      <span>{finding.diseaseName}</span>
-                      <strong>{finding.probability}%</strong>
-                    </div>
-                    <small style={{ color: '#64748b' }}>Model confidence이며 임상 확률이 아닙니다.</small>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '12px' }}>
+                    <div style={{ fontSize: '12px', color: '#475569', fontWeight: '700', marginBottom: '10px' }}>📸 저장된 환부 Image</div>
+                    {resultImageUrl ? (
+                      <img
+                        src={resultImageUrl}
+                        alt={`${selectedPet?.name || '반려동물'}의 진단 환부`}
+                        style={{ width: '100%', height: '170px', objectFit: 'contain', borderRadius: '12px', background: '#ffffff' }}
+                      />
+                    ) : (
+                      <div style={{ height: '170px', display: 'grid', placeItems: 'center', padding: '12px', color: '#64748b', textAlign: 'center', fontSize: '12px' }}>
+                        {storedImageError || '이 기록에는 다시 표시할 수 있는 보관 Image가 없습니다.'}
+                      </div>
+                    )}
                   </div>
-                )) : (
-                  <p style={{ padding: '12px', background: '#fff7ed', borderRadius: '10px' }}>
-                    검증된 Image 소견이 없습니다. 질환명이나 확률을 임의 생성하지 않았습니다.
-                  </p>
-                )}
 
-                <div style={{ whiteSpace: 'pre-line', padding: '16px', background: '#f0fdf4', borderRadius: '12px', lineHeight: 1.7 }}>
-                  {analysisResult.ragReport}
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '16px' }}>
+                    <div style={{ fontSize: '12px', color: '#475569', fontWeight: '700', marginBottom: '12px' }}>📊 AI Image 의심 소견</div>
+                    {findings.length > 0 ? findings.map((finding, index) => {
+                      const probability = Math.max(0, Math.min(100, Number(finding.probability) || 0));
+                      return (
+                        <div key={`${finding.diseaseName}-${finding.probability}`} style={{ marginBottom: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '13px', fontWeight: '700', marginBottom: '4px', color: '#0f172a' }}>
+                            <span>{index + 1}. {finding.diseaseName}</span>
+                            <span style={{ color: index === 0 ? '#059669' : '#64748b' }}>{probability}%</span>
+                          </div>
+                          <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: `${probability}%`, height: '100%', background: index === 0 ? 'linear-gradient(90deg, #059669, #0891b2)' : '#94a3b8', borderRadius: '4px' }} />
+                          </div>
+                          <small style={{ color: '#64748b' }}>Model confidence · 임상 확률 아님</small>
+                        </div>
+                      );
+                    }) : (
+                      <div style={{ padding: '14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', color: '#9a3412', fontSize: '12px', lineHeight: 1.6 }}>
+                        검증된 Image 소견이 없습니다. 질환명이나 확률을 임의 생성하지 않았습니다.
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {(analysisResult.actionGuidance || []).length > 0 && (
-                  <div style={{ marginTop: '14px' }}>
-                    <strong>다음 행동</strong>
-                    <div style={{ display: 'grid', gap: '8px', marginTop: '8px' }}>
+                <div style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)', border: '1.5px solid #6ee7b7', borderRadius: 'var(--radius-md)', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)' }}>
+                  <div style={{ fontWeight: '800', color: '#047857', marginBottom: '10px', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '18px' }}>🤖</span>
+                    <span>증상 분석 리포트 & 안전 행동 가이드</span>
+                  </div>
+                  <div style={{ whiteSpace: 'pre-line', fontSize: '13.5px', lineHeight: '1.7', color: '#064e3b' }}>
+                    {analysisResult.ragReport}
+                  </div>
+
+                  {(analysisResult.actionGuidance || []).length > 0 && (
+                    <div style={{ display: 'grid', gap: '8px', marginTop: '14px' }}>
                       {analysisResult.actionGuidance.map((item, index) => {
                         const actionCode = analysisResult.actionCodes?.[index];
                         return (
-                          <div key={`${actionCode || 'action'}-${item}`} style={{ padding: '12px', border: '1px solid #d1fae5', borderRadius: '10px', background: '#f0fdf4' }}>
-                            <strong style={{ display: 'block', color: '#047857' }}>
+                          <div key={`${actionCode || 'action'}-${item}`} style={{ padding: '10px 12px', border: '1px solid #a7f3d0', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.72)' }}>
+                            <strong style={{ display: 'block', color: '#047857', fontSize: '12.5px' }}>
                               {ACTION_TITLES[actionCode] || `권장 행동 ${index + 1}`}
                             </strong>
-                            <span style={{ display: 'block', marginTop: '4px', color: '#475569' }}>{item}</span>
+                            <span style={{ display: 'block', marginTop: '3px', color: '#475569', fontSize: '12.5px' }}>{item}</span>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+
                 {(analysisResult.limitations || []).length > 0 && (
-                  <div style={{ marginTop: '14px', color: '#64748b', fontSize: '12px' }}>
+                  <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '10px', color: '#64748b', fontSize: '12px' }}>
                     {analysisResult.limitations.map((item) => <div key={item}>제한: {item}</div>)}
                   </div>
                 )}
 
-                <div className="diagnosis-no-print" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '18px' }}>
+                <div className="diagnosis-no-print diagnosis-result-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                   {analysisResult.riskLevel === 'EMERGENCY' ? (
-                    <button type="button" onClick={() => onOpenCareFlow?.(analysisResult)} className="btn btn-danger" style={{ flex: 1 }}>
-                      현재 위치로 검증 응급 병원 조회
+                    <button type="button" onClick={() => onOpenCareFlow?.(analysisResult)} className="btn btn-danger" style={{ flex: 1, padding: '14px 20px' }}>
+                      🚨 현재 위치로 검증 응급 병원 조회
                     </button>
                   ) : (
                     <>
-                      <button type="button" onClick={() => onNavigateTimeline?.(analysisResult)} className="btn btn-primary" style={{ flex: 1 }}>
-                        3일 뒤 경과 기록하기
+                      <button type="button" onClick={() => onNavigateTimeline?.(analysisResult)} className="btn btn-primary" style={{ flex: 1, padding: '14px 18px' }}>
+                        📅 다음 경과 기록 준비하기
                       </button>
-                      <button type="button" onClick={() => onOpenCareFlow?.(analysisResult)} className="btn btn-secondary">현재 위치로 검증 병원 조회</button>
+                      <button type="button" onClick={() => onOpenCareFlow?.(analysisResult)} className="btn btn-secondary" style={{ padding: '14px 18px' }}>🏥 현재 위치로 검증 병원 조회</button>
                     </>
                   )}
                 </div>
                 {analysisResult.riskLevel !== 'EMERGENCY' && (
                   <p style={{ marginBottom: 0, color: '#9a3412', fontSize: '12px' }}>
-                    상태가 악화되면 3일을 기다리지 말고 동물병원에 문의하세요.
+                    상태가 악화되거나 새로운 위험 신호가 생기면 즉시 동물병원에 문의하세요.
                   </p>
                 )}
               </div>
@@ -597,11 +757,14 @@ export default function DiagnosisDropzone({
           </div>
         </div>
 
-        <div className="glass-card" style={{ padding: '24px', marginTop: '28px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ margin: 0 }}>과거 진단 이력</h3>
+        <div className="glass-card" style={{ padding: '28px', marginTop: '28px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: '#eff6ff', color: '#2563eb', display: 'grid', placeItems: 'center', fontSize: '20px' }}>🗂️</div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px' }}>과거 진단 이력</h3>
               <span style={{ color: '#64748b', fontSize: '12px' }}>총 {historyMeta.totalElements}건</span>
+              </div>
             </div>
             <button type="button" onClick={() => loadHistory(historyPage)} disabled={isHistoryLoading} className="btn btn-secondary">
               {isHistoryLoading ? '불러오는 중…' : '새로고침'}
@@ -617,12 +780,14 @@ export default function DiagnosisDropzone({
                 aria-pressed={analysisResult?.diagnosisId === record.diagnosisId}
                 onClick={() => showStoredDiagnosis(record.diagnosisId)}
                 style={{
-                  padding: '12px',
+                  padding: '14px 16px',
                   border: analysisResult?.diagnosisId === record.diagnosisId ? '2px solid #10b981' : '1px solid #e2e8f0',
-                  borderRadius: '10px',
+                  borderRadius: '14px',
                   background: analysisResult?.diagnosisId === record.diagnosisId ? '#ecfdf5' : '#fff',
                   textAlign: 'left',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.2s ease'
                 }}
               >
                 <strong>#{record.diagnosisId} · {record.riskLabel}</strong>
@@ -655,11 +820,46 @@ export default function DiagnosisDropzone({
           )}
         </div>
 
-        <div style={{ marginTop: '28px', padding: '24px', borderRadius: '18px', background: '#0f172a', color: '#fff' }}>
-          <h3 style={{ marginTop: 0 }}>AI Model 평가 상태: 평가 전</h3>
-          <p style={{ marginBottom: 0, color: '#cbd5e1' }}>
-            승인된 Dataset·동일 Pet Group Split·재현 가능한 Metric이 확보되기 전에는 정확도나 성능 수치를 게시하지 않습니다.
-          </p>
+        <div style={{ marginTop: '50px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', borderRadius: '24px', padding: '36px', color: '#ffffff', boxShadow: '0 20px 40px rgba(15, 23, 42, 0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ flex: '1 1 520px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 12px', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #059669', color: '#34d399', fontSize: '12px', fontWeight: '800', marginBottom: '8px' }}>
+                🔬 AI MODEL EVALUATION PLAN
+              </div>
+              <h3 style={{ fontSize: '24px', fontWeight: '900', color: '#ffffff', margin: 0 }}>
+                실제 Dataset 확보 후 <span style={{ color: '#34d399' }}>동일 Protocol로 성능 비교</span>
+              </h3>
+              <p style={{ fontSize: '13.5px', color: '#94a3b8', marginTop: '6px' }}>
+                승인된 Dataset·Model Artifact·Pet Group Split이 확보되기 전에는 정확도나 성능 수치를 게시하지 않습니다.
+              </p>
+            </div>
+            <div style={{ background: 'rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '16px', padding: '12px 20px', textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>현재 평가 상태</div>
+              <div style={{ fontSize: '30px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>평가 전</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+            {[
+              ['STEP 1. Dataset 검증', 'Source · License · Class', '사용 가능 범위와 품질 확인'],
+              ['STEP 2. Split 고정', 'Pet Group Split', '동일 Pet의 평가 누수 차단'],
+              ['STEP 3. 후보 비교', '동일 Metric · 동일 환경', 'Baseline과 후보 Model 분리 평가'],
+              ['STEP 4. 안전성 평가', 'RAG 근거 · 위반률', 'Vision 성능과 Report 품질 분리']
+            ].map(([step, title, descriptionText], index) => (
+              <div key={step} style={{ background: index === 3 ? 'rgba(5, 150, 105, 0.15)' : 'rgba(255, 255, 255, 0.05)', border: index === 3 ? '1px solid #059669' : '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
+                <div style={{ fontSize: '11px', color: index === 3 ? '#34d399' : '#94a3b8', fontWeight: '700' }}>{step}</div>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>{title}</div>
+                <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>{descriptionText}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="diagnosis-evaluation-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', fontSize: '12px', color: '#94a3b8' }}>
+            <span>📄 공개 수치는 재현 가능한 Evidence와 팀 승인 뒤에만 반영합니다.</span>
+            <button type="button" onClick={() => setIsBenchmarkOpen(true)} className="btn btn-secondary" style={{ padding: '8px 14px', fontSize: '12px' }}>
+              평가 기준 자세히 보기
+            </button>
+          </div>
         </div>
       </div>
     </section>
