@@ -3,29 +3,54 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.petcare.backend.domain.community.CommunityPostMapper">
 
+    <!--
+      posts 테이블 기준으로 조회한다.
+      화면이 쓰던 authorName / petInfo / 카운트는 posts에 컬럼이 없으므로
+      users, pets, comments, post_likes에서 가져와 조립한다.
+      timeAgo는 저장하지 않고 createdAt으로 Controller에서 계산한다.
+    -->
+    <sql id="postColumns">
+        p.id                        AS id,
+        p.user_id                   AS userId,
+        p.pet_id                    AS petId,
+        u.nickname                  AS authorName,
+        CASE
+            WHEN pt.id IS NULL THEN NULL
+            ELSE pt.name || ' (' || COALESCE(pt.breed, '') || ' ' || COALESCE(pt.age, '') || ')'
+        END                         AS petInfo,
+        p.title                     AS title,
+        CAST(NULL AS VARCHAR)       AS attachedReport,
+        p.content                   AS content,
+        (SELECT COUNT(*) FROM comments c    WHERE c.post_id = p.id) AS commentsCount,
+        (SELECT COUNT(*) FROM post_likes l  WHERE l.post_id = p.id) AS likesCount,
+        p.created_at                AS createdAt
+    </sql>
+
+    <sql id="postJoins">
+        FROM posts p
+        LEFT JOIN users u  ON u.id  = p.user_id
+        LEFT JOIN pets  pt ON pt.id = p.pet_id
+    </sql>
+
     <select id="findAll" resultType="com.petcare.backend.domain.community.CommunityPostDTO">
-        SELECT id, author_name AS authorName, pet_info AS petInfo, title,
-               attached_report AS attachedReport, content, comments_count AS commentsCount,
-               likes_count AS likesCount, time_ago AS timeAgo, created_at AS createdAt
-        FROM community_posts
-        ORDER BY id DESC
+        SELECT <include refid="postColumns"/>
+        <include refid="postJoins"/>
+        ORDER BY p.id DESC
     </select>
 
     <select id="findById" resultType="com.petcare.backend.domain.community.CommunityPostDTO">
-        SELECT id, author_name AS authorName, pet_info AS petInfo, title,
-               attached_report AS attachedReport, content, comments_count AS commentsCount,
-               likes_count AS likesCount, time_ago AS timeAgo, created_at AS createdAt
-        FROM community_posts
-        WHERE id = #{id}
+        SELECT <include refid="postColumns"/>
+        <include refid="postJoins"/>
+        WHERE p.id = #{id}
     </select>
 
     <select id="countAll" resultType="int">
-        SELECT COUNT(*) FROM community_posts
+        SELECT COUNT(*) FROM posts
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO community_posts (author_name, pet_info, title, attached_report, content, comments_count, likes_count, time_ago)
-        VALUES (#{authorName}, #{petInfo}, #{title}, #{attachedReport}, #{content}, #{commentsCount}, #{likesCount}, #{timeAgo})
+        INSERT INTO posts (user_id, pet_id, title, content)
+        VALUES (#{userId}, #{petId}, #{title}, #{content})
     </insert>
 
 </mapper>
