@@ -193,7 +193,14 @@ export default function HospitalLocator() {
       setLoading(true);
 
       // Try Backend DB First
-      const backendData = await hospitalApi.getNearbyHospitals(mapCenter.lat, mapCenter.lng, filter24h);
+      // hospitalApi는 좌표가 유효하지 않거나 요청이 실패하면 예외를 던진다.
+      // 여기서 잡지 않으면 아래 setLoading(false)까지 실행되지 않아 화면이 로딩 상태로 멈춘다.
+      let backendData = [];
+      try {
+        backendData = await hospitalApi.getNearbyHospitals(mapCenter.lat, mapCenter.lng, filter24h);
+      } catch (error) {
+        console.warn('주변 병원 조회 실패:', error);
+      }
       
       // Dynamic Regional Generation for current Map Center
       const dynamicList = generateDynamicNearbyHospitals(mapCenter.lat, mapCenter.lng);
