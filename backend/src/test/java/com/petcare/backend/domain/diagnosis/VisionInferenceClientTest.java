@@ -43,15 +43,16 @@ class VisionInferenceClientTest {
                     "붉은 부위를 계속 긁습니다.", Map.of());
             MockMultipartFile image = new MockMultipartFile(
                     "image", "lesion.jpg", "image/jpeg",
-                    new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00});
+                    DiagnosisTestImages.jpegBytes(2, 2));
 
-            VisionInferenceResult result = client.infer(request, image, "request-001");
+            VisionInferenceResult result = client.infer(
+                    request, new DiagnosisImageValidator().validate(image), "request-001");
 
             assertThat(result.failureCode()).isEqualTo("MODEL_UNAVAILABLE");
             assertThat(result.mode()).isEqualTo("RULE_FALLBACK");
             assertThat(requestContentType.get()).startsWith("multipart/form-data;boundary=");
             assertThat(requestBody.get())
-                    .contains("name=\"image\"", "filename=\"lesion.jpg\"", "name=\"petId\"", "request-001");
+                    .contains("name=\"image\"", "filename=\"diagnosis-image.jpg\"", "name=\"petId\"", "request-001");
         } finally {
             server.stop(0);
         }

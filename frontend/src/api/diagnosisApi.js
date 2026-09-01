@@ -21,7 +21,11 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
   symptoms: '/diagnosis/symptoms',
   // 전달받은 ID를 URL에 넣어 상세·이력 주소를 만든다.
   detail: (diagnosisId) => `/diagnosis/${diagnosisId}`,
-  historyByPet: (petId) => `/pets/${petId}/diagnoses`,
+  image: (diagnosisId) => `/diagnosis/${diagnosisId}/image`,
+  historyByPet: (petId, page, size) => {
+    const query = new URLSearchParams({ page: String(page), size: String(size) });
+    return `/pets/${petId}/diagnoses?${query}`;
+  },
   create: '/diagnosis'
 });
 
@@ -64,8 +68,22 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  * @property {string|null} failureCode
  * @property {string[]} limitations
  * @property {string|null} requestId
+ * @property {string[]} riskReasons
+ * @property {string[]} actionCodes
+ * @property {string[]} actionGuidance
  * @property {string} createdAt
  */
+
+/**
+ * @typedef {Object} DiagnosisHistoryPage
+ * @property {DiagnosisRecord[]} content
+ * @property {number} page
+ * @property {number} size
+ * @property {number} totalElements
+ * @property {number} totalPages
+ */
+
+const ANALYSIS_TIMEOUT_MS = 20_000;
 
 /* ====================================================
    3. 진단 입력·응답 검증
@@ -130,12 +148,44 @@ export const diagnosisApi = Object.freeze({
     return response.data;
   },
 
+  /** 소유권이 확인된 진단 기록의 비공개 Image를 Blob으로 조회한다. */
+  getDiagnosisImage: async (diagnosisId) => {
+    const id = requirePositiveId(diagnosisId, 'diagnosisId');
+    return httpClient.getBlob(DIAGNOSIS_ENDPOINTS.image(id));
+  },
+
   /** 반려동물 ID에 속한 과거 진단 결과 목록을 조회한다. */
-  getHistoryByPet: async (petId) => {
+  getHistoryByPet: async (petId, page = 0, size = 5) => {
     const id = requirePositiveId(petId, 'petId');
-    const body = await httpClient.get(DIAGNOSIS_ENDPOINTS.historyByPet(id));
+    if (!Number.isInteger(page) || page < 0) {
+      throw new TypeError('page는 0 이상의 정수여야 합니다.');
+    }
+    if (!Number.isInteger(size) || size < 1 || size > 20) {
+      throw new TypeError('size는 1 이상 20 이하의 정수여야 합니다.');
+    }
+
+    const body = await httpClient.get(DIAGNOSIS_ENDPOINTS.historyByPet(id, page, size));
     const response = requireSuccessfulDiagnosisResponse(body);
-    return response.data || [];
+    const data = response.data;
+
+    // Backend paging 배포 전의 배열 응답도 읽을 수 있게 하되 Component에는 한 형식만 반환한다.
+    if (Array.isArray(data)) {
+      return {
+        content: data,
+        page: 0,
+        size: data.length,
+        totalElements: data.length,
+        totalPages: data.length > 0 ? 1 : 0
+      };
+    }
+
+    return {
+      content: Array.isArray(data?.content) ? data.content : [],
+      page: Number.isInteger(data?.page) ? data.page : page,
+      size: Number.isInteger(data?.size) ? data.size : size,
+      totalElements: Number.isInteger(data?.totalElements) ? data.totalElements : 0,
+      totalPages: Number.isInteger(data?.totalPages) ? data.totalPages : 0
+    };
   },
 
   /**
@@ -156,8 +206,25 @@ export const diagnosisApi = Object.freeze({
     );
     formData.append('image', imageFile, imageFile.name);
 
-    const body = await httpClient.postForm(DIAGNOSIS_ENDPOINTS.create, formData);
-    const response = requireSuccessfulDiagnosisResponse(body);
-    return response.data;
+    const abortController = new AbortController();
+    const timeoutId = window.setTimeout(() => abortController.abort(), ANALYSIS_TIMEOUT_MS);
+
+    try {
+      const body = await httpClient.postForm(DIAGNOSIS_ENDPOINTS.create, formData, {
+        signal: abortController.signal
+      });
+      const response = requireSuccessfulDiagnosisResponse(body);
+      return response.data;
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        throw new DiagnosisApiError(
+          '진단 분석 시간이 초과되었습니다. 입력 내용은 유지되므로 잠시 후 다시 시도해 주세요.',
+          504
+        );
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
   }
 });

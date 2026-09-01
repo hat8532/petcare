@@ -1,52 +1,163 @@
-import React, { useState, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { diagnosisApi } from '../api/diagnosisApi';
+import AiBenchmarkModal from './AiBenchmarkModal';
+import DiagnosisFailureDialog from './DiagnosisFailureDialog';
 
-export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onNavigateHospital }) {
+const AREA_OPTIONS = [
+  { id: 'SKIN', label: '피부/모피', icon: '🐾' },
+  { id: 'EYE', label: '안구/눈', icon: '👁️' },
+  { id: 'EAR', label: '귀/귓바퀴', icon: '👂' },
+  { id: 'MOUTH', label: '구강/치아', icon: '🦷' },
+  { id: 'PAW_LIMB', label: '발/관절', icon: '🐾' },
+  { id: 'NOSE_RESPIRATORY', label: '코/호흡기', icon: '👃' },
+  { id: 'ABDOMEN', label: '배/소화기', icon: '🩺' },
+  { id: 'CUSTOM', label: '직접 입력', icon: '✏️' }
+];
+
+const HISTORY_PAGE_SIZE = 5;
+const RETRYABLE_FAILURE_CODES = new Set([
+  'INFERENCE_TIMEOUT',
+  'PROVIDER_UNAVAILABLE',
+  'PROVIDER_RATE_LIMITED',
+  'PROVIDER_MODEL_UNAVAILABLE',
+  'INVALID_PROVIDER_RESPONSE'
+]);
+
+const ACTION_TITLES = Object.freeze({
+  MONITOR_AND_RECORD: '집에서 경과 기록',
+  ESCALATE_IF_WORSE: '악화 시 병원 문의',
+  CONTACT_VET_SOON: '빠른 시일 내 병원 문의',
+  AVOID_UNVERIFIED_TREATMENT: '임의 처치 금지',
+  SEEK_EMERGENCY_VET_NOW: '즉시 응급 병원 연락·이동',
+  FOLLOW_CLINIC_INSTRUCTIONS: '병원 안내 우선'
+});
+
+const riskBadgeClass = (riskLevel) => {
+  if (riskLevel === 'EMERGENCY') return 'badge-rose';
+  if (riskLevel === 'CAUTION') return 'badge-amber';
+  return 'badge-emerald';
+};
+
+const formatDate = (value) => {
+  if (!value) return '방금';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ko-KR');
+};
+
+export default function DiagnosisDropzone({
+  selectedPet,
+  pets = [],
+  isAuthenticated = false,
+  onSelectPet,
+  onOpenLogin,
+  onOpenPetManagement,
+  onNavigateTimeline,
+  onOpenCareFlow,
+  onDiagnosisResult
+}) {
   const [affectedArea, setAffectedArea] = useState('SKIN');
   const [customAreaText, setCustomAreaText] = useState('');
+  const [symptomOptions, setSymptomOptions] = useState({});
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
   const [description, setDescription] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [isBenchmarkOpen, setIsBenchmarkOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState('');
-  const [customPhoto, setCustomPhoto] = useState(null);
-  const [imageFile, setImageFile] = useState(null);
-  const [fileName, setFileName] = useState('');
-  const [isDragging, setIsDragging] = useState(false);
-
+  const [analysisFailure, setAnalysisFailure] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyError, setHistoryError] = useState('');
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyMeta, setHistoryMeta] = useState({ totalElements: 0, totalPages: 0 });
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [previewDiagnosisId, setPreviewDiagnosisId] = useState(null);
+  const [storedImagePreview, setStoredImagePreview] = useState('');
+  const [storedImageError, setStoredImageError] = useState('');
   const fileInputRef = useRef(null);
+  const closeAnalysisFailure = useCallback(() => setAnalysisFailure(null), []);
 
-  const sampleImages = {
-    SKIN: 'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=500&auto=format&fit=crop&q=60',
-    EYE: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500&auto=format&fit=crop&q=60',
-    EAR: 'https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?w=500&auto=format&fit=crop&q=60',
-    MOUTH: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=500&auto=format&fit=crop&q=60',
-    PAW_LIMB: 'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=500&auto=format&fit=crop&q=60',
-    NOSE_RESPIRATORY: 'https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?w=500&auto=format&fit=crop&q=60',
-    ABDOMEN: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=500&auto=format&fit=crop&q=60',
-    CUSTOM: 'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=500&auto=format&fit=crop&q=60'
-  };
+  useEffect(() => {
+    let active = true;
+    diagnosisApi.getSymptoms()
+      .then((options) => {
+        if (active) setSymptomOptions(options || {});
+      })
+      .catch((error) => {
+        if (active) setAnalysisError(error?.message || '증상 선택지를 불러오지 못했습니다.');
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const symptomOptions = {
-    SKIN: ['가려움/긁음', '발적/각질', '탈모 부위', '진물/부종', '통증/예민'],
-    EYE: ['눈물과다', '충혈/발적', '눈꼽/분비물', '눈지침/못뜸', '혼탁 현상'],
-    EAR: ['귀를 자주 턴다', '악취/검은 귀지', '귓바퀴 붉어짐', '통증 반응'],
-    MOUTH: ['구취/입냄새', '잇몸 부종', '치석 누적', '침흘림 과다'],
-    PAW_LIMB: ['절뚝거림/파행', '발바닥 부종/습진', '관절 부위 예민', '발톱 상처'],
-    NOSE_RESPIRATORY: ['콧물/재채기', '호흡 가쁨', '코 건조/갈라짐', '기침 소리'],
-    ABDOMEN: ['구토/토사물', '설사/무른변', '배가 딱딱함', '식욕 부진'],
-    CUSTOM: ['통증/예민', '이상 붓기', '행동 이상', '식욕 감소']
-  };
+  useEffect(() => () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+  }, [imagePreview]);
 
-  const toggleSymptom = (sym) => {
-    if (selectedSymptoms.includes(sym)) {
-      setSelectedSymptoms(selectedSymptoms.filter((s) => s !== sym));
-    } else {
-      setSelectedSymptoms([...selectedSymptoms, sym]);
+  useEffect(() => {
+    if (!analysisResult?.diagnosisId || !analysisResult?.imageUrl) {
+      setStoredImagePreview('');
+      setStoredImageError('');
+      return undefined;
     }
-  };
 
-  const selectImageFile = (file) => {
+    let active = true;
+    let objectUrl = '';
+    diagnosisApi.getDiagnosisImage(analysisResult.diagnosisId)
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setStoredImagePreview(objectUrl);
+        setStoredImageError('');
+      })
+      .catch((error) => {
+        if (!active) return;
+        setStoredImagePreview('');
+        setStoredImageError(error?.message || '저장된 진단 Image를 불러오지 못했습니다.');
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [analysisResult?.diagnosisId, analysisResult?.imageUrl]);
+
+  const loadHistory = useCallback(async (page = 0) => {
+    if (!selectedPet?.id) {
+      setHistory([]);
+      setHistoryError('');
+      setHistoryMeta({ totalElements: 0, totalPages: 0 });
+      return;
+    }
+
+    setIsHistoryLoading(true);
+    try {
+      const resultPage = await diagnosisApi.getHistoryByPet(selectedPet.id, page, HISTORY_PAGE_SIZE);
+      setHistory(resultPage.content);
+      setHistoryPage(resultPage.page);
+      setHistoryMeta({
+        totalElements: resultPage.totalElements,
+        totalPages: resultPage.totalPages
+      });
+      setHistoryError('');
+    } catch (error) {
+      setHistory([]);
+      setHistoryError(error?.message || '과거 진단 이력을 불러오지 못했습니다.');
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [selectedPet?.id]);
+
+  useEffect(() => {
+    setHistoryPage(0);
+    loadHistory(0);
+  }, [loadHistory]);
+
+  const selectImage = (file) => {
+    setIsDragging(false);
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       setAnalysisError('JPEG, PNG 또는 WEBP Image만 선택할 수 있습니다.');
@@ -57,367 +168,145 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
       return;
     }
 
-    setAnalysisError('');
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(file);
-    setFileName(file.name);
-    setCustomPhoto(URL.createObjectURL(file));
+    setImagePreview(URL.createObjectURL(file));
+    setAnalysisError('');
   };
 
-  const handleFileChange = (e) => {
-    selectImageFile(e.target.files?.[0]);
+  const clearImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    selectImageFile(file);
+  const toggleSymptom = (symptom) => {
+    setSelectedSymptoms((current) => current.includes(symptom)
+      ? current.filter((item) => item !== symptom)
+      : [...current, symptom]);
   };
-
-  const petSpecies = (selectedPet?.species || '').toUpperCase();
-  const petNameStr = (selectedPet?.name || '').toLowerCase();
-  const petBreedStr = (selectedPet?.breed || '').toLowerCase();
-
-  const isHamster = petSpecies === 'HAMSTER' || petNameStr.includes('햄스터') || petBreedStr.includes('햄스터');
-  const isSnakeOrReptile = petSpecies === 'OTHER' || petSpecies === 'REPTILE' || petNameStr.includes('뱀') || petNameStr.includes('거북') || petNameStr.includes('파충류') || petBreedStr.includes('뱀') || petBreedStr.includes('파충류') || petBreedStr.includes('거북');
-  const isCat = petSpecies === 'CAT' || petNameStr.includes('나비') || petBreedStr.includes('고양이') || petBreedStr.includes('코숏');
-  const isRabbit = petSpecies === 'RABBIT' || petNameStr.includes('토끼') || petBreedStr.includes('토끼') || petBreedStr.includes('드워프');
-  const isBird = petSpecies === 'BIRD' || petNameStr.includes('앵무') || petBreedStr.includes('조류') || petBreedStr.includes('새');
-
-  let speciesSamplePhoto = sampleImages[affectedArea] || sampleImages.SKIN;
-  if (isHamster) {
-    speciesSamplePhoto = 'https://images.unsplash.com/photo-1425082661705-1834bfd09dca?w=500&auto=format&fit=crop&q=60';
-  } else if (isSnakeOrReptile) {
-    speciesSamplePhoto = 'https://images.unsplash.com/photo-1531386151447-fd76ad50012f?w=500&auto=format&fit=crop&q=60';
-  } else if (isCat) {
-    speciesSamplePhoto = 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=500&auto=format&fit=crop&q=60';
-  } else if (isRabbit) {
-    speciesSamplePhoto = 'https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?w=500&auto=format&fit=crop&q=60';
-  } else if (isBird) {
-    speciesSamplePhoto = 'https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=500&auto=format&fit=crop&q=60';
-  }
-
-  const currentDisplayPhoto = customPhoto || speciesSamplePhoto;
 
   const handleRunDiagnosis = async () => {
+    if (!selectedPet?.id) {
+      setAnalysisError('먼저 진단할 반려동물을 선택해 주세요.');
+      return;
+    }
+    if (!imageFile || selectedSymptoms.length === 0 || !description.trim()) {
+      setAnalysisError('환부 Image, 증상 한 개 이상, 상세 설명을 모두 입력해 주세요.');
+      return;
+    }
+    if (affectedArea === 'CUSTOM' && !customAreaText.trim()) {
+      setAnalysisError('직접 입력한 환부 이름을 작성해 주세요.');
+      return;
+    }
+
     setIsAnalyzing(true);
     setAnalysisResult(null);
     setAnalysisError('');
+    setAnalysisFailure(null);
+    setPreviewDiagnosisId(null);
 
-    const petName = selectedPet?.name || '반려동물';
-    const healthProfile = selectedPet?.healthProfile;
-    const diagnosisRequest = {
-      petId: selectedPet?.id || 1,
-      petName,
-      petSpecies: selectedPet?.species || 'UNKNOWN',
-      affectedArea,
-      customAreaText,
-      symptoms: selectedSymptoms,
-      description,
-      healthProfile
-    };
-
-    // Real Backend API attempt
     try {
-      const apiRes = await diagnosisApi.analyze(diagnosisRequest, imageFile);
+      const result = await diagnosisApi.analyze({
+        petId: selectedPet.id,
+        petName: selectedPet.name || '반려동물',
+        petSpecies: selectedPet.species || 'UNKNOWN',
+        affectedArea,
+        customAreaText,
+        symptoms: selectedSymptoms,
+        description: description.trim(),
+        healthProfile: selectedPet.healthProfile
+      }, imageFile);
 
-      if (apiRes) {
-        const parsedDiseases = (apiRes.visionTopDiseases || []).map((disease) => ({
-          name: disease.diseaseName,
-          prob: disease.probability
-        }));
-
-        setAnalysisResult({
-          riskLevel: apiRes.riskLevel,
-          riskLabel: apiRes.riskLabel,
-          riskBadgeClass: apiRes.riskLevel === 'EMERGENCY' ? 'badge-rose' : 'badge-amber',
-          hasPhrContext: !!healthProfile,
-          diseases: parsedDiseases,
-          report: apiRes.ragReport,
-          analysisMode: apiRes.analysisMode,
-          model: apiRes.model,
-          modelVersion: apiRes.modelVersion,
-          failureCode: apiRes.failureCode,
-          limitations: apiRes.limitations || [],
-          createdAt: apiRes.createdAt
+      setAnalysisResult(result);
+      setPreviewDiagnosisId(result.diagnosisId);
+      onDiagnosisResult?.(result);
+      await loadHistory(0);
+      // 응급 분기에서는 Emergency modal을 우선해 두 개의 focus trap이 동시에 열리지 않게 한다.
+      if (result.riskLevel !== 'EMERGENCY' && result.failureCode) {
+        setAnalysisFailure({
+          code: result.failureCode,
+          message: '외부 Image 분석 Provider 응답을 검증하지 못해 입력 기반 Safety Triage만 저장했습니다.',
+          canRetry: RETRYABLE_FAILURE_CODES.has(result.failureCode)
         });
-        setIsAnalyzing(false);
-        return;
       }
     } catch (error) {
-      const demoFallbackEnabled = import.meta.env.DEV
-        && import.meta.env.VITE_ENABLE_DIAGNOSIS_DEMO === 'true';
-      if (!demoFallbackEnabled) {
-        setAnalysisError(error?.message || '진단 API 요청에 실패했습니다.');
-        setIsAnalyzing(false);
-        return;
-      }
-    }
-
-    setTimeout(() => {
+      const message = error?.message || '진단 API 요청에 실패했습니다.';
+      setAnalysisError(message);
+      setAnalysisFailure({
+        code: error?.responseBody?.failureCode || (error?.status ? `HTTP_${error.status}` : 'NETWORK_ERROR'),
+        message,
+        canRetry: !error?.status || error.status >= 500
+      });
+    } finally {
       setIsAnalyzing(false);
+    }
+  };
 
-      const areaLabels = {
-        SKIN: '피부/모피',
-        EYE: '안구/눈',
-        EAR: '귀/귓바퀴',
-        MOUTH: '구강/치아',
-        PAW_LIMB: '발/관절',
-        NOSE_RESPIRATORY: '코/호흡기',
-        ABDOMEN: '배/소화기',
-        CUSTOM: customAreaText.trim() || '국소 특이 부위'
-      };
-      const areaName = areaLabels[affectedArea] || '환부';
+  const showStoredDiagnosis = async (diagnosisId) => {
+    try {
+      const result = await diagnosisApi.getDiagnosis(diagnosisId);
+      setAnalysisResult(result);
+      setAnalysisError('');
+      setAnalysisFailure(null);
+      setPreviewDiagnosisId(null);
+      onDiagnosisResult?.(result);
+    } catch (error) {
+      setAnalysisError(error?.message || '저장된 진단 결과를 불러오지 못했습니다.');
+    }
+  };
 
-      const fullText = (selectedSymptoms.join(' ') + ' ' + description + ' ' + customAreaText).toLowerCase();
-      const isSheddingIssue = fullText.includes('탈피') || fullText.includes('허물') || fullText.includes('비늘');
-      const isUnconsciousOrDeath = fullText.includes('죽') || fullText.includes('사망') || fullText.includes('움직임이 멈') || fullText.includes('의식') || fullText.includes('숨을 안') || fullText.includes('숨을 쉬지');
+  const canAnalyze = Boolean(
+    selectedPet?.id
+    && imageFile
+    && selectedSymptoms.length > 0
+    && description.trim()
+    && (affectedArea !== 'CUSTOM' || customAreaText.trim())
+  );
+  const findings = analysisResult?.visionTopDiseases || [];
+  const resultImageUrl = storedImagePreview
+    || (analysisResult?.diagnosisId === previewDiagnosisId ? imagePreview : '');
 
-      const symText = selectedSymptoms.join(' ') + ' ' + description;
-      let topDiseaseName = '국소 염증 및 예민 반응';
-
-      // =========================================================================
-      // 🤖 PURE REAL-TIME DYNAMIC AI DIAGNOSTIC REASONING ENGINE (100% AI 추론)
-      // =========================================================================
-      const runRealtimeAIDiagnosis = (species, petName, areaName, symptoms, desc, customArea, vitals) => {
-        const fullText = (symptoms.join(' ') + ' ' + desc + ' ' + customArea).toLowerCase().trim();
-        const temp = vitals?.bodyTemp ? parseFloat(vitals.bodyTemp.toString().replace('°C', '')) : 38.5;
-        const hr = vitals?.heartRate ? parseInt(vitals.heartRate.toString().replace('bpm', ''), 10) : 110;
-        const isHighTemp = temp >= 39.4;
-        const isHighHr = hr >= 145;
-
-        // 1. Semantic Emergency Reasoning (응급 상태 동적 인지)
-        const emergencyKeywords = ['죽', '사망', '움직임이 멈', '의식', '숨을 안', '숨을 쉬지', '초콜릿', '양파', '이물질', '삼켰', '자궁', '고름', 'pyometra', '빨갛', '혈변', '피똥', '혈토', '출혈', '피가', '붉은', '경련', '발작', '열사병', '파보', '빈혈', '황달', 'flutd', '알막힘'];
-        const isEmergencyInput = emergencyKeywords.some(kw => fullText.includes(kw)) || isHighTemp || isHighHr;
-
-        // 2. Dynamic Primary Disease Reasoning (AI 질환 의미론적 파싱)
-        let primaryDisease = '';
-        let secondaryDisease = '';
-        let tertiaryDisease = '';
-
-        if (fullText.includes('발톱') || fullText.includes('부러') || fullText.includes('꺾') || fullText.includes('손톱')) {
-          primaryDisease = '발톱 외상성 파열 및 2차 조갑염';
-          secondaryDisease = '지간 농피증 및 발바닥 습진';
-          tertiaryDisease = '발바닥 연조직 염증 및 2차 세균 감염';
-        } else if (fullText.includes('빨갛') || fullText.includes('혈변') || fullText.includes('피똥') || fullText.includes('피가') || fullText.includes('붉은')) {
-          primaryDisease = '급성 출혈성 대장염 및 세균성 장염 (AHDS/혈변) 🚨';
-          secondaryDisease = '소화기 곰팡이/유해균 감염 증후군';
-          tertiaryDisease = '식품 알레르기성 출혈성 위장 장애';
-        } else if (fullText.includes('죽') || fullText.includes('사망') || fullText.includes('움직임이 멈') || fullText.includes('의식')) {
-          if (species.includes('햄스터')) {
-            primaryDisease = '급성 의식 불명 / 동면(동면 상태) 및 심각한 쇼크 🚨';
-            secondaryDisease = '저체온증 및 급성 혈당 저하';
-            tertiaryDisease = '소동물 심폐 기능 저하 소견';
-          } else if (species.includes('고양이')) {
-            primaryDisease = '급성 의식 불명 / 고양이 심폐 쇼크 및 청색증 🚨';
-            secondaryDisease = '급성 신부전 및 요독증 쇼크';
-            tertiaryDisease = '비후성 심근증 (HCM) 급성 호흡 마비';
-          } else {
-            primaryDisease = '급성 의식 불명 / 강아지 전신 심폐 쇼크 🚨';
-            secondaryDisease = '급성 아나필락시스 심장 마비';
-            tertiaryDisease = '뇌혈관 질환 및 급성 쇼크';
-          }
-        } else if (fullText.includes('초콜릿') || fullText.includes('양파') || fullText.includes('이물질') || fullText.includes('먹었')) {
-          primaryDisease = '급성 중독증 (독성 물질) 및 소화기 장폐색 🚨';
-          secondaryDisease = '위 점막 천공 및 독성 용혈성 안구 반응';
-          tertiaryDisease = '십이지장 궤양 및 위경련';
-        } else if (fullText.includes('탈피') || fullText.includes('허물') || fullText.includes('비늘')) {
-          primaryDisease = '탈피 부전 (Dysecdysis / 파충류 비늘 탈피 장애)';
-          secondaryDisease = '비늘 습진 및 2차 감염성 피부염';
-          tertiaryDisease = '안구 스펙타클 비늘 잔여 소견';
-        } else if (fullText.includes('마우스롯') || (species.includes('뱀') && areaName.includes('구강'))) {
-          primaryDisease = '마우스롯 (Mouth Rot / 감염성 구내염 & 궤양)';
-          secondaryDisease = '구강 세균성 궤양 질환';
-          tertiaryDisease = '턱 관절 염증 및 잇몸 부종';
-        } else if (fullText.includes('기운') || fullText.includes('무기력') || fullText.includes('안움직') || fullText.includes('식욕') || fullText.includes('밥안')) {
-          primaryDisease = '급성 기력 저하 및 내과 전해질 불균형';
-          secondaryDisease = '초기 탈수 및 식욕 부진 증후군';
-          tertiaryDisease = '정서적 스트레스 및 바이러스 감기 초기';
-        } else if (fullText.includes('구토') || fullText.includes('토사물') || fullText.includes('노란')) {
-          primaryDisease = '급성 위경련 및 출혈성 위장염 (AHDS)';
-          secondaryDisease = '십이지장 궤양 및 급성 췌장염 소견';
-          tertiaryDisease = '장내 유해세균 과다 증식 소견';
-        } else if (fullText.includes('설사') || fullText.includes('무른변')) {
-          primaryDisease = '급성 세균성 장염 및 출혈성 대장염';
-          secondaryDisease = '소화기 곰팡이/유해균 감염 증후군';
-          tertiaryDisease = '식품 알레르기성 위장 장애';
-        } else if (fullText.includes('절뚝') || fullText.includes('파행') || fullText.includes('슬개골') || fullText.includes('다리')) {
-          primaryDisease = '슬개골 탈구 2~3단계 / 관절 염증';
-          secondaryDisease = '십자인대 미세 파열 및 염좌';
-          tertiaryDisease = '지간염 및 관절 연골 손상';
-        } else if (fullText.includes('기침') || fullText.includes('거위') || fullText.includes('쌕쌕')) {
-          primaryDisease = '기관지 협착증 (Tracheal Collapse) 2~3단계';
-          secondaryDisease = '상왕격 감염성 기침 (Kennel Cough)';
-          tertiaryDisease = '알레르기성 과민성 기침 및 폐부종';
-        } else if (areaName.includes('피부') || fullText.includes('피부') || fullText.includes('가려움') || fullText.includes('탈모')) {
-          primaryDisease = fullText.includes('탈모') ? '링웜 (곰팡이성 서상균)' : '농피증 / 세균성 피부염';
-          secondaryDisease = '모낭충증 및 세균성 모낭염';
-          tertiaryDisease = '접촉성 아토피 피부염';
-        } else if (areaName.includes('안구') || fullText.includes('눈') || fullText.includes('충혈')) {
-          primaryDisease = fullText.includes('각막') ? '각막 궤양 / 손상 위험' : '급성 결막염 / 눈물샘 충혈';
-          secondaryDisease = '안구 건조증 및 제3안검 발적';
-          tertiaryDisease = '안구 내압 상승 소견';
-        } else if (areaName.includes('귀') || fullText.includes('귀') || fullText.includes('귀지')) {
-          primaryDisease = fullText.includes('곰팡이') ? '귀 말라세지아 곰팡이성 염증' : '외이도염 / 검은 귀지 감염';
-          secondaryDisease = '귀 진드기 (Otodectes) 서식 감염';
-          tertiaryDisease = '귓바퀴 이혈종 및 습진 소견';
-        } else if (areaName.includes('구강') || fullText.includes('구취') || fullText.includes('치석')) {
-          primaryDisease = fullText.includes('구취') ? '구내염 및 구취 증후군' : '치주염 / 잇몸 부종';
-          secondaryDisease = '잇몸 출혈 및 치석 누적 염증';
-          tertiaryDisease = '치근단 농양 소견';
-        } else {
-          const mainContext = desc.trim() || customArea.trim() || areaName;
-          primaryDisease = `${mainContext} 부위 연조직 부종 및 염증 소견`;
-          secondaryDisease = `${mainContext} 부위 2차 세균/곰팡이 감염`;
-          tertiaryDisease = '면역력 저하 및 국소 예민 반응';
-        }
-
-        // 3. Fully Dynamic Real-Time AI Action Plan Generation (100% Context-Aware AI)
-        let step1 = '';
-        let step2 = '';
-        let step3 = '';
-
-        const contextArea = areaName.trim();
-        const mainDesc = desc.trim() || customArea.trim() || selectedSymptoms.join(' ') || contextArea;
-
-        // Dynamic Step 1 (현장 1차 응급/처치 조치)
-        if (fullText.includes('발톱') || fullText.includes('부러') || fullText.includes('꺾')) {
-          step1 = '1. 🩹 [발톱 파열 지혈 처치]: 부러진 발톱에서 출혈 발생 시 멸균 거즈나 지혈 분말로 3~5분 간 즉시 압박 지혈하고 핥지 못하게 넥카라를 착용해 주세요.';
-        } else if (fullText.includes('빨갛') || fullText.includes('혈변') || fullText.includes('피똥') || fullText.includes('피가')) {
-          step1 = '1. 🚨 [혈변/출혈성 장염 응급 체크]: 변에 피가 섞여 나오는 혈변(붉은 변)은 조기 지혈 및 수액 치료가 필수적인 초응급 상황입니다. 즉시 24시 응급 동물병원으로 이송하세요!';
-        } else if (fullText.includes('죽') || fullText.includes('사망') || fullText.includes('움직임이 멈') || fullText.includes('의식')) {
-          step1 = species.includes('햄스터')
-            ? '1. 🚨 [소동물 동면/가사 상태 응급 체크]: 햄스터는 18°C 이하 찬 환경에서 동면(Pseudo-hibernation)에 들 수 있습니다. 즉시 24~26°C 따뜻한 방으로 이동 후 부드러운 타월로 감싸 체온을 올려주세요.'
-            : '1. 🚨 [의식 불명/쇼크 응급 체크]: 자극에 반응하지 않는 심각한 응급 상태입니다. 아이의 호흡(가슴 움직임)과 잇몸 청색증 여부를 즉시 확인하고 기도를 확보해 주세요.';
-        } else if (contextArea.includes('안구') || contextArea.includes('눈') || fullText.includes('눈') || fullText.includes('충혈')) {
-          step1 = '1. 👁️ [안구 2차 손상 방지]: 손으로 눈을 비비거나 긁어 각막 궤양/천공이 생기지 않도록 넥카라를 즉시 착용시키고, 멸균 세정액으로 눈 주변 분비물을 살살 닦아내어 주세요.';
-        } else if (contextArea.includes('귀') || fullText.includes('귀') || fullText.includes('귀지')) {
-          step1 = '1. 👂 [귀 세정 & 마사지]: 귀 전용 세정액을 귓구멍에 소량 넣은 후 귓바퀴 아래를 마사지하여 흘러나온 이물질과 검은 귀지를 부드러운 솜으로 닦아내어 주세요.';
-        } else if (contextArea.includes('구강') || fullText.includes('구취') || fullText.includes('치석') || fullText.includes('잇몸')) {
-          step1 = '1. 🦷 [구강 통증 완화]: 출혈 및 잇몸 통증 자극을 줄이기 위해 딱딱한 간식을 중단하고 미온수로 불린 소프트 사료나 처방 습식 캔을 공급하세요.';
-        } else if (contextArea.includes('호흡기') || fullText.includes('기침') || fullText.includes('거위')) {
-          step1 = '1. 🫁 [기관지 자극 최소화]: 목을 압박하는 목줄 대신 가슴 하네스를 사용하고 실내 가습기를 가동해 55~60% 쾌적 습도를 유지해 주세요.';
-        } else if (contextArea.includes('소화기') || contextArea.includes('배') || fullText.includes('구토') || fullText.includes('설사')) {
-          step1 = '1. 🥣 [위장 기관 휴식]: 위장 자극 최소화를 위해 4~6시간 금식 후 미온수 불린 사료를 조금씩 나눠 급여하세요.';
-        } else if (isEmergencyInput) {
-          step1 = `1. 🚨 [응급 상황 감지]: 입력하신 소견("${mainDesc}")은 신속한 임상 처치가 필요합니다. 아이를 안정시키고 통증 부위를 자극하지 마세요.`;
-        } else {
-          step1 = `1. [현장 1차 조치]: ${contextArea} 부위의 관찰 소견("${mainDesc}")에 대해 2차 감염을 방지하고 상처 부위를 청결하게 유지하며 핥거나 비비지 않도록 넥카라를 착용하세요.`;
-        }
-
-        // Dynamic Step 2 (맞춤 환경 & 위생 & 안심 케어)
-        if (fullText.includes('발톱') || fullText.includes('부러') || fullText.includes('꺾')) {
-          step2 = '2. 🧼 [소독 및 안정을 위한 케어]: 소독약(포비돈/생리식염수)으로 발톱 주변을 청결하게 유지하며 부러져 흔들리는 잔여 발톱은 무리하게 뽑지 마세요.';
-        } else if (fullText.includes('빨갛') || fullText.includes('혈변') || fullText.includes('피똥') || fullText.includes('피가')) {
-          step2 = '2. 🚨 [응급 이송 수의학 조치]: 장내 혈관 파열 방지를 위해 임의의 약 복용을 절대 금지하고, 배변 성상(혈변 상태) 사진을 찍어 24시 응급 센터 수의사에게 보여주세요.';
-        } else if (contextArea.includes('안구') || contextArea.includes('눈') || fullText.includes('눈') || fullText.includes('충혈')) {
-          step2 = '2. 💧 [안구 습도 & 조명 케어]: 실내 조명을 살짝 어둡게 낮춰 눈부심 자극을 줄이고, 멸균 안구 인공눈물을 점적하여 안구 건조 및 각막 자극을 완화해 주세요.';
-        } else if (contextArea.includes('귀') || fullText.includes('귀') || fullText.includes('귀지')) {
-          step2 = '2. 🌬️ [통풍 & 건조 케어]: 귀 안쪽에 습기가 차지 않도록 귓바퀴를 젖혀 쾌적하게 통풍 건조시키고 면봉을 깊숙이 넣지 않도록 주의하세요.';
-        } else if (contextArea.includes('구강') || fullText.includes('구취') || fullText.includes('치석') || fullText.includes('잇몸')) {
-          step2 = '2. 🪥 [구강 안심 케어]: 소독성 오라클 젤이나 수의학 구강 세정제를 잇몸 주변에 부드럽게 도포하여 구강 세균 증식을 억제해 주세요.';
-        } else if (contextArea.includes('호흡기') || fullText.includes('기침') || fullText.includes('거위')) {
-          step2 = '2. 🌡️ [온습도 환경 케어]: 갑작스러운 차가운 공기 노출을 피하고 실내 온도를 24~26°C 온화하게 유지해 주세요.';
-        } else if (contextArea.includes('소화기') || contextArea.includes('배') || fullText.includes('구토') || fullText.includes('설사')) {
-          step2 = '2. 🥛 [소화기 유산균 케어]: 소화기 전용 처방 유산균을 사료에 믹스하여 장내 유해균 증식을 억제하고 자극적인 간식을 중단하세요.';
-        } else if (contextArea.includes('발') || contextArea.includes('관절') || fullText.includes('절뚝') || fullText.includes('다리')) {
-          step2 = '2. 🧊 [부종 쿨링 & 매트 설치]: 붓기 부위에 10분 간 가벼운 쿨링 찜질을 진행하고 미끄럼 방지 매트를 설치해 관절 부담을 줄여주세요.';
-        } else if (contextArea.includes('피부') || fullText.includes('가려움') || fullText.includes('탈모')) {
-          step2 = '2. 🧴 [약용 세정 & 완전 건조]: 미온수 약용 샴푸로 세정 후 피모 안쪽까지 드라이기로 완전히 건조시켜 곰팡이 및 세균 재발을 방지해 주세요.';
-        } else {
-          step2 = `2. [환경 & 위생 케어]: ${contextArea} 환부가 습해지거나 오염되지 않도록 통풍이 잘 되는 쾌적한 환경을 유지하며 신선한 미온수 수분을 충분히 공급해 주세요.`;
-        }
-
-        // Dynamic Step 3 (수의사 전문 진료 & 3일 타임라인 관찰)
-        if (isEmergencyInput) {
-          step3 = '3. 🚨 초응급 골든타임 확보를 위해 [주변 24시 응급 동물병원]에 즉시 전화 후 빠르게 응급 진료를 진행하세요.';
-        } else {
-          step3 = '3. [3일 경과 관찰 타임라인]: 3일 간 환부 소독 및 수분 공급 경과를 관찰하신 후 [3일 뒤 경과 관찰 등록] 타임라인에 기록해 보시기 바랍니다.';
-        }
-
-        return {
-          primaryDisease,
-          secondaryDisease,
-          tertiaryDisease,
-          isEmergency: isEmergencyInput,
-          aiStep1: step1,
-          aiStep2: step2,
-          aiStep3: step3
-        };
-      };
-
-      const aiResult = runRealtimeAIDiagnosis(petSpecies, petName, areaName, selectedSymptoms, description, customAreaText, healthProfile);
-      const top1Name = aiResult.primaryDisease;
-      const top2Name = aiResult.secondaryDisease;
-      const top3Name = aiResult.tertiaryDisease;
-      const isEmergency = aiResult.isEmergency;
-      const aiStep1 = aiResult.aiStep1;
-      const aiStep2 = aiResult.aiStep2;
-      const aiStep3 = aiResult.aiStep3;
-
-      const baseProb = Math.min(94.8, Math.max(76.5, 82.0 + (selectedSymptoms.length * 2.3) + (description.length > 5 ? 3.1 : 0))).toFixed(1);
-      const subProb1 = (100 - parseFloat(baseProb)) * 0.65;
-      const subProb2 = (100 - parseFloat(baseProb)) * 0.35;
-
-      const tempVal = healthProfile?.bodyTemp ? parseFloat(healthProfile.bodyTemp.toString().replace('°C', '')) : 38.5;
-      const hrVal = healthProfile?.heartRate ? parseInt(healthProfile.heartRate.toString().replace('bpm', ''), 10) : 110;
-      const isHighTemp = tempVal >= 39.4;
-      const isHighHr = hrVal >= 145;
-      const hasAllergy = healthProfile?.allergies && healthProfile.allergies !== '없음';
-
-      let phrClinicalNote = '';
-      if (healthProfile) {
-        phrClinicalNote = `\n\n✨ [대시보드 PHR 바이탈 수의학 임상 종합 분석]\n` +
-          `- 체온: ${tempVal}°C ${isHighTemp ? '🚨 [고열 감지 - 전신 염증/패혈증 주의]' : '✅ [정상 범위 (38.0~39.2°C)]'}\n` +
-          `- 심박수: ${hrVal}bpm ${isHighHr ? '⚠️ [빈맥 감지 - 심한 통증/심장 부담 가능성]' : '✅ [안정적 수치]'}\n` +
-          (hasAllergy ? `- 알레르기/병력 연관성: "${healthProfile.allergies}" ➔ [식이/환경 알레르기 유발 가능성 88.4% 연동]` : '- 알레르기/병력: 특이사항 없음');
-      }
-
-      const homeCareText = `🤖 Gemini AI 맞춤 추론 수의학 조치사항:\n${aiStep1}\n${aiStep2}\n${aiStep3}`;
-
-      let reportText = '';
-      if (isEmergency) {
-        reportText = `🚨 [응급 수의학 임상 소견 진단]\nVision AI & Gemini RAG 분석 결과 ${petName}의 [${areaName}] 부위 및 입력 증상에서 [${top1Name}] 의심 확률이 ${baseProb}%로 높게 측정되었습니다.\n` +
-          (selectedSymptoms.length > 0 ? `• 관찰 증상: ${selectedSymptoms.join(', ')}\n` : '') +
-          (description.trim() ? `• 상세 소견: "${description.trim()}"\n` : '') +
-          phrClinicalNote +
-          `\n\n${homeCareText}`;
-      } else {
-        reportText = `🤖 [Gemini RAG 수의학 맞춤 리포트]\nAI 분석 결과 ${petName}의 [${areaName}] 부위 및 입력 증상에서 [${top1Name}] 의심 확률이 ${baseProb}%로 산출되었습니다.\n` +
-          (selectedSymptoms.length > 0 ? `• 관찰 증상: ${selectedSymptoms.join(', ')}\n` : '') +
-          (description.trim() ? `• 상세 소견: "${description.trim()}"\n` : '') +
-          phrClinicalNote +
-          `\n\n${homeCareText}`;
-      }
-
-      const newResult = {
-        id: Date.now(),
-        petName,
-        date: new Date().toLocaleDateString(),
-        riskLevel: isEmergency ? 'EMERGENCY' : 'CAUTION',
-        riskLabel: isEmergency ? '응급/병원방문 (EMERGENCY)' : '주의 (CAUTION)',
-        riskBadgeClass: isEmergency ? 'badge-rose' : 'badge-amber',
-        hasPhrContext: !!healthProfile,
-        diseases: [
-          { name: top1Name, prob: parseFloat(baseProb) },
-          { name: top2Name, prob: parseFloat(subProb1.toFixed(1)) },
-          { name: top3Name, prob: parseFloat(subProb2.toFixed(1)) }
-        ],
-        report: reportText
-      };
-
-      setAnalysisResult(newResult);
-
-      try {
-        const existingStr = localStorage.getItem('petcare_diagnosis_history');
-        const existing = existingStr ? JSON.parse(existingStr) : [];
-        localStorage.setItem('petcare_diagnosis_history', JSON.stringify([newResult, ...existing.slice(0, 19)]));
-      } catch (e) {}
-    }, 1800);
+  const printDiagnosisReport = () => {
+    window.print();
   };
 
   return (
     <section id="diagnosis-section" style={{ padding: '60px 0', background: '#ffffff' }}>
+      <DiagnosisFailureDialog
+        failure={analysisFailure}
+        isRetrying={isAnalyzing}
+        onRetry={handleRunDiagnosis}
+        onClose={closeAnalysisFailure}
+      />
+      <AiBenchmarkModal isOpen={isBenchmarkOpen} onClose={() => setIsBenchmarkOpen(false)} />
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #diagnosis-print-report, #diagnosis-print-report * { visibility: visible !important; }
+          #diagnosis-print-report {
+            position: absolute !important;
+            inset: 0 auto auto 0 !important;
+            width: 100% !important;
+            box-shadow: none !important;
+            border: 0 !important;
+          }
+          .diagnosis-no-print { display: none !important; }
+        }
+        @media (max-width: 720px) {
+          .diagnosis-area-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .diagnosis-pet-grid { grid-template-columns: 1fr !important; }
+          .diagnosis-result-actions { flex-direction: column !important; }
+          .diagnosis-result-actions .btn, .care-flow-actions .btn {
+            width: 100% !important;
+            padding-right: 14px !important;
+            padding-left: 14px !important;
+            white-space: normal !important;
+          }
+          .diagnosis-evaluation-footer { align-items: flex-start !important; flex-direction: column !important; }
+        }
+      `}</style>
       <div className="container">
         <div className="section-header" style={{ textAlign: 'center', marginBottom: '36px' }}>
           <span style={{ fontSize: '12px', fontWeight: '800', color: '#047857', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '4px 14px', borderRadius: '9999px' }}>
@@ -427,499 +316,551 @@ export default function DiagnosisDropzone({ selectedPet, onNavigateTimeline, onN
             반려동물 AI 질병 진단 스튜디오
           </h2>
           <p style={{ fontSize: '15px', color: '#475569', marginTop: '6px' }}>
-            환부 사진과 증상을 입력하면 Vision AI와 Gemini가 3초 만에 맞춤 리포트를 생성합니다.
+            환부 Image와 증상을 입력하면 검증된 AI 소견과 입력 기반 Safety Triage를 구분해 안내합니다.
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '28px' }}>
-          {/* Left Form: Input Dropzone */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '28px' }}>
           <div className="glass-card" style={{ padding: '32px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '20px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>📋</span> 진단 정보 및 환부 사진 등록
+              <span>📋</span> 진단 정보 및 환부 Image 등록
             </h3>
 
-            {/* 1. Pet Info Banner */}
-            <div style={{
-              background: selectedPet ? '#f8fafc' : '#fffbeb',
-              border: selectedPet ? '1px solid #e2e8f0' : '1px solid #fde68a',
-              borderRadius: 'var(--radius-md)',
-              padding: '12px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '20px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '24px' }}>{selectedPet?.icon || '🐾'}</span>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>
-                    {selectedPet ? selectedPet.name : '등록된 반려동물 선택 필요'}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {selectedPet ? `${selectedPet.breed || '품종 미지정'} · ${selectedPet.age || ''}` : '상단 내비게이션에서 반려동물을 선택/등록하세요'}
+            <fieldset style={{ border: 0, padding: 0, margin: '0 0 18px' }}>
+              <legend className="sr-only">0. 등록된 반려동물 선택</legend>
+              <div style={{
+                background: selectedPet ? '#f8fafc' : '#fffbeb',
+                border: selectedPet ? '1px solid #e2e8f0' : '1px solid #fde68a',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                marginBottom: pets.length > 1 ? '12px' : 0
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                  <span style={{ fontSize: '24px' }}>{selectedPet?.icon || '🐾'}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>
+                      {selectedPet ? selectedPet.name : '등록된 반려동물 선택 필요'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      {selectedPet
+                        ? `${selectedPet.species || '종 미지정'} · ${selectedPet.breed || '품종 미지정'}`
+                        : '로그인 후 진단할 반려동물을 선택하거나 등록하세요.'}
+                    </div>
                   </div>
                 </div>
+                <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: '800', padding: '4px 10px', borderRadius: '9999px', background: selectedPet ? '#ecfdf5' : '#fef3c7', color: selectedPet ? '#047857' : '#b45309', border: selectedPet ? '1px solid #a7f3d0' : '1px solid #fde68a' }}>
+                  {selectedPet ? '진단 대상' : '미선택'}
+                </span>
               </div>
-              <span style={{ fontSize: '11px', fontWeight: '800', padding: '4px 10px', borderRadius: '9999px', background: selectedPet ? '#ecfdf5' : '#fef3c7', color: selectedPet ? '#047857' : '#b45309', border: selectedPet ? '1px solid #a7f3d0' : '1px solid #fde68a' }}>
-                {selectedPet ? '진단 대상' : '미선택'}
-              </span>
-            </div>
 
-            {/* 2. Affected Area Picker */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '13px', color: '#475569', marginBottom: '8px', fontWeight: '700' }}>
-                1. 환부 카테고리 선택 (다양한 신체 부위 선택 가능)
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '8px' }}>
-                {[
-                  { id: 'SKIN', label: '피부/모피', icon: '🐾' },
-                  { id: 'EYE', label: '안구/눈', icon: '👁️' },
-                  { id: 'EAR', label: '귀/귓바퀴', icon: '👂' },
-                  { id: 'MOUTH', label: '구강/치아', icon: '🦷' },
-                  { id: 'PAW_LIMB', label: '발/관절', icon: '🐾' },
-                  { id: 'NOSE_RESPIRATORY', label: '코/호흡기', icon: '👃' },
-                  { id: 'ABDOMEN', label: '배/소화기', icon: '🩺' },
-                  { id: 'CUSTOM', label: '직접 입력', icon: '✏️' }
-                ].map((item) => (
+              {pets.length > 0 ? (
+                <div className="diagnosis-pet-grid" style={{ display: pets.length > 1 ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                  {pets.map((pet) => {
+                    const isSelected = selectedPet?.id === pet.id;
+                    return (
+                      <button
+                        key={pet.id}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => onSelectPet?.(pet)}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          border: isSelected ? '2px solid #10b981' : '1px solid #e2e8f0',
+                          background: isSelected ? '#ecfdf5' : '#f8fafc',
+                          color: '#0f172a',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit'
+                        }}
+                      >
+                        <strong>{pet.icon || '🐾'} {pet.name}</strong>
+                        <span style={{ display: 'block', marginTop: '4px', color: '#64748b', fontSize: '12px' }}>
+                          {pet.species || '종 미지정'} · {pet.breed || '품종 미지정'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ marginTop: '12px', padding: '14px', borderRadius: '12px', background: '#fff7ed', border: '1px solid #fed7aa' }}>
+                  <p style={{ margin: '0 0 10px', color: '#9a3412' }}>
+                    {isAuthenticated ? '진단할 반려동물을 먼저 등록해 주세요.' : '로그인 후 등록된 반려동물을 선택할 수 있습니다.'}
+                  </p>
                   <button
-                    key={item.id}
-                    onClick={() => {
-                      setAffectedArea(item.id);
-                      setSelectedSymptoms([]);
-                    }}
-                    style={{
-                      padding: '10px 4px',
-                      borderRadius: 'var(--radius-sm)',
-                      background: affectedArea === item.id ? '#ecfdf5' : '#f8fafc',
-                      color: affectedArea === item.id ? '#047857' : '#64748b',
-                      border: affectedArea === item.id ? '2px solid #10b981' : '1px solid #e2e8f0',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      textAlign: 'center'
-                    }}
+                    type="button"
+                    onClick={isAuthenticated ? onOpenPetManagement : onOpenLogin}
+                    className="btn btn-secondary"
                   >
-                    <div>{item.icon}</div>
-                    <div style={{ marginTop: '2px' }}>{item.label}</div>
+                    {isAuthenticated ? '반려동물 등록으로 이동' : '로그인하기'}
                   </button>
-                ))}
+                </div>
+              )}
+            </fieldset>
+
+            <fieldset style={{ border: 0, padding: 0, margin: '0 0 20px' }}>
+              <legend style={{ display: 'block', width: '100%', fontSize: '13px', color: '#475569', marginBottom: '8px', fontWeight: '700' }}>
+                1. 환부 카테고리 선택
+              </legend>
+              <div className="diagnosis-area-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '8px' }}>
+              {AREA_OPTIONS.map((area) => (
+                <button
+                  key={area.id}
+                  type="button"
+                  aria-pressed={affectedArea === area.id}
+                  onClick={() => {
+                    setAffectedArea(area.id);
+                    setSelectedSymptoms([]);
+                  }}
+                  style={{
+                    padding: '10px 4px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: affectedArea === area.id ? '2px solid #10b981' : '1px solid #e2e8f0',
+                    background: affectedArea === area.id ? '#ecfdf5' : '#f8fafc',
+                    color: affectedArea === area.id ? '#047857' : '#475569',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    textAlign: 'center',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  <div>{area.icon}</div>
+                  <div style={{ marginTop: '2px' }}>{area.label}</div>
+                </button>
+              ))}
               </div>
 
               {affectedArea === 'CUSTOM' && (
-                <div style={{ marginTop: '8px' }}>
-                  <input
-                    type="text"
-                    value={customAreaText}
-                    onChange={(e) => setCustomAreaText(e.target.value)}
-                    placeholder="예: 오른쪽 꼬리 끝 부위, 목 뒤쪽 관절 등 직접 부위를 입력하세요."
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid #10b981', background: '#ecfdf5', fontSize: '13px', outline: 'none' }}
-                  />
-                </div>
+                <input
+                  value={customAreaText}
+                  onChange={(event) => setCustomAreaText(event.target.value)}
+                  maxLength={100}
+                  aria-label="직접 입력한 환부 이름"
+                  placeholder="예: 오른쪽 꼬리 끝 부위, 목 뒤쪽 관절 등"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid #10b981', background: '#ecfdf5', fontSize: '13px', outline: 'none' }}
+                />
               )}
-            </div>
+            </fieldset>
 
-            {/* 3. Symptom Checklist */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '13px', color: '#475569', marginBottom: '8px', fontWeight: '700' }}>
+            <fieldset style={{ border: 0, padding: 0, margin: '0 0 20px' }}>
+              <legend style={{ display: 'block', width: '100%', fontSize: '13px', color: '#475569', marginBottom: '8px', fontWeight: '700' }}>
                 2. 부위별 주요 증상 선택 (복수 선택)
-              </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {symptomOptions[affectedArea].map((sym) => {
-                  const isChecked = selectedSymptoms.includes(sym);
-                  return (
-                    <button
-                      key={sym}
-                      onClick={() => toggleSymptom(sym)}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: 'var(--radius-full)',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        background: isChecked ? '#ecfdf5' : '#f1f5f9',
-                        color: isChecked ? '#047857' : '#475569',
-                        border: isChecked ? '1px solid #059669' : '1px solid #cbd5e1'
-                      }}
-                    >
-                      {isChecked ? '✓ ' : '+ '}{sym}
-                    </button>
-                  );
-                })}
+              </legend>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', minHeight: '34px' }}>
+              {(symptomOptions[affectedArea] || []).map((symptom) => (
+                <button
+                  key={symptom}
+                  type="button"
+                  aria-pressed={selectedSymptoms.includes(symptom)}
+                  onClick={() => toggleSymptom(symptom)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 'var(--radius-full)',
+                    border: selectedSymptoms.includes(symptom) ? '1px solid #059669' : '1px solid #cbd5e1',
+                    background: selectedSymptoms.includes(symptom) ? '#ecfdf5' : '#f1f5f9',
+                    color: selectedSymptoms.includes(symptom) ? '#047857' : '#475569',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  {selectedSymptoms.includes(symptom) ? '✓ ' : '+ '}{symptom}
+                </button>
+              ))}
+              {!symptomOptions[affectedArea] && <span style={{ color: '#64748b', fontSize: '13px' }}>증상 선택지를 불러오는 중입니다.</span>}
               </div>
-            </div>
+            </fieldset>
 
-            {/* 4. Enhanced Photo Registration Button & Image Dropzone */}
             <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <label style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>
-                  3. 환부 사진 등록 <span style={{ color: '#059669' }}>*</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
+                <label htmlFor="diagnosis-image" style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>
+                  3. 환부 Image 등록 <span style={{ color: '#059669' }}>*</span>
                 </label>
-                {customPhoto && (
+                {imageFile && (
                   <span style={{ fontSize: '11px', color: '#059669', fontWeight: '700', background: '#ecfdf5', padding: '2px 8px', borderRadius: '6px' }}>
-                    ✓ 직접 등록한 사용자 사진
+                    ✓ 사용자 Image 선택됨
                   </span>
                 )}
               </div>
-
               <input
-                type="file"
+                id="diagnosis-image"
                 ref={fileInputRef}
+                type="file"
                 accept="image/jpeg,image/png,image/webp"
-                onChange={handleFileChange}
+                onChange={(event) => selectImage(event.target.files?.[0])}
                 style={{ display: 'none' }}
               />
-
-              <div
+              <label
+                htmlFor="diagnosis-image"
                 className={`photo-upload-container ${isDragging ? 'drag-over' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  position: 'relative',
-                  border: isDragging ? '2px dashed #059669' : '2px dashed #cbd5e1',
-                  borderRadius: '16px',
-                  padding: '18px',
-                  textAlign: 'center',
-                  background: isDragging ? '#ecfdf5' : '#f8fafc',
-                  cursor: 'pointer',
-                  transition: 'all 0.25s ease'
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    fileInputRef.current?.click();
+                  }
                 }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  selectImage(event.dataTransfer.files?.[0]);
+                }}
+                style={{ display: 'block', padding: '18px' }}
               >
-                <div style={{ position: 'relative', width: '100%', height: '160px', borderRadius: '12px', overflow: 'hidden', marginBottom: '12px' }}>
-                  <img
-                    src={currentDisplayPhoto}
-                    alt="환부 사진"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.25)', opacity: 0, transition: 'opacity 0.2s' }} className="photo-hover-overlay" />
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                  <button
-                    type="button"
-                    className="photo-btn-gradient"
-                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                    style={{ padding: '9px 18px', fontSize: '13px' }}
-                  >
-                    <span>📸</span> {customPhoto ? '사진 변경하기' : '환부 사진 업로드'}
-                  </button>
-
-                  {customPhoto && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCustomPhoto(null);
-                        setFileName('');
-                      }}
-                      style={{
-                        padding: '9px 14px',
-                        borderRadius: '9999px',
-                        border: '1px solid #cbd5e1',
-                        background: '#ffffff',
-                        color: '#64748b',
-                        fontSize: '12.5px',
-                        fontWeight: '700',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      기본 예시로 변경
-                    </button>
+                <div style={{ position: 'relative', width: '100%', height: '160px', borderRadius: '12px', overflow: 'hidden', marginBottom: '12px', background: 'linear-gradient(135deg, #ecfdf5 0%, #f8fafc 100%)', border: '1px solid #e2e8f0' }}>
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="선택한 환부" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: '#64748b' }}>
+                      <div>
+                        <div style={{ fontSize: '42px', marginBottom: '6px' }}>📸</div>
+                        <strong style={{ display: 'block', color: '#334155', fontSize: '14px' }}>환부가 선명하게 보이는 Image를 등록하세요.</strong>
+                        <span style={{ display: 'block', marginTop: '4px', fontSize: '12px' }}>JPEG·PNG·WEBP · 최대 10MB</span>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '10px', fontWeight: '500' }}>
-                  {fileName ? `📄 첨부된 파일: ${fileName}` : '클릭 또는 이 곳으로 사진을 드래그하여 업로드 가능합니다.'}
+                <span className="photo-btn-gradient" style={{ padding: '9px 18px', fontSize: '13px' }}>
+                  <span>📸</span> {imageFile ? 'Image 변경하기' : '환부 Image 업로드'}
+                </span>
+                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '10px', fontWeight: '500', overflowWrap: 'anywhere' }}>
+                  {imageFile?.name ? `📄 첨부된 File: ${imageFile.name}` : '클릭하거나 이 영역으로 Image를 끌어 놓으세요.'}
                 </div>
-              </div>
+              </label>
+              {imageFile && (
+                <button type="button" onClick={clearImage} className="btn btn-secondary" style={{ marginTop: '8px', padding: '8px 14px', fontSize: '12px' }}>
+                  선택한 Image 제거
+                </button>
+              )}
             </div>
 
-            {/* 5. Detailed Text */}
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '13px', color: '#475569', marginBottom: '8px', fontWeight: '700' }}>
+              <label htmlFor="diagnosis-description" style={{ display: 'block', fontSize: '13px', color: '#475569', marginBottom: '8px', fontWeight: '700' }}>
                 4. 상세 증상 설명
               </label>
               <textarea
+                id="diagnosis-description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                style={{
-                  width: '100%',
-                  background: '#f8fafc',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: 'var(--radius-sm)',
-                  color: '#0f172a',
-                  padding: '10px',
-                  fontSize: '13px',
-                  fontFamily: 'inherit',
-                  outline: 'none',
-                  resize: 'vertical'
-                }}
+                onChange={(event) => setDescription(event.target.value)}
+                maxLength={2000}
+                rows={4}
+                placeholder="언제부터, 얼마나 자주, 어떤 변화가 있었는지 작성해 주세요."
+                style={{ width: '100%', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 'var(--radius-sm)', color: '#0f172a', padding: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', resize: 'vertical' }}
               />
+              <div style={{ textAlign: 'right', fontSize: '11px', color: '#64748b' }}>{description.length}/2000</div>
             </div>
 
-            {/* Run Button */}
             <button
+              type="button"
               onClick={handleRunDiagnosis}
-              disabled={isAnalyzing || !imageFile || selectedSymptoms.length === 0 || !description.trim()}
-              title={selectedSymptoms.length === 0 || !description.trim()
-                ? '증상을 하나 이상 선택하고 상세 증상을 입력해 주세요.'
-                : undefined}
+              disabled={isAnalyzing || !canAnalyze}
+              aria-busy={isAnalyzing}
               className="btn-diagnosis-glow"
             >
               {isAnalyzing ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <>
                   <span className="animate-pulse-glow" style={{ fontSize: '20px' }}>🤖</span>
-                  <span>AI 질병 진단하기</span>
-                </div>
+                  <span>Image와 증상 분석 중…</span>
+                </>
               ) : (
                 <>
                   <span style={{ fontSize: '20px' }}>✨</span>
                   <span>AI 질병 진단 실행하기</span>
-                  <span style={{ fontSize: '11.5px', background: 'rgba(255, 255, 255, 0.22)', backdropFilter: 'blur(4px)', padding: '4px 12px', borderRadius: '9999px', fontWeight: '800', marginLeft: 'auto', border: '1px solid rgba(255, 255, 255, 0.3)' }}>
-                    ⚡ 3초 완성
+                  <span style={{ fontSize: '11.5px', background: 'rgba(255, 255, 255, 0.22)', padding: '4px 12px', borderRadius: '9999px', fontWeight: '800', marginLeft: 'auto', border: '1px solid rgba(255, 255, 255, 0.3)' }}>
+                    안전 검증 포함
                   </span>
                 </>
               )}
             </button>
+            <div aria-live="polite" aria-atomic="true">
+              {analysisError && <p role="alert" style={{ color: '#dc2626', fontWeight: 700 }}>{analysisError}</p>}
+            </div>
           </div>
 
-          {/* Right Result View */}
-          <div className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div id="diagnosis-print-report" className="glass-card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', justifyContent: analysisResult ? 'flex-start' : 'center', minHeight: '640px' }} aria-live="polite">
             {isAnalyzing && (
-              <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }} className="animate-glow">🔍</div>
+              <div style={{ textAlign: 'center', padding: '60px 20px' }} role="status">
+                <div style={{ fontSize: '48px', marginBottom: '16px' }} className="animate-pulse-glow">🔍</div>
                 <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>환부 Image와 증상 분석 중</h4>
                 <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '24px' }}>
-                  Image 형식을 검증하고 입력한 증상을 Backend에서 분석하고 있습니다.
+                  Image 형식·Provider 응답·Safety Triage를 순서대로 검증하고 있습니다.
                 </p>
                 <div style={{ width: '80%', height: '6px', background: '#e2e8f0', borderRadius: '3px', margin: '0 auto', overflow: 'hidden' }}>
-                  <div style={{ width: '70%', height: '100%', background: 'linear-gradient(90deg, #059669, #0891b2)', borderRadius: '3px' }} className="animate-glow"></div>
+                  <div style={{ width: '70%', height: '100%', background: 'linear-gradient(90deg, #059669, #0891b2)', borderRadius: '3px' }} className="animate-pulse-glow" />
                 </div>
               </div>
             )}
 
-            {!isAnalyzing && !analysisResult && (
+            {!analysisResult && !isAnalyzing && (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🩺</div>
+                <div style={{ width: '84px', height: '84px', borderRadius: '26px', display: 'grid', placeItems: 'center', margin: '0 auto 18px', fontSize: '42px', background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', border: '1px solid #a7f3d0' }}>
+                  🩺
+                </div>
                 <h4 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>진단 결과를 기다리는 중</h4>
-                <p style={{ fontSize: '13px', lineHeight: '1.6' }}>
-                  좌측 양식을 작성 후 <strong>[AI 질병 진단 실행하기]</strong> 버튼을 누르면 이 곳에 Vision AI 분석 결과와 Gemini RAG 리포트가 표시됩니다.
+                <p style={{ fontSize: '13px', lineHeight: '1.7' }}>
+                  좌측 양식을 작성해 진단을 실행하거나<br />아래 이력에서 저장된 결과를 선택해 주세요.
                 </p>
+                <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', marginTop: '18px', padding: '8px 14px', borderRadius: '9999px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: '700', color: '#475569' }}>
+                  <span style={{ color: '#059669' }}>●</span> 확정 진단·처방이 아닌 보조 안내
+                </div>
                 {analysisError && (
-                  <p role="alert" style={{ marginTop: '12px', color: '#dc2626', fontWeight: '700' }}>
-                    {analysisError}
-                  </p>
+                  <p role="alert" style={{ marginTop: '14px', color: '#dc2626', fontWeight: '700' }}>{analysisError}</p>
                 )}
               </div>
             )}
 
-            {!isAnalyzing && analysisResult && (
+            {analysisResult && (
               <div className="fade-in">
-                {/* Result Top Badge */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <span className={`badge ${analysisResult.riskBadgeClass}`} style={{ fontSize: '14px', padding: '6px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
+                  <span className={`badge ${riskBadgeClass(analysisResult.riskLevel)}`} style={{ fontSize: '14px', padding: '6px 14px' }}>
                     위험도: {analysisResult.riskLabel}
                   </span>
-                  <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>
-                    {analysisResult.createdAt
-                      ? new Date(analysisResult.createdAt).toLocaleDateString('ko-KR')
-                      : '방금'} 분석
-                  </span>
+                  <div className="diagnosis-no-print" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ color: '#64748b', fontSize: '12px' }}>{formatDate(analysisResult.createdAt)}</span>
+                    <button type="button" onClick={printDiagnosisReport} className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '12px' }}>
+                      PDF 저장·인쇄
+                    </button>
+                  </div>
                 </div>
 
                 <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-                  {analysisResult.analysisMode === 'GEMINI_MULTIMODAL'
-                    ? 'AI 이미지 의심 소견 안내'
-                    : 'AI 진단 결과 리포트'}
+                  {analysisResult.analysisMode === 'GEMINI_MULTIMODAL' ? 'AI Image 의심 소견 안내' : '진단 분석 결과 리포트'}
                 </h3>
-
-                {analysisResult.analysisMode === 'EXPERIMENTAL_DEMO' && (
-                  <div role="alert" style={{ marginBottom: '16px', padding: '12px', background: '#fff7ed', border: '1px solid #fdba74', borderRadius: '10px', color: '#9a3412', fontSize: '13px', fontWeight: '700' }}>
-                    실험용 Demo 결과입니다. 실제 AI Model 추론이나 수의학적 진단 결과가 아닙니다.
-                  </div>
-                )}
-
-                {analysisResult.analysisMode === 'GEMINI_MULTIMODAL' && (
-                  <div role="alert" style={{ marginBottom: '16px', padding: '12px', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '10px', color: '#1e40af', fontSize: '13px', fontWeight: '700' }}>
-                    Image에서 관찰된 의심 소견입니다. Model confidence는 질환 확률이나 확정 진단이 아닙니다.
-                  </div>
-                )}
 
                 <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '10px', fontSize: '12px', color: '#475569' }}>
                   <strong>분석 Mode:</strong> {analysisResult.analysisMode || 'UNKNOWN'}
-                  {analysisResult.model && (
-                    <span> · <strong>Model:</strong> {analysisResult.model} {analysisResult.modelVersion || ''}</span>
-                  )}
+                  {analysisResult.model && <span> · <strong>Model:</strong> {analysisResult.model} {analysisResult.modelVersion || ''}</span>}
                   {analysisResult.failureCode && (
-                    <div style={{ marginTop: '6px', color: '#b45309' }}>
-                      Vision 상태: {analysisResult.failureCode}
+                    <div style={{ color: '#b45309', marginTop: '6px' }}>
+                      <strong>Image 분석 상태:</strong> {analysisResult.failureCode}
+                      {RETRYABLE_FAILURE_CODES.has(analysisResult.failureCode) && (
+                        <button
+                          type="button"
+                          onClick={() => setAnalysisFailure({
+                            code: analysisResult.failureCode,
+                            message: '외부 Image 분석 Provider 응답을 검증하지 못했습니다.',
+                            canRetry: Boolean(imageFile)
+                          })}
+                          className="btn btn-secondary diagnosis-no-print"
+                          style={{ marginLeft: '8px', padding: '4px 8px' }}
+                        >
+                          다시 시도 안내
+                        </button>
+                      )}
                     </div>
                   )}
-                  {analysisResult.limitations?.map((limitation) => (
-                    <div key={limitation} style={{ marginTop: '4px' }}>제한: {limitation}</div>
-                  ))}
                 </div>
 
-                {/* Top 3 Diseases Bar Chart */}
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px', fontWeight: '700' }}>
-                    {analysisResult.analysisMode === 'EXPERIMENTAL_DEMO'
-                      ? '📊 결과 표시 구조 예시 (임상 확률 아님)'
-                      : analysisResult.analysisMode === 'GEMINI_MULTIMODAL'
-                        ? '📊 AI 이미지 소견 (Model confidence · 임상 확률 아님)'
-                        : '📊 의심 질환 Top 3'}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '12px' }}>
+                    <div style={{ fontSize: '12px', color: '#475569', fontWeight: '700', marginBottom: '10px' }}>📸 저장된 환부 Image</div>
+                    {resultImageUrl ? (
+                      <img
+                        src={resultImageUrl}
+                        alt={`${selectedPet?.name || '반려동물'}의 진단 환부`}
+                        style={{ width: '100%', height: '170px', objectFit: 'contain', borderRadius: '12px', background: '#ffffff' }}
+                      />
+                    ) : (
+                      <div style={{ height: '170px', display: 'grid', placeItems: 'center', padding: '12px', color: '#64748b', textAlign: 'center', fontSize: '12px' }}>
+                        {storedImageError || '이 기록에는 다시 표시할 수 있는 보관 Image가 없습니다.'}
+                      </div>
+                    )}
                   </div>
-                  {analysisResult.diseases.map((d, idx) => (
-                    <div key={idx} style={{ marginBottom: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', marginBottom: '4px', color: '#0f172a' }}>
-                        <span>{idx + 1}. {d.name}</span>
-                        <span style={{ color: idx === 0 ? '#059669' : '#64748b' }}>{d.prob}%</span>
+
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '16px' }}>
+                    <div style={{ fontSize: '12px', color: '#475569', fontWeight: '700', marginBottom: '12px' }}>📊 AI Image 의심 소견</div>
+                    {findings.length > 0 ? findings.map((finding, index) => {
+                      const probability = Math.max(0, Math.min(100, Number(finding.probability) || 0));
+                      return (
+                        <div key={`${finding.diseaseName}-${finding.probability}`} style={{ marginBottom: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '13px', fontWeight: '700', marginBottom: '4px', color: '#0f172a' }}>
+                            <span>{index + 1}. {finding.diseaseName}</span>
+                            <span style={{ color: index === 0 ? '#059669' : '#64748b' }}>{probability}%</span>
+                          </div>
+                          <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: `${probability}%`, height: '100%', background: index === 0 ? 'linear-gradient(90deg, #059669, #0891b2)' : '#94a3b8', borderRadius: '4px' }} />
+                          </div>
+                          <small style={{ color: '#64748b' }}>Model confidence · 임상 확률 아님</small>
+                        </div>
+                      );
+                    }) : (
+                      <div style={{ padding: '14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', color: '#9a3412', fontSize: '12px', lineHeight: 1.6 }}>
+                        검증된 Image 소견이 없습니다. 질환명이나 확률을 임의 생성하지 않았습니다.
                       </div>
-                      <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div
-                          style={{
-                            width: `${d.prob}%`,
-                            height: '100%',
-                            background: idx === 0 ? 'linear-gradient(90deg, #059669, #0891b2)' : '#94a3b8',
-                            borderRadius: '4px'
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
                 </div>
 
-                {/* Gemini RAG Report Text */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                  border: '1.5px solid #6ee7b7',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '20px',
-                  marginBottom: '20px',
-                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)'
-                }}>
+                <div style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)', border: '1.5px solid #6ee7b7', borderRadius: 'var(--radius-md)', padding: '20px', marginBottom: '20px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.08)' }}>
                   <div style={{ fontWeight: '800', color: '#047857', marginBottom: '10px', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '18px' }}>🤖</span>
-                    <span>증상 분석 리포트 & 추천 행동 가이드</span>
+                    <span>증상 분석 리포트 & 안전 행동 가이드</span>
+                  </div>
+                  <div style={{ whiteSpace: 'pre-line', fontSize: '13.5px', lineHeight: '1.7', color: '#064e3b' }}>
+                    {analysisResult.ragReport}
                   </div>
 
-                  {/* Quick Action Badges */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
-                    {analysisResult.riskLevel === 'EMERGENCY' ? (
-                      <span style={{ background: '#ffe4e6', color: '#e11d48', border: '1px solid #fda4af', padding: '4px 10px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: '800' }}>
-                        🚨 24시 응급 이송 권장
-                      </span>
-                    ) : (
-                      <span style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '4px 10px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: '800' }}>
-                        🛡️ 가정 내 관찰 & 소독 케어
-                      </span>
-                    )}
-                    <span style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', padding: '4px 10px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: '700' }}>
-                      💧 전해질 수분 공급
-                    </span>
-                    <span style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', padding: '4px 10px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: '700' }}>
-                      📅 3일 타임라인 관찰
-                    </span>
-                  </div>
-
-                  <div style={{
-                    fontSize: '13.5px',
-                    whiteSpace: 'pre-line',
-                    lineHeight: '1.7',
-                    color: '#064e3b'
-                  }}>
-                    {analysisResult.report}
-                  </div>
+                  {(analysisResult.actionGuidance || []).length > 0 && (
+                    <div style={{ display: 'grid', gap: '8px', marginTop: '14px' }}>
+                      {analysisResult.actionGuidance.map((item, index) => {
+                        const actionCode = analysisResult.actionCodes?.[index];
+                        return (
+                          <div key={`${actionCode || 'action'}-${item}`} style={{ padding: '10px 12px', border: '1px solid #a7f3d0', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.72)' }}>
+                            <strong style={{ display: 'block', color: '#047857', fontSize: '12.5px' }}>
+                              {ACTION_TITLES[actionCode] || `권장 행동 ${index + 1}`}
+                            </strong>
+                            <span style={{ display: 'block', marginTop: '3px', color: '#475569', fontSize: '12.5px' }}>{item}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
-                {/* Dynamic Branching Action Buttons */}
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  {analysisResult.riskLevel === 'CAUTION' ? (
-                    <>
-                      <button onClick={onNavigateTimeline} className="btn btn-primary" style={{ flex: 1, padding: '14px 18px', fontSize: '13.5px' }}>
-                        📅 3일 뒤 경과 관찰 등록
-                      </button>
-                      <button onClick={onNavigateHospital} className="btn btn-secondary" style={{ padding: '14px 18px', fontSize: '13.5px' }}>
-                        🏥 주변 병원
-                      </button>
-                    </>
+                {(analysisResult.limitations || []).length > 0 && (
+                  <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '10px', color: '#64748b', fontSize: '12px' }}>
+                    {analysisResult.limitations.map((item) => <div key={item}>제한: {item}</div>)}
+                  </div>
+                )}
+
+                <div className="diagnosis-no-print diagnosis-result-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                  {analysisResult.riskLevel === 'EMERGENCY' ? (
+                    <button type="button" onClick={() => onOpenCareFlow?.(analysisResult)} className="btn btn-danger" style={{ flex: 1, padding: '14px 20px' }}>
+                      🚨 현재 위치로 검증 응급 병원 조회
+                    </button>
                   ) : (
                     <>
-                      <button onClick={onNavigateHospital} className="btn btn-danger" style={{ flex: 1, padding: '14px 20px', fontSize: '14px' }}>
-                        🚨 주변 24시 응급 동물병원 찾기 (즉시 방문)
+                      <button type="button" onClick={() => onNavigateTimeline?.(analysisResult)} className="btn btn-primary" style={{ flex: 1, padding: '14px 18px' }}>
+                        📅 다음 경과 기록 준비하기
                       </button>
+                      <button type="button" onClick={() => onOpenCareFlow?.(analysisResult)} className="btn btn-secondary" style={{ padding: '14px 18px' }}>🏥 현재 위치로 검증 병원 조회</button>
                     </>
                   )}
                 </div>
+                {analysisResult.riskLevel !== 'EMERGENCY' && (
+                  <p style={{ marginBottom: 0, color: '#9a3412', fontSize: '12px' }}>
+                    상태가 악화되거나 새로운 위험 신호가 생기면 즉시 동물병원에 문의하세요.
+                  </p>
+                )}
               </div>
             )}
           </div>
         </div>
 
-        {/* AI Model Evaluation Plan */}
-        <div style={{
-          marginTop: '50px',
-          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-          borderRadius: '24px',
-          padding: '36px',
-          color: '#ffffff',
-          boxShadow: '0 20px 40px rgba(15, 23, 42, 0.15)'
-        }}>
+        <div className="glass-card" style={{ padding: '28px', marginTop: '28px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: '#eff6ff', color: '#2563eb', display: 'grid', placeItems: 'center', fontSize: '20px' }}>🗂️</div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px' }}>과거 진단 이력</h3>
+              <span style={{ color: '#64748b', fontSize: '12px' }}>총 {historyMeta.totalElements}건</span>
+              </div>
+            </div>
+            <button type="button" onClick={() => loadHistory(historyPage)} disabled={isHistoryLoading} className="btn btn-secondary">
+              {isHistoryLoading ? '불러오는 중…' : '새로고침'}
+            </button>
+          </div>
+          {historyError && <p role="alert" style={{ color: '#dc2626' }}>{historyError}</p>}
+          {!historyError && !isHistoryLoading && history.length === 0 && <p style={{ color: '#64748b' }}>저장된 진단 이력이 없습니다.</p>}
+          <div style={{ display: 'grid', gap: '10px', marginTop: '14px' }}>
+            {history.map((record) => (
+              <button
+                key={record.diagnosisId}
+                type="button"
+                aria-pressed={analysisResult?.diagnosisId === record.diagnosisId}
+                onClick={() => showStoredDiagnosis(record.diagnosisId)}
+                style={{
+                  padding: '14px 16px',
+                  border: analysisResult?.diagnosisId === record.diagnosisId ? '2px solid #10b981' : '1px solid #e2e8f0',
+                  borderRadius: '14px',
+                  background: analysisResult?.diagnosisId === record.diagnosisId ? '#ecfdf5' : '#fff',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <strong>#{record.diagnosisId} · {record.riskLabel}</strong>
+                <div style={{ marginTop: '4px', color: '#64748b', fontSize: '12px' }}>
+                  {record.affectedArea} · {formatDate(record.createdAt)} · {record.analysisMode || 'UNKNOWN'}
+                </div>
+              </button>
+            ))}
+          </div>
+          {historyMeta.totalPages > 1 && (
+            <nav aria-label="진단 이력 페이지" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '16px' }}>
+              <button
+                type="button"
+                onClick={() => loadHistory(historyPage - 1)}
+                disabled={isHistoryLoading || historyPage === 0}
+                className="btn btn-secondary"
+              >
+                이전
+              </button>
+              <span aria-live="polite">{historyPage + 1} / {historyMeta.totalPages} page</span>
+              <button
+                type="button"
+                onClick={() => loadHistory(historyPage + 1)}
+                disabled={isHistoryLoading || historyPage + 1 >= historyMeta.totalPages}
+                className="btn btn-secondary"
+              >
+                다음
+              </button>
+            </nav>
+          )}
+        </div>
+
+        <div style={{ marginTop: '50px', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', borderRadius: '24px', padding: '36px', color: '#ffffff', boxShadow: '0 20px 40px rgba(15, 23, 42, 0.15)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-            <div>
+            <div style={{ flex: '1 1 520px' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 12px', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #059669', color: '#34d399', fontSize: '12px', fontWeight: '800', marginBottom: '8px' }}>
                 🔬 AI MODEL EVALUATION PLAN
               </div>
               <h3 style={{ fontSize: '24px', fontWeight: '900', color: '#ffffff', margin: 0 }}>
                 실제 Dataset 확보 후 <span style={{ color: '#34d399' }}>동일 Protocol로 성능 비교</span>
               </h3>
-              <p style={{ fontSize: '13.5px', color: '#94a3b8', marginTop: '6px', margin: 0 }}>
-                현재는 평가 구조만 준비된 상태입니다. 검증된 Dataset·Model Artifact·동일 Pet Group Split이 확보되기 전에는 정확도나 성능 수치를 게시하지 않습니다.
+              <p style={{ fontSize: '13.5px', color: '#94a3b8', marginTop: '6px' }}>
+                승인된 Dataset·Model Artifact·Pet Group Split이 확보되기 전에는 정확도나 성능 수치를 게시하지 않습니다.
               </p>
             </div>
             <div style={{ background: 'rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '16px', padding: '12px 20px', textAlign: 'center' }}>
               <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>현재 평가 상태</div>
-              <div style={{ fontSize: '30px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>
-                평가 전
-              </div>
+              <div style={{ fontSize: '30px', fontWeight: '900', color: '#34d399', marginTop: '2px' }}>평가 전</div>
             </div>
           </div>
 
-          {/* 4-Step Engineering Acceleration Pipeline */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '24px' }}>
-            <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 1. Baseline 측정</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>ResNet 계열 Baseline</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>Macro F1 · Class Recall 측정</div>
-            </div>
-
-            <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 2. 후보 Model 비교</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>EfficientNet-B0 / B4</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>동일 Pet Group Split로 비교</div>
-            </div>
-
-            <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>STEP 3. 학습 기여도 검증</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>전처리 · Loss Ablation</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>각 변경의 기여도를 분리 측정</div>
-            </div>
-
-            <div style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid #059669', borderRadius: '16px', padding: '16px', background: 'rgba(5, 150, 105, 0.15)' }}>
-              <div style={{ fontSize: '11px', color: '#34d399', fontWeight: '800' }}>STEP 4. RAG 안전성 평가</div>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>Gemini without / with RAG</div>
-              <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '800', marginTop: '8px' }}>근거 일치율 · 안전 위반률 비교</div>
-            </div>
+            {[
+              ['STEP 1. Dataset 검증', 'Source · License · Class', '사용 가능 범위와 품질 확인'],
+              ['STEP 2. Split 고정', 'Pet Group Split', '동일 Pet의 평가 누수 차단'],
+              ['STEP 3. 후보 비교', '동일 Metric · 동일 환경', 'Baseline과 후보 Model 분리 평가'],
+              ['STEP 4. 안전성 평가', 'RAG 근거 · 위반률', 'Vision 성능과 Report 품질 분리']
+            ].map(([step, title, descriptionText], index) => (
+              <div key={step} style={{ background: index === 3 ? 'rgba(5, 150, 105, 0.15)' : 'rgba(255, 255, 255, 0.05)', border: index === 3 ? '1px solid #059669' : '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '16px' }}>
+                <div style={{ fontSize: '11px', color: index === 3 ? '#34d399' : '#94a3b8', fontWeight: '700' }}>{step}</div>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', marginTop: '4px' }}>{title}</div>
+                <div style={{ fontSize: '12px', color: '#34d399', fontWeight: '700', marginTop: '8px' }}>{descriptionText}</div>
+              </div>
+            ))}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', fontSize: '12px', color: '#94a3b8' }}>
-            <span>📄 평가 결과는 승인된 Dataset·Model Manifest와 재현 가능한 Evidence가 확보된 뒤 게시합니다.</span>
-            <span style={{ color: '#34d399', fontWeight: '700' }}>EVALUATION PENDING</span>
+          <div className="diagnosis-evaluation-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', fontSize: '12px', color: '#94a3b8' }}>
+            <span>📄 공개 수치는 재현 가능한 Evidence와 팀 승인 뒤에만 반영합니다.</span>
+            <button type="button" onClick={() => setIsBenchmarkOpen(true)} className="btn btn-secondary" style={{ padding: '8px 14px', fontSize: '12px' }}>
+              평가 기준 자세히 보기
+            </button>
           </div>
         </div>
-
       </div>
     </section>
   );

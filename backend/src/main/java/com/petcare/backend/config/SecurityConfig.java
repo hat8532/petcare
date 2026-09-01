@@ -63,7 +63,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**", "/oauth2/**", "/login/**", "/error", "/h2-console/**").permitAll()
                 // 공개 조회 API 허용
                 .requestMatchers(HttpMethod.GET, "/api/v1/hospitals/**", "/api/v1/news/**", "/api/v1/community/**", "/api/v1/timelines/**").permitAll()
-                .requestMatchers("/api/v1/diagnosis/**", "/api/v1/chat/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/diagnosis/symptoms").permitAll()
+                .requestMatchers("/api/v1/diagnosis/**").authenticated()
+                .requestMatchers("/api/v1/chat/**").permitAll()
                 // 반려동물 관련 API 및 주소록 API는 인증된 사용자만 접근 가능 (보호된 API)
                 .requestMatchers("/api/v1/pets/**").authenticated()
                 .requestMatchers("/api/v1/addresses/**").authenticated()

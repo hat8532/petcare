@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.AssertTrue;
 
 import java.util.List;
 import java.util.Map;
@@ -13,18 +14,24 @@ import java.util.Map;
 public record DiagnosisAnalyzeRequest(
         @NotNull @Positive Long petId,
         @Size(max = 100) String petName,
-        @NotBlank @Size(max = 30) String petSpecies,
+        @Size(max = 30) String petSpecies,
         @NotBlank
         @Pattern(regexp = "SKIN|EYE|EAR|MOUTH|PAW_LIMB|NOSE_RESPIRATORY|ABDOMEN|CUSTOM")
         String affectedArea,
         @Size(max = 100) String customAreaText,
-        @NotEmpty List<@NotBlank @Size(max = 100) String> symptoms,
+        @NotEmpty @Size(max = 20) List<@NotBlank @Size(max = 100) String> symptoms,
         @NotBlank @Size(max = 2000) String description,
         Map<String, Object> healthProfile
 ) {
     public DiagnosisAnalyzeRequest {
         petName = petName == null || petName.isBlank() ? "반려동물" : petName;
+        petSpecies = petSpecies == null || petSpecies.isBlank() ? "UNKNOWN" : petSpecies;
         customAreaText = customAreaText == null ? "" : customAreaText;
         healthProfile = healthProfile == null ? Map.of() : Map.copyOf(healthProfile);
+    }
+
+    @AssertTrue(message = "CUSTOM 환부를 선택하면 customAreaText가 필요합니다.")
+    public boolean isCustomAreaValid() {
+        return !"CUSTOM".equals(affectedArea) || !customAreaText.isBlank();
     }
 }

@@ -37,7 +37,7 @@ export default function Navbar({
 
   return (
     <>
-      <header style={{
+      <header className="site-navbar" style={{
         position: 'sticky',
         top: 0,
         zIndex: 100,
@@ -47,9 +47,10 @@ export default function Navbar({
         padding: '12px 0',
         boxShadow: '0 2px 10px rgba(15, 23, 42, 0.03)'
       }}>
-        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="container site-navbar__inner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {/* Logo */}
-          <div 
+          <div
+            className="site-navbar__brand"
             onClick={() => setActiveTab('home')} 
             style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
           >
@@ -75,7 +76,7 @@ export default function Navbar({
           </div>
 
           {/* Navigation Links */}
-          <nav style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <nav className="site-navbar__links" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {[
               { id: 'home', label: '홈' },
               { id: 'diagnosis', label: 'AI 질병 진단', isCore: true },
@@ -109,7 +110,7 @@ export default function Navbar({
           </nav>
 
           {/* Upper Right Action Group: Dashboard & Pet Selector & Auth */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="site-navbar__actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* Prominent Upper Right Dashboard Button */}
             <button
               onClick={() => setActiveTab('dashboard')}
@@ -277,7 +278,7 @@ export default function Navbar({
 
             {/* Login Status */}
             {user ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="site-navbar__auth" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a', whiteSpace: 'nowrap' }}>
                   👋 {user.nickname}
                 </span>

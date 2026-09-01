@@ -6,7 +6,6 @@ import PetHealthDashboard from './components/PetHealthDashboard';
 import DailyCareChatbot from './components/DailyCareChatbot';
 import CareFlowBranch from './components/CareFlowBranch';
 import TimelineSlider from './components/TimelineSlider';
-import HospitalLocator from './components/HospitalLocator';
 import NewsSection from './components/NewsSection';
 import CommunitySection from './components/CommunitySection';
 import LoginPage from './components/LoginPage';
@@ -14,6 +13,8 @@ import OAuth2CallbackPage from './components/OAuth2CallbackPage';
 import PetEditModal from './components/PetEditModal';
 import Footer from './components/Footer';
 import { petApi } from './api/petApi';
+
+const OFFICIAL_HOSPITAL_SEARCH_URL = 'https://map.naver.com/p/search/24시%20동물병원';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(() => {
@@ -25,6 +26,8 @@ export default function App() {
   const [pets, setPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
   const [editingPet, setEditingPet] = useState(null);
+  const [latestDiagnosis, setLatestDiagnosis] = useState(null);
+  const [careFlowLookupRequest, setCareFlowLookupRequest] = useState(0);
 
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('petcare_user');
@@ -56,6 +59,10 @@ export default function App() {
     loadPets();
   }, [user, isOAuth2Callback]);
 
+  useEffect(() => {
+    setLatestDiagnosis(null);
+  }, [selectedPet?.id]);
+
   const handlePetAdded = (newPet) => {
     setPets((prev) => [...prev, newPet]);
     setSelectedPet(newPet);
@@ -76,6 +83,19 @@ export default function App() {
       }
       return filtered;
     });
+  };
+
+  const handleOpenDiagnosisCareFlow = (diagnosisResult) => {
+    if (diagnosisResult) setLatestDiagnosis(diagnosisResult);
+    setCareFlowLookupRequest((current) => current + 1);
+    window.requestAnimationFrame(() => {
+      document.getElementById('diagnosis-care-flow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const handleNavigateTimeline = (diagnosisResult) => {
+    if (diagnosisResult) setLatestDiagnosis(diagnosisResult);
+    setActiveTab('timeline');
   };
 
   // Render content dynamically based on selected Category Tab
@@ -112,16 +132,27 @@ export default function App() {
                 AI 반려동물 질병 진단 스튜디오
               </h2>
               <p style={{ fontSize: '15px', color: '#475569', marginTop: '6px' }}>
-                Vision AI 분류 및 Gemini RAG 수의학 리포트가 실시간 생성됩니다.
+                환부 Image 소견과 입력 기반 Safety Triage 결과를 구분해 안내합니다.
               </p>
             </div>
             <DiagnosisDropzone
+              key={selectedPet?.id || 'no-pet'}
               selectedPet={selectedPet}
-              onNavigateTimeline={() => setActiveTab('timeline')}
-              onNavigateHospital={() => setActiveTab('hospitals')}
+              pets={pets}
+              isAuthenticated={Boolean(user)}
+              onSelectPet={setSelectedPet}
+              onOpenLogin={() => setActiveTab('login')}
+              onOpenPetManagement={() => setActiveTab('dashboard')}
+              onNavigateTimeline={handleNavigateTimeline}
+              onOpenCareFlow={handleOpenDiagnosisCareFlow}
+              onDiagnosisResult={setLatestDiagnosis}
             />
             <div style={{ marginTop: '40px' }}>
-              <CareFlowBranch />
+              <CareFlowBranch
+                diagnosisResult={latestDiagnosis}
+                onNavigateTimeline={handleNavigateTimeline}
+                lookupRequestId={careFlowLookupRequest}
+              />
             </div>
           </div>
         );
@@ -134,10 +165,14 @@ export default function App() {
                 Before / After 경과 관찰 타임라인
               </h2>
               <p style={{ fontSize: '15px', color: '#475569', marginTop: '6px' }}>
-                동일 환부의 날짜별 변화를 대조하고 AI 호전도 판정을 확인하세요.
+                저장된 실제 진단 두 건이 준비되면 같은 환부의 변화를 비교할 수 있습니다.
               </p>
             </div>
-            <TimelineSlider selectedPet={selectedPet} />
+            <TimelineSlider
+              selectedPet={selectedPet}
+              sourceDiagnosis={latestDiagnosis}
+              onNavigateDiagnosis={() => setActiveTab('diagnosis')}
+            />
           </div>
         );
 
@@ -146,16 +181,30 @@ export default function App() {
           <div className="container" style={{ padding: '40px 20px 60px 20px' }}>
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <span style={{ fontSize: '12px', fontWeight: '800', color: '#e11d48', background: '#fff1f2', border: '1px solid #fecdd3', padding: '4px 12px', borderRadius: '9999px' }}>
-                24 Hours Emergency
+                VERIFIED SOURCE REQUIRED
               </span>
               <h2 style={{ fontSize: '32px', fontWeight: '900', color: '#0f172a', marginTop: '10px' }}>
-                전국 24시 응급 동물병원 찾기
+                24시 응급 동물병원 검색 안내
               </h2>
               <p style={{ fontSize: '15px', color: '#475569', marginTop: '6px' }}>
-                Haversine 공간 거리 계산을 거쳐 현재 위치에서 가장 가까운 병원을 안내합니다.
+                저장소의 출처 검증 전 seed 병원 정보는 이 화면에 노출하지 않습니다. 공식 지도와 병원 전화로 실제 운영 여부를 확인하세요.
               </p>
             </div>
-            <HospitalLocator />
+            <div className="glass-card" style={{ padding: '32px', textAlign: 'center' }}>
+              <h3 style={{ marginTop: 0 }}>검증된 병원 Data Source 연결 전입니다.</h3>
+              <p style={{ color: '#475569', lineHeight: 1.7 }}>
+                고정 좌표나 생성한 병원명·전화번호는 실제 응급 정보로 표시하지 않습니다.
+                현재는 공식 지도에서 병원 운영 여부와 연락처를 직접 확인해 주세요.
+              </p>
+              <a
+                href={OFFICIAL_HOSPITAL_SEARCH_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary"
+              >
+                공식 지도에서 24시 동물병원 검색
+              </a>
+            </div>
           </div>
         );
 
@@ -228,10 +277,11 @@ export default function App() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '24px' }}>
                 {/* Feature 1 */}
-                <div 
+                <button
+                  type="button"
                   onClick={() => setActiveTab('diagnosis')}
                   className="harmonious-card"
-                  style={{ cursor: 'pointer', textAlign: 'center', padding: '32px 24px' }}
+                  style={{ cursor: 'pointer', textAlign: 'center', padding: '32px 24px', width: '100%', font: 'inherit' }}
                 >
                   <div style={{ width: '60px', height: '60px', borderRadius: '20px', background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', color: '#059669', fontSize: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto', border: '1px solid #a7f3d0', boxShadow: '0 8px 20px rgba(5, 150, 105, 0.12)' }}>
                     🩺
@@ -240,15 +290,16 @@ export default function App() {
                     AI 질병 진단 스튜디오
                   </h3>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: '1.6' }}>
-                    환부 사진과 증상 입력 시 Vision AI 분류 및 Gemini RAG 수의학 맞춤 리포트 즉시 발급
+                    환부 사진·증상으로 Safety Triage를 안내하고, 검증된 Provider 응답이 있을 때만 AI 의심 소견을 표시
                   </p>
-                </div>
+                </button>
 
                 {/* Feature 2 */}
-                <div 
+                <button
+                  type="button"
                   onClick={() => setActiveTab('timeline')}
                   className="harmonious-card"
-                  style={{ cursor: 'pointer', textAlign: 'center', padding: '32px 24px' }}
+                  style={{ cursor: 'pointer', textAlign: 'center', padding: '32px 24px', width: '100%', font: 'inherit' }}
                 >
                   <div style={{ width: '60px', height: '60px', borderRadius: '20px', background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', color: '#2563eb', fontSize: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto', border: '1px solid #bfdbfe', boxShadow: '0 8px 20px rgba(37, 99, 235, 0.12)' }}>
                     📊
@@ -257,32 +308,34 @@ export default function App() {
                     경과 관찰 타임라인
                   </h3>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: '1.6' }}>
-                    3일 뒤 동일 환부를 찍어 대조 슬라이더 비교 및 AI 호전도 자동 판정
+                    실제 진단 두 건의 비교 Contract가 연결되기 전에는 준비 상태만 안내
                   </p>
-                </div>
+                </button>
 
                 {/* Feature 3 */}
-                <div 
+                <button
+                  type="button"
                   onClick={() => setActiveTab('hospitals')}
                   className="harmonious-card"
-                  style={{ cursor: 'pointer', textAlign: 'center', padding: '32px 24px' }}
+                  style={{ cursor: 'pointer', textAlign: 'center', padding: '32px 24px', width: '100%', font: 'inherit' }}
                 >
                   <div style={{ width: '60px', height: '60px', borderRadius: '20px', background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)', color: '#e11d48', fontSize: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto', border: '1px solid #fecdd3', boxShadow: '0 8px 20px rgba(225, 29, 72, 0.12)' }}>
                     🏥
                   </div>
                   <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>
-                    24시 응급 동물병원
+                    공식 병원 검색 안내
                   </h3>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: '1.6' }}>
-                    내 위치 기반 거리 계산(Haversine)을 거쳐 24시 응급 동물병원 즉시 전화 연결
+                    검증된 병원 Source 연결 전에는 생성 연락처 대신 공식 지도 검색만 제공
                   </p>
-                </div>
+                </button>
 
                 {/* Feature 4 */}
-                <div 
+                <button
+                  type="button"
                   onClick={() => setActiveTab('community')}
                   className="harmonious-card"
-                  style={{ cursor: 'pointer', textAlign: 'center', padding: '32px 24px' }}
+                  style={{ cursor: 'pointer', textAlign: 'center', padding: '32px 24px', width: '100%', font: 'inherit' }}
                 >
                   <div style={{ width: '60px', height: '60px', borderRadius: '20px', background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)', color: '#9333ea', fontSize: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto', border: '1px solid #e9d5ff', boxShadow: '0 8px 20px rgba(147, 51, 234, 0.12)' }}>
                     💬
@@ -291,9 +344,9 @@ export default function App() {
                     반려인 커뮤니티
                   </h3>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: '1.6' }}>
-                    AI 진단 리포트를 첨부하고 전문 수의사 및 다른 반려인들과 조언 공유
+                    진단 기록을 참고해 다른 반려인들과 경험과 관리 메모를 공유
                   </p>
-                </div>
+                </button>
               </div>
             </div>
           </>

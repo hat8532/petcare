@@ -1,14 +1,28 @@
 import os
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.gemini_adapter import GeminiAdapterError, GeminiMultimodalAdapter
+from app.image_validation import ImageValidationError, read_validated_image
 from app.manifest import ManifestState, inspect_model_manifest
 
 SERVICE_VERSION = "0.1.0"
 DEMO_MODEL_NAME = "petcare-contract-demo"
+ALLOWED_PROVIDER_FAILURE_CODES = {
+    "INVALID_INPUT",
+    "INVALID_PROVIDER_REQUEST",
+    "INVALID_PROVIDER_RESPONSE",
+    "INFERENCE_TIMEOUT",
+    "PROVIDER_AUTH_FAILED",
+    "PROVIDER_MODEL_UNAVAILABLE",
+    "PROVIDER_RATE_LIMITED",
+    "PROVIDER_REJECTED",
+    "PROVIDER_UNAVAILABLE",
+}
 
 
 def experimental_demo_enabled() -> bool:
@@ -39,6 +53,24 @@ class InferenceResponse(BaseModel):
 
 
 app = FastAPI(title="PetCare Vision Inference", version=SERVICE_VERSION)
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_handler(
+    _request: Request,
+    exception: RequestValidationError,
+) -> JSONResponse:
+    body = exception.body
+    request_id = body.get("requestId") if hasattr(body, "get") else None
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": {
+                "failureCode": "INVALID_PROVIDER_REQUEST",
+                "requestId": request_id,
+            }
+        },
+    )
 
 
 def model_state() -> ManifestState:
@@ -76,31 +108,28 @@ def version() -> dict[str, str | bool | None]:
 )
 async def infer(
     image: Annotated[UploadFile, File()],
-    pet_id: Annotated[int, Form(alias="petId")],
-    species: Annotated[str, Form()],
-    affected_area: Annotated[str, Form(alias="affectedArea")],
-    symptoms: Annotated[str, Form()],
-    description: Annotated[str, Form()],
-    request_id: Annotated[str, Form(alias="requestId")],
+    pet_id: Annotated[int, Form(alias="petId", gt=0)],
+    species: Annotated[str, Form(min_length=1, max_length=30)],
+    affected_area: Annotated[str, Form(alias="affectedArea", min_length=1, max_length=30)],
+    symptoms: Annotated[str, Form(min_length=2, max_length=4000)],
+    description: Annotated[str, Form(min_length=1, max_length=2000)],
+    request_id: Annotated[str, Form(alias="requestId", min_length=1, max_length=100)],
 ) -> InferenceResponse:
     del pet_id
 
-    if image.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+    try:
+        validated_image = await read_validated_image(image)
+    except ImageValidationError as exception:
         raise HTTPException(
-            status_code=415,
-            detail={"failureCode": "UNSUPPORTED_MEDIA_TYPE", "requestId": request_id},
-        )
+            status_code=exception.status_code,
+            detail={"failureCode": exception.failure_code, "requestId": request_id},
+        ) from exception
 
     if experimental_demo_enabled():
         if species not in {"DOG", "CAT"} or affected_area != "SKIN":
             raise HTTPException(
                 status_code=422,
                 detail={"failureCode": "OUT_OF_SCOPE", "requestId": request_id},
-            )
-        if not await image.read():
-            raise HTTPException(
-                status_code=400,
-                detail={"failureCode": "INVALID_INPUT", "requestId": request_id},
             )
         return InferenceResponse(
             mode="EXPERIMENTAL_DEMO",
@@ -129,23 +158,28 @@ async def infer(
             )
         try:
             result = await gemini.analyze(
-                image_bytes=await image.read(),
-                mime_type=image.content_type,
+                image_bytes=validated_image.content,
+                mime_type=validated_image.mime_type,
                 species=species,
                 affected_area=affected_area,
                 symptoms=symptoms,
                 description=description,
             )
         except GeminiAdapterError as exception:
+            failure_code = (
+                exception.failure_code
+                if exception.failure_code in ALLOWED_PROVIDER_FAILURE_CODES
+                else "PROVIDER_UNAVAILABLE"
+            )
             status_code = {
                 "INVALID_INPUT": 400,
                 "PROVIDER_REJECTED": 422,
                 "PROVIDER_RATE_LIMITED": 429,
                 "INFERENCE_TIMEOUT": 504,
-            }.get(exception.failure_code, 503)
+            }.get(failure_code, 503)
             raise HTTPException(
                 status_code=status_code,
-                detail={"failureCode": exception.failure_code, "requestId": request_id},
+                detail={"failureCode": failure_code, "requestId": request_id},
             ) from exception
 
         return InferenceResponse(

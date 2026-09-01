@@ -1,21 +1,71 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function AiBenchmarkModal({ isOpen, onClose }) {
+  const modalRef = useRef(null);
+  const closeButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const appRoot = document.getElementById('root');
+    const previouslyFocused = document.activeElement;
+    appRoot?.setAttribute('inert', '');
+    const focusFrame = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const focusableElements = Array.from(
+        modalRef.current?.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])') || []
+      );
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      event.preventDefault();
+      const currentIndex = focusableElements.indexOf(document.activeElement);
+      const nextIndex = event.shiftKey
+        ? (currentIndex <= 0 ? focusableElements.length - 1 : currentIndex - 1)
+        : (currentIndex < 0 || currentIndex === focusableElements.length - 1 ? 0 : currentIndex + 1);
+      focusableElements[nextIndex].focus();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener('keydown', handleKeyDown);
+      appRoot?.removeAttribute('inert');
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) previouslyFocused.focus();
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
-  return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 1000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'rgba(15, 23, 42, 0.65)',
-      backdropFilter: 'blur(10px)',
-      padding: '20px'
-    }}>
-      <div style={{
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ai-benchmark-title"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(10px)'
+      }}
+    >
+      <div ref={modalRef} style={{
         position: 'relative',
         width: '100%',
         maxWidth: '880px',
@@ -27,210 +77,81 @@ export default function AiBenchmarkModal({ isOpen, onClose }) {
         border: '1px solid #f1f5f9',
         padding: '32px'
       }}>
-        
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid #e2e8f0',
-          paddingBottom: '20px',
-          marginBottom: '24px'
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '20px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '14px',
-              background: '#ecfdf5',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#059669',
-              fontSize: '22px',
-              fontWeight: '800'
-            }}>
+            <div style={{ width: '44px', height: '44px', flexShrink: 0, borderRadius: '14px', background: '#ecfdf5', display: 'grid', placeItems: 'center', color: '#059669', fontSize: '22px', fontWeight: '800' }}>
               ⚡
             </div>
             <div>
-              <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-                PetCare AI 알고리즘 비교 & 벤치마크 리포트
+              <h2 id="ai-benchmark-title" style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+                PetCare AI 평가 Protocol & 공개 상태
               </h2>
-              <p style={{ fontSize: '13px', color: '#64748b', fontWeight: '500', marginTop: '2px', margin: 0 }}>
-                전통 ML (SVM/Random Forest) vs 딥러닝 (EfficientNet-B4 + CLAHE + Gemini RAG)
+              <p style={{ fontSize: '13px', color: '#64748b', fontWeight: '500', margin: '2px 0 0' }}>
+                검증된 Dataset·Split·Metric이 준비된 뒤 동일 조건에서 Model을 비교합니다.
               </p>
             </div>
           </div>
           <button
+            ref={closeButtonRef}
+            type="button"
             onClick={onClose}
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              background: '#f1f5f9',
-              border: 'none',
-              color: '#64748b',
-              fontSize: '16px',
-              fontWeight: '700',
-              cursor: 'pointer'
-            }}
+            aria-label="AI 평가 안내 닫기"
+            style={{ width: '36px', height: '36px', flexShrink: 0, borderRadius: '50%', background: '#f1f5f9', border: 'none', color: '#64748b', fontSize: '16px', fontWeight: '700', cursor: 'pointer' }}
           >
             ✕
           </button>
         </div>
 
-        {/* 1. Core Metrics Before vs After */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '16px', marginBottom: '28px' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-            border: '1px solid #a7f3d0',
-            borderRadius: '18px',
-            padding: '20px',
-            textAlign: 'center'
-          }}>
-            <span style={{ fontSize: '12px', fontWeight: '700', color: '#047857', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-              최종 분류 정확도 (Accuracy)
-            </span>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '16px', color: '#94a3b8', textDecoration: 'line-through', fontWeight: '600' }}>71.4%</span>
-              <span style={{ fontSize: '32px', fontWeight: '900', color: '#059669' }}>94.8%</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+          {[
+            ['Dataset', '승인 대기', '출처·License·Class 분포 확인 전', '#ecfdf5', '#047857', '#a7f3d0'],
+            ['Pet Group Split', '미확정', '동일 Pet의 평가 누수 차단 필요', '#eff6ff', '#1d4ed8', '#bfdbfe'],
+            ['공개 성능 수치', '비공개', '재현 Evidence와 팀 승인 전 차단', '#fffbeb', '#b45309', '#fde68a']
+          ].map(([label, status, description, background, color, border]) => (
+            <div key={label} style={{ background, border: `1px solid ${border}`, borderRadius: '18px', padding: '20px', textAlign: 'center' }}>
+              <span style={{ display: 'block', fontSize: '12px', fontWeight: '700', color, marginBottom: '6px' }}>{label}</span>
+              <strong style={{ display: 'block', fontSize: '28px', fontWeight: '900', color }}>{status}</strong>
+              <span style={{ display: 'block', marginTop: '8px', fontSize: '11.5px', color: '#64748b', lineHeight: 1.5 }}>{description}</span>
             </div>
-            <span style={{ display: 'inline-block', marginTop: '8px', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: '#059669', color: '#ffffff' }}>
-              +23.4%p 향상 (vs RF +40.6%p ↑)
-            </span>
-          </div>
-
-          <div style={{
-            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-            border: '1px solid #bfdbfe',
-            borderRadius: '18px',
-            padding: '20px',
-            textAlign: 'center'
-          }}>
-            <span style={{ fontSize: '12px', fontWeight: '700', color: '#1d4ed8', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-              정밀도 지표 (F1-Score)
-            </span>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '16px', color: '#94a3b8', textDecoration: 'line-through', fontWeight: '600' }}>0.68</span>
-              <span style={{ fontSize: '32px', fontWeight: '900', color: '#2563eb' }}>0.93</span>
-            </div>
-            <span style={{ display: 'inline-block', marginTop: '8px', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: '#2563eb', color: '#ffffff' }}>
-              SOTA 수준 달성 🎯
-            </span>
-          </div>
-
-          <div style={{
-            background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-            border: '1px solid #fde68a',
-            borderRadius: '18px',
-            padding: '20px',
-            textAlign: 'center'
-          }}>
-            <span style={{ fontSize: '12px', fontWeight: '700', color: '#b45309', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-              추론 속도 (Latency)
-            </span>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '16px', color: '#94a3b8', textDecoration: 'line-through', fontWeight: '600' }}>1,200ms</span>
-              <span style={{ fontSize: '32px', fontWeight: '900', color: '#d97706' }}>180ms</span>
-            </div>
-            <span style={{ display: 'inline-block', marginTop: '8px', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: '#d97706', color: '#ffffff' }}>
-              85% 시간 단축 ⚡
-            </span>
-          </div>
+          ))}
         </div>
 
-        {/* 2. Model Comparison Table (SVM / Random Forest vs Deep Learning) */}
-        <div style={{ background: '#f8fafc', borderRadius: '18px', padding: '20px', border: '1px solid #e2e8f0', marginBottom: '28px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-              📊 전통 머신러닝(SVM/RF) vs 딥러닝(CNN/ViT) 전격 비교
-            </h3>
+        <div style={{ background: '#f8fafc', borderRadius: '18px', padding: '20px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: 0 }}>📊 평가 진입 Gate</h3>
             <span style={{ fontSize: '11px', fontWeight: '700', color: '#059669', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '4px 10px', borderRadius: '8px' }}>
-              수의학 환부 데이터셋 평가
+              EVALUATION PENDING
             </span>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', fontSize: '13px', textAlign: 'left', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#e2e8f0', color: '#334155', fontWeight: '700' }}>
-                  <th style={{ padding: '10px 12px', borderRadius: '8px 0 0 8px' }}>알고리즘 종류</th>
-                  <th style={{ padding: '10px 12px' }}>특징 추출 방식</th>
-                  <th style={{ padding: '10px 12px' }}>정확도 (Accuracy)</th>
-                  <th style={{ padding: '10px 12px' }}>F1-Score</th>
-                  <th style={{ padding: '10px 12px' }}>추론 속도</th>
-                  <th style={{ padding: '10px 12px', borderRadius: '0 8px 8px 0' }}>비고 및 총평</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '10px 12px', fontWeight: '700', color: '#64748b' }}>Random Forest (100 Trees)</td>
-                  <td style={{ padding: '10px 12px', fontSize: '12px' }}>HOG + Color Hist (수공예)</td>
-                  <td style={{ padding: '10px 12px', fontWeight: '700', color: '#e11d48' }}>54.2%</td>
-                  <td style={{ padding: '10px 12px' }}>0.51</td>
-                  <td style={{ padding: '10px 12px' }}>45ms</td>
-                  <td style={{ padding: '10px 12px', fontSize: '11px', color: '#64748b' }}>털 결 노이즈에 과적합(Overfitting) 발생</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '10px 12px', fontWeight: '700', color: '#64748b' }}>SVM (RBF Kernel)</td>
-                  <td style={{ padding: '10px 12px', fontSize: '12px' }}>SIFT + LBP (수공예)</td>
-                  <td style={{ padding: '10px 12px', fontWeight: '700', color: '#d97706' }}>61.8%</td>
-                  <td style={{ padding: '10px 12px' }}>0.59</td>
-                  <td style={{ padding: '10px 12px' }}>210ms</td>
-                  <td style={{ padding: '10px 12px', fontSize: '11px', color: '#64748b' }}>복잡한 비선형 환부 경계선 인식 한계</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '10px 12px', fontWeight: '700', color: '#334155' }}>Vanilla ResNet-50</td>
-                  <td style={{ padding: '10px 12px', fontSize: '12px' }}>CNN End-to-End</td>
-                  <td style={{ padding: '10px 12px', fontWeight: '700' }}>71.4%</td>
-                  <td style={{ padding: '10px 12px' }}>0.68</td>
-                  <td style={{ padding: '10px 12px' }}>1,200ms</td>
-                  <td style={{ padding: '10px 12px', fontSize: '11px', color: '#64748b' }}>딥러닝 기본 모델 (Baseline)</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '10px 12px', fontWeight: '700', color: '#334155' }}>Vision Transformer (ViT)</td>
-                  <td style={{ padding: '10px 12px', fontSize: '12px' }}>Self-Attention</td>
-                  <td style={{ padding: '10px 12px', fontWeight: '700' }}>89.1%</td>
-                  <td style={{ padding: '10px 12px' }}>0.88</td>
-                  <td style={{ padding: '10px 12px' }}>450ms</td>
-                  <td style={{ padding: '10px 12px', fontSize: '11px', color: '#64748b' }}>정확도 높으나 모바일 웹 추론 지연</td>
-                </tr>
-                <tr style={{ background: '#ecfdf5' }}>
-                  <td style={{ padding: '10px 12px', fontWeight: '900', color: '#047857' }}>PetCare Custom Model (최종)</td>
-                  <td style={{ padding: '10px 12px', fontSize: '12px', fontWeight: '700', color: '#047857' }}>CLAHE + EfficientNet + Focal Loss</td>
-                  <td style={{ padding: '10px 12px', fontWeight: '900', color: '#059669', fontSize: '15px' }}>94.8%</td>
-                  <td style={{ padding: '10px 12px', fontWeight: '800', color: '#059669' }}>0.93</td>
-                  <td style={{ padding: '10px 12px', fontWeight: '800', color: '#059669' }}>180ms</td>
-                  <td style={{ padding: '10px 12px', fontSize: '11px', fontWeight: '700', color: '#047857' }}>정확도 & 속도 최적 밸런스 달성 (SOTA)</td>
-                </tr>
-              </tbody>
-            </table>
+          <div style={{ display: 'grid', gap: '10px' }}>
+            {[
+              ['01', 'Dataset 계약', 'Source·License·Species·환부·Class와 minimum support를 고정합니다.'],
+              ['02', '누수 방지 Split', 'Train·Validation·Test를 동일 Pet 단위로 분리합니다.'],
+              ['03', '동일 평가 환경', 'Baseline과 후보 Model을 같은 전처리·Metric·Latency 조건에서 비교합니다.'],
+              ['04', '안전성·독립 재현', '응급 Recall·OOD abstention·Report 안전성을 확인하고 다른 Reviewer가 재현합니다.']
+            ].map(([number, title, description]) => (
+              <div key={number} style={{ display: 'grid', gridTemplateColumns: '42px minmax(0, 1fr)', gap: '12px', alignItems: 'center', padding: '12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                <span style={{ width: '36px', height: '36px', display: 'grid', placeItems: 'center', borderRadius: '12px', background: '#ecfdf5', color: '#047857', fontSize: '12px', fontWeight: '900' }}>{number}</span>
+                <div>
+                  <strong style={{ display: 'block', color: '#0f172a', fontSize: '13px' }}>{title}</strong>
+                  <span style={{ display: 'block', marginTop: '2px', color: '#64748b', fontSize: '12px', lineHeight: 1.55 }}>{description}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '8px' }}>
-          <span style={{ fontSize: '12px', color: '#059669', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>📄</span> docs/AI_MODEL_OPTIMIZATION_AND_BENCHMARK.md 상세 비교 분석 문서 참조
-          </span>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '10px 24px',
-              background: '#0f172a',
-              color: '#ffffff',
-              fontSize: '13px',
-              fontWeight: '700',
-              borderRadius: '12px',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            닫기
-          </button>
+        <div role="note" style={{ padding: '14px 16px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '14px', color: '#9a3412', fontSize: '12.5px', lineHeight: 1.65, marginBottom: '22px' }}>
+          기존 94.8%·F1 0.93·180ms 같은 숫자는 현재 Repository에서 재현되지 않았습니다. 승인된 평가 Artifact가 생기기 전까지 제품 성능으로 표시하지 않습니다.
         </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: '#059669', fontWeight: '700' }}>📄 결과는 Dataset·Model Manifest와 재현 Evidence에 연결합니다.</span>
+          <button type="button" onClick={onClose} className="btn btn-primary">확인</button>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
