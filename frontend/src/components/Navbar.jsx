@@ -334,9 +334,7 @@ export default function Navbar({
         onClose={() => setShowLoginModal(false)}
         onLoginSuccess={(loggedInUser) => {
           if (onUserChange) onUserChange(loggedInUser);
-          if (pets.length === 0) {
-            setShowPetRegisterModal(true);
-          }
+          setShowLoginModal(false);
         }}
       />
 

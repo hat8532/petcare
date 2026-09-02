@@ -9,7 +9,7 @@
 | :---: | :--- | :--- | :--- | :--- |
 | **회원/인증** | **👤 태준 (User)** | 이메일/소셜 회원가입, JWT 로그인, 사용자 프로필 관리 | `users` | Auth/User API, `LoginPage.jsx`, `Navbar.jsx` |
 | **AI 진단/분석** | **🤖 진한님** | Vision AI + Gemini RAG 질병 진단, Before/After 타임라인 분석 | `diagnosis_records`<br>`timeline_compares` | Diagnosis/Timeline API, `DiagnosisDropzone.jsx`, `TimelineSlider.jsx` |
-| **대시보드/펫관리** | **📊 세민님** | 1:N 펫 프로필 CRUD, 스마트 PHR 바이탈 관리, AI 챗봇/사료 계산기 | `pets` | Pet API, `PetHealthDashboard.jsx`, `DailyCareChatbot.jsx` |
+| **대시보드/펫관리** | **👤 태준 (User)** | 1:N 펫 프로필 CRUD, 스마트 PHR 바이탈 관리, AI 챗봇/사료 계산기 | `pets` | Pet API, `PetHealthDashboard.jsx`, `DailyCareChatbot.jsx` |
 | **뉴스/지도/커뮤니티** | **📰 지호님** | 실시간 펫 뉴스 캐싱, 24시 응급병원 지도 탐색, 커뮤니티 게시판 | `news_items`<br>`hospitals`<br>`posts`<br>`comments` | News/Hospital/Community API, `HospitalLocator.jsx`, `CommunitySection.jsx` |
 
 ---
@@ -61,7 +61,7 @@
 * **최소 이메일/비밀번호 회원가입** 및 소셜 로그인 연동 (카카오, 구글)
 * **JWT 토큰 기반 인증/인가** 및 내 프로필 정보 관리
 
-### 2.7 반려동물 프로필 & PHR 헬스 대시보드 — `[담당자: 📊 세민님]`
+### 2.7 반려동물 프로필 & PHR 헬스 대시보드 — `[담당자: 👤 태준 (User)]`
 * **1:N 반려동물 등록**: 회원 1명당 다수의 반려동물(강아지, 고양이 등) 프로필 등록 및 수정 지원
 * **스마트 PHR 대시보드 & AI 챗봇**: 바이탈 입력(체온, 심박수, 체중), 알레르기 관리 및 사료 계산기 연동
 
@@ -82,9 +82,9 @@ graph TD
     FastAPI -->|Vector DB + Prompt| Gemini[Google Gemini API]
     end
 
-    subgraph "👤 태준 (User) / 📊 세민님 파이프라인"
+    subgraph "👤 태준 (User) 파이프라인"
     SpringBoot -->|Auth & User API| UserDomain[User & Auth Domain - 👤 태준]
-    SpringBoot -->|Pet & PHR API| PetDomain[Pet & Dashboard Domain - 📊 세민님]
+    SpringBoot -->|Pet & PHR API| PetDomain[Pet & Dashboard Domain - 👤 태준]
     end
 ```
 
@@ -96,11 +96,11 @@ graph TD
 
 ```mermaid
 erDiagram
-    users ||--o{ pets : "1:N 등록 (👤태준 / 📊세민)"
+    users ||--o{ pets : "1:N 등록 (👤태준)"
     users ||--o{ posts : "작성 (👤태준 / 💬지호)"
     users ||--o{ comments : "작성 (👤태준 / 💬지호)"
-    pets ||--o{ diagnosis_records : "진단 기록 (📊세민 / 🤖진한)"
-    pets ||--o{ timeline_compares : "경과 비교 (📊세민 / 🤖진한)"
+    pets ||--o{ diagnosis_records : "진단 기록 (👤태준 / 🤖진한)"
+    pets ||--o{ timeline_compares : "경과 비교 (👤태준 / 🤖진한)"
     diagnosis_records ||--o{ posts : "리포트 첨부 (🤖진한 / 💬지호)"
     posts ||--o{ comments : "댓글 목록 (💬지호)"
 ```
@@ -121,7 +121,7 @@ erDiagram
 | `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 가입 일시 |
 | `updated_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 수정 일시 |
 
-#### 2) `pets` (반려동물 테이블) — `[담당자: 📊 세민님]`
+#### 2) `pets` (반려동물 테이블) — `[담당자: 👤 태준 (User)]`
 | 컬럼명 | 타입 | 제약조건 | 설명 |
 | :--- | :--- | :--- | :--- |
 | `id` | BIGINT | PK, AUTO_INCREMENT | 반려동물 고유 식별자 |
