@@ -127,65 +127,10 @@ export default function HospitalLocator() {
     return `${p1}·${p2}`;
   }
 
-  // Dynamic Nearby Hospital Generator based on Map Center Coords
-  function generateDynamicNearbyHospitals(centerLat, centerLng) {
-    const region = getRegionName(centerLat, centerLng);
-
-    // Create unique hospital names specific to this map viewport
-    const h1Name = region.includes('·') 
-      ? `24시 ${region} 동물의료센터`
-      : `24시 ${region} 센트럴 동물의료센터`;
-      
-    const h2Name = region.includes('·')
-      ? `${region.split('·')[0]} 24시 스마트 펫메디컬`
-      : `${region} 24시 로얄 펫병원`;
-
-    const h3Name = region.includes('·')
-      ? `24시 아크로 ${region.split('·')[1] || region} 응급동물병원`
-      : `24시 웰니스 ${region} 응급센터`;
-
-    return [
-      {
-        id: Math.floor(centerLat * 1000) + 1001,
-        name: h1Name,
-        address: `${region} 중심 0.3km 내 24시간 응급센터`,
-        phone: '02-850-7582',
-        latitude: centerLat + 0.0024,
-        longitude: centerLng + 0.0028,
-        isEmergency24h: true,
-        businessHours: '연중무휴 24시간 진료',
-        rating: '4.90',
-        reviewCount: 142,
-        naverPlaceUrl: `https://map.naver.com/v5/search/${encodeURIComponent(h1Name)}`
-      },
-      {
-        id: Math.floor(centerLng * 1000) + 2002,
-        name: h2Name,
-        address: `${region} 중심 0.7km 내 야간응급병원`,
-        phone: '02-861-1119',
-        latitude: centerLat - 0.0032,
-        longitude: centerLng - 0.0025,
-        isEmergency24h: true,
-        businessHours: '연중무휴 24시간 진료',
-        rating: '4.85',
-        reviewCount: 98,
-        naverPlaceUrl: `https://map.naver.com/v5/search/${encodeURIComponent(h2Name)}`
-      },
-      {
-        id: Math.floor((centerLat + centerLng) * 1000) + 3003,
-        name: h3Name,
-        address: `${region} 중심 1.2km 내 24시 의료센터`,
-        phone: '02-715-1234',
-        latitude: centerLat + 0.0048,
-        longitude: centerLng - 0.0042,
-        isEmergency24h: true,
-        businessHours: '연중무휴 24시간 진료',
-        rating: '4.78',
-        reviewCount: 65,
-        naverPlaceUrl: `https://map.naver.com/v5/search/${encodeURIComponent(h3Name)}`
-      }
-    ];
-  }
+  // 지도 중심 좌표로 병원을 생성하던 generateDynamicNearbyHospitals()를 제거했다.
+  // 이름·좌표를 만들어내고 전화번호·평점·영업시간을 임의로 채워 넣어
+  // 실제 응급 정보처럼 보였기 때문이다. 병원 목록은 백엔드의
+  // 네이버 지역검색(NaverLocalSearchService) 결과만 사용한다.
 
   // Fetch real hospitals dynamically when Map Center or Filter changes
   useEffect(() => {
@@ -197,18 +142,13 @@ export default function HospitalLocator() {
       // 여기서 잡지 않으면 아래 setLoading(false)까지 실행되지 않아 화면이 로딩 상태로 멈춘다.
       let backendData = [];
       try {
-        backendData = await hospitalApi.getNearbyHospitals(mapCenter.lat, mapCenter.lng, filter24h);
+        backendData = await hospitalApi.getNearbyHospitals(mapCenter.lat, mapCenter.lng, filter24h, mapCenter.regionName);
       } catch (error) {
         console.warn('주변 병원 조회 실패:', error);
       }
       
-      // Dynamic Regional Generation for current Map Center
-      const dynamicList = generateDynamicNearbyHospitals(mapCenter.lat, mapCenter.lng);
-
-      let rawList = (backendData && backendData.length > 0) ? backendData : [];
-      
-      // Combine backend hospitals and dynamic regional hospitals
-      const combined = [...rawList, ...dynamicList];
+      // 백엔드가 내려준 검증된 병원만 사용한다 (생성 데이터를 섞지 않는다).
+      const combined = Array.isArray(backendData) ? backendData : [];
 
       // Deduplicate and filter 24h
       const filtered = combined.filter(h => filter24h ? h.isEmergency24h : true);

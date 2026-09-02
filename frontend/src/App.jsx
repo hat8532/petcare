@@ -6,6 +6,7 @@ import PetHealthDashboard from './components/PetHealthDashboard';
 import DailyCareChatbot from './components/DailyCareChatbot';
 import CareFlowBranch from './components/CareFlowBranch';
 import TimelineSlider from './components/TimelineSlider';
+import HospitalLocator from './components/HospitalLocator';
 import NewsSection from './components/NewsSection';
 import CommunitySection from './components/CommunitySection';
 import LoginPage from './components/LoginPage';
@@ -180,31 +181,14 @@ export default function App() {
         return (
           <div className="container" style={{ padding: '40px 20px 60px 20px' }}>
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <span style={{ fontSize: '12px', fontWeight: '800', color: '#e11d48', background: '#fff1f2', border: '1px solid #fecdd3', padding: '4px 12px', borderRadius: '9999px' }}>
-                VERIFIED SOURCE REQUIRED
-              </span>
-              <h2 style={{ fontSize: '32px', fontWeight: '900', color: '#0f172a', marginTop: '10px' }}>
-                24시 응급 동물병원 검색 안내
+              <h2 style={{ fontSize: '32px', fontWeight: '900', color: '#0f172a' }}>
+                24시 응급 동물병원 찾기
               </h2>
               <p style={{ fontSize: '15px', color: '#475569', marginTop: '6px' }}>
-                저장소의 출처 검증 전 seed 병원 정보는 이 화면에 노출하지 않습니다. 공식 지도와 병원 전화로 실제 운영 여부를 확인하세요.
+                네이버 지역검색으로 확인된 병원만 표시합니다. 이동 전 병원에 전화해 진료 가능 여부를 확인하세요.
               </p>
             </div>
-            <div className="glass-card" style={{ padding: '32px', textAlign: 'center' }}>
-              <h3 style={{ marginTop: 0 }}>검증된 병원 Data Source 연결 전입니다.</h3>
-              <p style={{ color: '#475569', lineHeight: 1.7 }}>
-                고정 좌표나 생성한 병원명·전화번호는 실제 응급 정보로 표시하지 않습니다.
-                현재는 공식 지도에서 병원 운영 여부와 연락처를 직접 확인해 주세요.
-              </p>
-              <a
-                href={OFFICIAL_HOSPITAL_SEARCH_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-primary"
-              >
-                공식 지도에서 24시 동물병원 검색
-              </a>
-            </div>
+            <HospitalLocator />
           </div>
         );
 
