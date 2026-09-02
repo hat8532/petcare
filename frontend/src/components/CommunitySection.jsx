@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { communityApi } from '../api/communityApi';
 
-export default function CommunitySection({ user, onOpenLogin }) {
+export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
   const [posts, setPosts] = useState([]);
   const [isWriteOpen, setIsWriteOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -153,7 +153,22 @@ export default function CommunitySection({ user, onOpenLogin }) {
 
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
                 <div>💬 댓글 {p.commentsCount} · ❤️ 좋아요 {p.likesCount}</div>
-                <span style={{ color: '#059669', fontWeight: '700', cursor: 'pointer' }}>글 상세보기 ➔</span>
+                <button
+                  type="button"
+                  onClick={() => onOpenDetail?.(p.id)}
+                  style={{
+                    color: '#059669',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    fontSize: '12px',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  글 상세보기 ➔
+                </button>
               </div>
             </div>
           ))}

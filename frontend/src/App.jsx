@@ -9,6 +9,7 @@ import TimelineSlider from './components/TimelineSlider';
 import HospitalLocator from './components/HospitalLocator';
 import NewsSection from './components/NewsSection';
 import CommunitySection from './components/CommunitySection';
+import CommunityPostDetail from './components/CommunityPostDetail';
 import LoginPage from './components/LoginPage';
 import OAuth2CallbackPage from './components/OAuth2CallbackPage';
 import PetEditModal from './components/PetEditModal';
@@ -18,6 +19,10 @@ import { petApi } from './api/petApi';
 const OFFICIAL_HOSPITAL_SEARCH_URL = 'https://map.naver.com/p/search/24시%20동물병원';
 
 export default function App() {
+  // 커뮤니티 목록에서 "글 상세보기"를 누르면 그 글 번호를 여기에 담고
+  // activeTab 을 'community-detail' 로 바꿔 상세 화면을 띄운다.
+  const [selectedPostId, setSelectedPostId] = useState(null);
+
   const [activeTab, setActiveTab] = useState(() => {
     if (window.location.pathname.startsWith('/login') || window.location.search.includes('error=')) {
       return 'login';
@@ -221,6 +226,20 @@ export default function App() {
             <CommunitySection
               user={user}
               onOpenLogin={() => setActiveTab('login')}
+              onOpenDetail={(postId) => {
+                setSelectedPostId(postId);
+                setActiveTab('community-detail');
+              }}
+            />
+          </div>
+        );
+
+      case 'community-detail':
+        return (
+          <div className="container" style={{ padding: '40px 20px 60px 20px' }}>
+            <CommunityPostDetail
+              postId={selectedPostId}
+              onBack={() => setActiveTab('community')}
             />
           </div>
         );
