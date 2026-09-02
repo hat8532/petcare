@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { communityApi } from '../api/communityApi';
 
-export default function CommunitySection() {
+export default function CommunitySection({ user, onOpenLogin }) {
   const [posts, setPosts] = useState([]);
   const [isWriteOpen, setIsWriteOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -16,8 +16,24 @@ export default function CommunitySection() {
     loadCommunity();
   }, []);
 
+  // 글쓰기 화면과 실제 전송 모두에서 로그인 상태를 확인한다.
+  function requireLogin() {
+    if (user) return true;
+
+    alert('로그인 후 커뮤니티 글을 작성할 수 있습니다.');
+    onOpenLogin?.();
+    return false;
+  }
+
+  function handleOpenWrite() {
+    if (!requireLogin()) return;
+    setIsWriteOpen(true);
+  }
+
   // 글 작성: 유효성 검사 → 저장 → 목록 새로고침 → 폼 초기화
   async function handleSubmit() {
+    if (!requireLogin()) return;
+
     if (!newTitle.trim() || !newContent.trim()) {
       alert('제목과 내용을 모두 입력해주세요.');
       return;
@@ -37,6 +53,12 @@ export default function CommunitySection() {
       setNewContent('');
       setIsWriteOpen(false);
     } catch (e) {
+      if (e?.status === 401) {
+        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        onOpenLogin?.();
+        return;
+      }
+
       alert('글 작성에 실패했습니다. 잠시 후 다시 시도해주세요.');
     }
   }
@@ -52,7 +74,7 @@ export default function CommunitySection() {
             <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a', margin: 0 }}>반려인 케어 정보 공유 커뮤니티</h2>
             <p style={{ fontSize: '14.5px', color: '#64748b', marginTop: '4px', margin: 0 }}>자신의 AI 진단 리포트를 선택 첨부하여 비슷한 증상을 겪은 반려인들과 소통하고 노하우를 나눠보세요.</p>
           </div>
-          <button className="btn btn-primary" onClick={() => setIsWriteOpen(true)} style={{ padding: '10px 20px', fontSize: '13.5px' }}>
+          <button className="btn btn-primary" onClick={handleOpenWrite} style={{ padding: '10px 20px', fontSize: '13.5px' }}>
             ✏️ 새 글 작성하기
           </button>
         </div>

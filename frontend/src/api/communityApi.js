@@ -14,7 +14,7 @@ export const communityApi = Object.freeze({
   },
 
   createCommunityPost: async (payload) => {
-    const body = await httpClient.post('/community', payload, publicRequest);
+    const body = await httpClient.post('/community', payload);
     return body?.data;
   }
 });

@@ -218,7 +218,10 @@ export default function App() {
                 AI 진단 리포트를 첨부하고 다른 반려인들과 경험을 나누어 보세요.
               </p>
             </div>
-            <CommunitySection />
+            <CommunitySection
+              user={user}
+              onOpenLogin={() => setActiveTab('login')}
+            />
           </div>
         );
 
