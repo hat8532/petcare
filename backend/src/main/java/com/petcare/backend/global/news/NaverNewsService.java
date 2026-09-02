@@ -7,7 +7,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -40,15 +42,28 @@ public class NaverNewsService {
 
         // Official Naver Developers News Search API
         try {
-            String encodedQuery = java.net.URLEncoder.encode(query, StandardCharsets.UTF_8);
-            String url = String.format("https://openapi.naver.com/v1/search/news.json?query=%s&start=%d&display=%d&sort=date", encodedQuery, validStart, validDisplay);
+            // RestTemplate에 String URL을 넘기면 이미 인코딩된 문자열을 한 번 더 인코딩한다
+            // (% -> %25). 그러면 네이버가 한글 대신 깨진 문자열을 검색해 엉뚱한 결과를 준다.
+            // URI 객체로 넘겨야 재인코딩되지 않는다.
+            URI uri = UriComponentsBuilder
+                    .fromUriString("https://openapi.naver.com/v1/search/news.json")
+                    .queryParam("query", query)
+                    .queryParam("start", validStart)
+                    .queryParam("display", validDisplay)
+                    // sort=date(최신순)는 검색어와 무관한 기사가 섞인다.
+                    // 예: "반려동물 사료" -> 농식품부 예산 기사.
+                    // sim(정확도순)이 검색 기능에는 더 적합하다.
+                    .queryParam("sort", "sim")
+                    .encode(StandardCharsets.UTF_8)
+                    .build()
+                    .toUri();
 
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-Naver-Client-Id", newsClientId.trim());
             headers.set("X-Naver-Client-Secret", newsClientSecret.trim());
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+            ResponseEntity<Map> response = restTemplate.exchange(uri, HttpMethod.GET, entity, Map.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 List<Map<String, Object>> items = (List<Map<String, Object>>) response.getBody().get("items");
