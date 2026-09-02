@@ -1,6 +1,11 @@
 package com.petcare.backend.domain.community;
 
+import com.petcare.backend.domain.pet.PetDTO;
+import com.petcare.backend.domain.pet.PetMapper;
+import com.petcare.backend.domain.user.UserDTO;
+import com.petcare.backend.domain.user.UserMapper;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -15,16 +20,23 @@ import java.util.Map;
 @CrossOrigin(origins = "*")
 public class CommunityController {
 
-    // 로그인 연동 전까지 사용할 기본 작성자/반려동물 (씨앗 데이터의 초코마미·초코)
+    // 비로그인 상태에서 글을 쓸 때 사용할 기본 작성자/반려동물 (씨앗 데이터의 초코마미·초코).
+    // POST /api/v1/community 는 현재 비로그인도 허용되어 있어 폴백이 필요하다.
     private static final Long DEFAULT_USER_ID = 1L;
     private static final Long DEFAULT_PET_ID = 1L;
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy.MM.dd");
 
     private final CommunityPostMapper communityPostMapper;
+    private final UserMapper userMapper;
+    private final PetMapper petMapper;
 
-    public CommunityController(CommunityPostMapper communityPostMapper) {
+    public CommunityController(CommunityPostMapper communityPostMapper,
+                               UserMapper userMapper,
+                               PetMapper petMapper) {
         this.communityPostMapper = communityPostMapper;
+        this.userMapper = userMapper;
+        this.petMapper = petMapper;
     }
 
     @GetMapping
@@ -59,10 +71,13 @@ public class CommunityController {
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, Object>> createPost(@RequestBody CommunityPostDTO post) {
-        // 로그인 연동 전이라 작성자를 기본값으로 채운다
-        if (post.getUserId() == null) post.setUserId(DEFAULT_USER_ID);
-        if (post.getPetId() == null) post.setPetId(DEFAULT_PET_ID);
+    public ResponseEntity<Map<String, Object>> createPost(@RequestBody CommunityPostDTO post,
+                                                          Authentication authentication) {
+        // 작성자는 요청 본문이 아니라 인증 정보에서 결정한다.
+        // 클라이언트가 보낸 userId를 그대로 믿으면 다른 사람 이름으로 글을 쓸 수 있다.
+        Long authorId = resolveAuthorId(authentication);
+        post.setUserId(authorId);
+        post.setPetId(resolvePetId(authorId));
 
         communityPostMapper.insert(post);
 
@@ -76,6 +91,31 @@ public class CommunityController {
         response.put("data", saved);
 
         return ResponseEntity.ok(response);
+    }
+
+    // 로그인했으면 그 사용자의 id를, 아니면 기본 작성자를 돌려준다.
+    // JwtAuthenticationFilter가 principal에 email을 담으므로 email로 사용자를 찾는다.
+    private Long resolveAuthorId(Authentication authentication) {
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+            return DEFAULT_USER_ID;
+        }
+
+        UserDTO currentUser = userMapper.findByEmail(authentication.getName());
+        return (currentUser != null && currentUser.getId() != null)
+                ? currentUser.getId()
+                : DEFAULT_USER_ID;
+    }
+
+    // 작성자가 등록한 첫 번째 반려동물을 글에 붙인다. 없으면 기본값.
+    private Long resolvePetId(Long userId) {
+        if (userId == null) return DEFAULT_PET_ID;
+
+        List<PetDTO> pets = petMapper.findByUserId(userId);
+        if (pets == null || pets.isEmpty()) return DEFAULT_PET_ID;
+
+        return pets.get(0).getId();
     }
 
     // createdAt을 "방금 전", "3분 전" 같은 표시 문구로 바꾼다.
