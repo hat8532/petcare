@@ -98,82 +98,15 @@ public class DataInitializer implements CommandLineRunner {
             petMapper.insert(pet2);
         }
 
-        // 3. Initial 24h Emergency Hospitals (Nationwide Key Regions)
-        if (hospitalMapper.countAll() == 0) {
-            // 마포 / 신촌
-            hospitalMapper.insert(HospitalDTO.builder()
-                    .name("24시 웨스턴 동물의료센터")
-                    .phone("02-701-7582")
-                    .address("서울 마포구 신촌로 160 (대흥동)")
-                    .latitude(37.5552)
-                    .longitude(126.9423)
-                    .isEmergency24h(true)
-                    .businessHours("연중무휴 24시간 진료")
-                    .rating(new BigDecimal("4.90"))
-                    .reviewCount(128)
-                    .naverPlaceUrl("https://map.naver.com/p/search/24시웨스턴동물의료센터")
-                    .isActive(true)
-                    .build());
-
-            // 구로 / 가산디지털단지
-            hospitalMapper.insert(HospitalDTO.builder()
-                    .name("24시 구로 디지털 동물의료센터")
-                    .phone("02-850-7582")
-                    .address("서울 구로구 디지털로 300 (가산동)")
-                    .latitude(37.4780)
-                    .longitude(126.8835)
-                    .isEmergency24h(true)
-                    .businessHours("연중무휴 24시간 진료")
-                    .rating(new BigDecimal("4.85"))
-                    .reviewCount(112)
-                    .naverPlaceUrl("https://map.naver.com/p/search/구로24시아동물병원")
-                    .isActive(true)
-                    .build());
-
-            hospitalMapper.insert(HospitalDTO.builder()
-                    .name("가산 스마트 24시 펫메디컬센터")
-                    .phone("02-861-1119")
-                    .address("서울 금천구 가산디지털1로 186")
-                    .latitude(37.4745)
-                    .longitude(126.8810)
-                    .isEmergency24h(true)
-                    .businessHours("연중무휴 24시간 진료")
-                    .rating(new BigDecimal("4.78"))
-                    .reviewCount(84)
-                    .naverPlaceUrl("https://map.naver.com")
-                    .isActive(true)
-                    .build());
-
-            // 강남 / 서초
-            hospitalMapper.insert(HospitalDTO.builder()
-                    .name("24시 강남 센트럴 동물의료센터")
-                    .phone("02-540-7582")
-                    .address("서울 강남구 테헤란로 152 (역삼동)")
-                    .latitude(37.5000)
-                    .longitude(127.0360)
-                    .isEmergency24h(true)
-                    .businessHours("연중무휴 24시간 진료")
-                    .rating(new BigDecimal("4.95"))
-                    .reviewCount(210)
-                    .naverPlaceUrl("https://map.naver.com")
-                    .isActive(true)
-                    .build());
-
-            // 중랑 / 동대문
-            hospitalMapper.insert(HospitalDTO.builder()
-                    .name("24시 로얄동물메디컬센터")
-                    .phone("02-494-7582")
-                    .address("서울 중랑구 망우로 247")
-                    .latitude(37.5956)
-                    .longitude(127.0864)
-                    .isEmergency24h(true)
-                    .businessHours("연중무휴 24시간 진료")
-                    .rating(new BigDecimal("4.80"))
-                    .reviewCount(96)
-                    .naverPlaceUrl("https://map.naver.com/p/search/24시로얄동물메디컬센터")
-                    .isActive(true)
-                    .build());
-        }
+        // 3. Initial 24h Emergency Hospitals — 제거됨
+        //
+        // 기존 seed 병원 5곳은 실존하지 않는 데이터였다.
+        // 네이버 지역검색으로 확인한 결과:
+        //   - "24시 구로 디지털 동물의료센터", "24시 강남 센트럴 동물의료센터": 검색 결과 0건
+        //   - "24시 웨스턴 동물의료센터": 실존하나 주소가 신촌로 110 (seed는 160)
+        // 전화번호는 4곳이 뒷자리 7582로 동일했고, 평점·리뷰·영업시간도 임의값이었다.
+        //
+        // 병원 정보는 NaverLocalSearchService(네이버 지역검색)에서 조회한다.
 
         // 4. Initial Timeline Compare Record
         if (timelineCompareMapper.countAll() == 0 && petMapper.countAll() > 0) {
