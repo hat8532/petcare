@@ -4,9 +4,8 @@
 ---
 
 ## 📌 [도메인별 담당자 요약]
-* **👤 태준 (User)**: 회원 & 인증 (Auth & User API)
+* **👤 태준 (User)**: 회원 & 인증, 반려동물 온보딩 & PHR 헬스 대시보드 (Auth, User & Pet API)
 * **🤖 진한님**: AI 질병 진단 & 경과 관찰 타임라인 (AI Diagnosis & Timeline API)
-* **📊 세민님**: 반려동물 온보딩 & PHR 헬스 대시보드 (Pet & Dashboard API)
 * **📰 지호님**: 24시 응급 동물병원, 실시간 펫 뉴스, 커뮤니티 (Hospital, News & Community API)
 
 ---
@@ -40,7 +39,7 @@
 
 ---
 
-### 2.2 반려동물 온보딩 & 관리 (Pet API) — `[담당자: 📊 세민님]`
+### 2.2 반려동물 온보딩 & 관리 (Pet API) — `[담당자: 👤 태준 (User)]`
 | Method | Endpoint | 설명 | Auth |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/pets/breeds` | 축종별 품종 마스터 데이터 자동완성 목록 조회 | Public |

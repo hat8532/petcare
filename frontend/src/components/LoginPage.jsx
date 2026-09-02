@@ -24,6 +24,44 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // 모달이 열릴 때 항상 'login' 모드로 초기화 및 상태 정리
+  useEffect(() => {
+    if (isOpen) {
+      setViewMode('login');
+      setMessage('');
+      setSuccessMessage('');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setNickname('');
+      setPhone('');
+      setEmailStatus(null);
+      setNicknameStatus(null);
+      setTempPasswordResult('');
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+    }
+  }, [isOpen]);
+
+  const handleClose = () => {
+    setViewMode('login');
+    setMessage('');
+    setSuccessMessage('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setNickname('');
+    setPhone('');
+    setEmailStatus(null);
+    setNicknameStatus(null);
+    setTempPasswordResult('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    if (onClose) {
+      onClose();
+    }
+  };
+
   // 소셜 로그인 리다이렉트 실패 에러 파라미터 처리 (?error=deleted_user 등)
   useEffect(() => {
     try {
@@ -198,7 +236,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
       {/* Close Button if Modal */}
       {!isEmbeddedPage && onClose && (
         <button
-          onClick={onClose}
+          onClick={handleClose}
           style={{
             position: 'absolute',
             top: '20px',
@@ -559,17 +597,24 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 1000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'rgba(15, 23, 42, 0.65)',
-      backdropFilter: 'blur(10px)',
-      padding: '20px'
-    }}>
+    <div 
+      onClick={(e) => {
+        if (e.target === e.currentTarget && onClose) {
+          handleClose();
+        }
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(10px)',
+        padding: '20px'
+      }}
+    >
       {formCardContent}
     </div>
   );
