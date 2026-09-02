@@ -8,9 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +22,6 @@ public class CommunityController {
     // 평소에는 쓰이지 않지만, 설정이 바뀌었을 때 예외로 터지지 않도록 남겨 둔다.
     private static final Long DEFAULT_USER_ID = 1L;
     private static final Long DEFAULT_PET_ID = 1L;
-
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy.MM.dd");
 
     private final CommunityPostMapper communityPostMapper;
     private final UserMapper userMapper;
@@ -123,24 +118,9 @@ public class CommunityController {
         return pets.get(0).getId();
     }
 
-    // createdAt을 "방금 전", "3분 전" 같은 표시 문구로 바꾼다.
-    // 예전에는 이 문구를 DB에 저장해서 시간이 지나도 그대로였다.
+    // 표시 문구 계산은 댓글과 공유하려고 TimeAgoFormatter로 옮겼다.
     private void applyTimeAgo(CommunityPostDTO post) {
-        if (post == null || post.getCreatedAt() == null) return;
-
-        long minutes = Duration.between(post.getCreatedAt(), LocalDateTime.now()).toMinutes();
-        if (minutes < 0) minutes = 0;
-
-        if (minutes < 1) {
-            post.setTimeAgo("방금 전");
-        } else if (minutes < 60) {
-            post.setTimeAgo(minutes + "분 전");
-        } else if (minutes < 60 * 24) {
-            post.setTimeAgo((minutes / 60) + "시간 전");
-        } else if (minutes < 60 * 24 * 7) {
-            post.setTimeAgo((minutes / (60 * 24)) + "일 전");
-        } else {
-            post.setTimeAgo(post.getCreatedAt().format(DATE_FORMAT));
-        }
+        if (post == null) return;
+        post.setTimeAgo(TimeAgoFormatter.format(post.getCreatedAt()));
     }
 }
