@@ -8,6 +8,15 @@ import java.util.List;
 @Mapper
 public interface CommunityPostMapper {
     List<CommunityPostDTO> findAll();
+
+    // 한 페이지만 잘라서 가져온다. keyword 가 null 이거나 비어 있으면 전체가 대상이다.
+    List<CommunityPostDTO> findPage(@Param("keyword") String keyword,
+                                    @Param("limit") int limit,
+                                    @Param("offset") int offset);
+
+    // 전체 몇 건인지. 마지막 페이지인지 판단하려면 개수를 알아야 한다.
+    int countByKeyword(@Param("keyword") String keyword);
+
     void insert(CommunityPostDTO post);
     int countAll();
     CommunityPostDTO findById(Long id);

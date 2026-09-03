@@ -3,6 +3,18 @@ import { communityApi } from '../api/communityApi';
 
 export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
   const [posts, setPosts] = useState([]);
+
+  // 검색어는 두 개를 둔다.
+  //  searchInput  입력창에 지금 쳐 있는 글자
+  //  keyword      실제로 서버에 보낸 검색어
+  // 하나로 합치면 글자를 칠 때마다 요청이 나간다.
+  const [searchInput, setSearchInput] = useState('');
+  const [keyword, setKeyword] = useState('');
+
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [nextPage, setNextPage] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isWriteOpen, setIsWriteOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -13,13 +25,37 @@ export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
   const [selectedReportId, setSelectedReportId] = useState('');
 
 
+  // 첫 페이지를 새로 불러온다. 검색하거나 글을 쓴 뒤에도 이걸 쓴다.
+  async function loadFirstPage(searchKeyword) {
+    const result = await communityApi.getCommunityPosts({ page: 0, keyword: searchKeyword });
+    setPosts(result.data);
+    setTotalCount(result.totalCount);
+    setHasNext(result.hasNext);
+    setNextPage(1);
+  }
+
+  // keyword 가 바뀔 때마다 다시 부른다. 처음 화면에 들어올 때도 한 번 돈다.
   useEffect(() => {
-    async function loadCommunity() {
-      const data = await communityApi.getCommunityPosts();
-      setPosts(data);
+    loadFirstPage(keyword);
+  }, [keyword]);
+
+  // "더 보기": 기존 목록을 지우지 않고 뒤에 이어 붙인다.
+  async function handleLoadMore() {
+    setIsLoadingMore(true);
+    try {
+      const result = await communityApi.getCommunityPosts({ page: nextPage, keyword });
+      setPosts((prev) => [...prev, ...result.data]);
+      setHasNext(result.hasNext);
+      setNextPage((prev) => prev + 1);
+    } finally {
+      setIsLoadingMore(false);
     }
-    loadCommunity();
-  }, []);
+  }
+
+  // 검색 실행. 입력창의 글자를 실제 검색어로 확정한다.
+  function handleSearch() {
+    setKeyword(searchInput.trim());
+  }
 
   // 글쓰기 화면과 실제 전송 모두에서 로그인 상태를 확인한다.
   function requireLogin() {
@@ -57,8 +93,8 @@ export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
         diagnosisRecordId: selectedReportId ? Number(selectedReportId) : null
       });
 
-      const data = await communityApi.getCommunityPosts();
-      setPosts(data);
+      // 새 글은 맨 위에 있으므로 첫 페이지부터 다시 부른다.
+      await loadFirstPage(keyword);
 
       setNewTitle('');
       setNewContent('');
@@ -96,6 +132,58 @@ export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
             ✏️ 새 글 작성하기
           </button>
         </div>
+
+        {/* 검색. form 으로 감싸야 Enter 로도 검색된다. */}
+        <form
+          onSubmit={(e) => { e.preventDefault(); handleSearch(); }}
+          style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}
+        >
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="제목이나 내용으로 검색"
+            aria-label="커뮤니티 글 검색"
+            style={{
+              flex: 1,
+              padding: '10px 14px',
+              fontSize: '14px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              boxSizing: 'border-box',
+              fontFamily: 'inherit'
+            }}
+          />
+          <button type="submit" className="btn btn-primary" style={{ padding: '9px 20px', fontSize: '13.5px', whiteSpace: 'nowrap' }}>
+            🔍 검색
+          </button>
+          {keyword && (
+            <button
+              type="button"
+              onClick={() => { setSearchInput(''); setKeyword(''); }}
+              style={{
+                padding: '9px 16px',
+                fontSize: '13.5px',
+                fontWeight: '700',
+                border: '1px solid #e2e8f0',
+                background: '#ffffff',
+                color: '#64748b',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                fontFamily: 'inherit'
+              }}
+            >
+              초기화
+            </button>
+          )}
+        </form>
+
+        {keyword && (
+          <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
+            &quot;{keyword}&quot; 검색 결과 {totalCount}건
+          </p>
+        )}
         {isWriteOpen && (
           <div style={{ padding: '24px', background: '#ffffff', borderRadius: '12px', marginBottom: '24px' }}>
             <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '800', color: '#0f172a' }}>새 글 작성</h4>
@@ -171,7 +259,9 @@ export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
 
         {posts.length === 0 && (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-            아직 작성된 글이 없습니다. 첫 글을 남겨보세요!
+            {keyword
+              ? '검색 결과가 없습니다. 다른 단어로 찾아보세요.'
+              : '아직 작성된 글이 없습니다. 첫 글을 남겨보세요!'}
           </div>
         )}
 
@@ -229,6 +319,29 @@ export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
             </div>
           ))}
         </div>
+
+        {hasNext && (
+          <div style={{ textAlign: 'center', marginTop: '24px' }}>
+            <button
+              type="button"
+              onClick={handleLoadMore}
+              disabled={isLoadingMore}
+              style={{
+                padding: '11px 28px',
+                fontSize: '13.5px',
+                fontWeight: '700',
+                border: '1px solid #e2e8f0',
+                background: '#ffffff',
+                color: '#0f172a',
+                borderRadius: '9999px',
+                cursor: isLoadingMore ? 'default' : 'pointer',
+                fontFamily: 'inherit'
+              }}
+            >
+              {isLoadingMore ? '불러오는 중…' : `더 보기 (${posts.length} / ${totalCount})`}
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
