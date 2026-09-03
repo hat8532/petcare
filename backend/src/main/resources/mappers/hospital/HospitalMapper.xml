@@ -35,4 +35,23 @@
         VALUES (#{name}, #{phone}, #{address}, #{detailAddress}, #{latitude}, #{longitude}, #{isEmergency24h}, #{businessHours}, #{rating}, #{reviewCount}, #{naverPlaceUrl}, #{isActive})
     </insert>
 
+    <!--
+      북마크할 때 같은 병원을 여러 번 저장하지 않으려고 먼저 찾아본다.
+      네이버 지역검색 결과에는 우리 DB의 id가 없어서 이름+주소로 맞춰볼 수밖에 없다.
+
+      주소는 상세주소까지 포함되면 표기가 조금씩 달라지므로 도로명 주소만 비교한다.
+      공백은 표기가 제각각이라(예: "서울시 구로구" / "서울시  구로구") 지우고 본다.
+      여러 건이 나와도 한 건만 쓰면 되므로 LIMIT 1 을 건다.
+    -->
+    <select id="findByNameAndAddress" resultType="com.petcare.backend.domain.hospital.HospitalDTO">
+        SELECT id, name, phone, address, detail_address AS detailAddress,
+               latitude, longitude, is_emergency_24h AS isEmergency24h,
+               business_hours AS businessHours, rating, review_count AS reviewCount,
+               naver_place_url AS naverPlaceUrl, is_active AS isActive
+        FROM hospitals
+        WHERE REPLACE(name, ' ', '') = REPLACE(#{name}, ' ', '')
+          AND REPLACE(address, ' ', '') = REPLACE(#{address}, ' ', '')
+        LIMIT 1
+    </select>
+
 </mapper>

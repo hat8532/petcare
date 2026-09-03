@@ -69,6 +69,10 @@ public class SecurityConfig {
                 // 떨어져 인증 없이 Controller까지 도달한다.
                 .requestMatchers(HttpMethod.PUT, "/api/v1/community/**").authenticated()
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/community/**").authenticated()
+                // 병원 북마크 등록/해제는 로그인 필수.
+                // 조회(GET /api/v1/hospitals/bookmarks)는 위 permitAll 규칙에 걸리므로
+                // Controller에서 직접 401로 끊는다.
+                .requestMatchers(HttpMethod.POST, "/api/v1/hospitals/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/diagnosis/symptoms").permitAll()
                 .requestMatchers("/api/v1/diagnosis/**").authenticated()
                 .requestMatchers("/api/v1/chat/**").permitAll()

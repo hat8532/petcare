@@ -1,8 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { hospitalApi } from '../api/hospitalApi';
 
-export default function HospitalLocator() {
+// 같은 병원인지 판단하는 열쇠. 네이버에서 온 병원은 id가 없어서 이름+주소로 맞춘다.
+// 서버의 findByNameAndAddress 와 같은 기준이라야 화면과 DB가 어긋나지 않는다.
+function hospitalKey(h) {
+  return `${(h?.name || '').replace(/\s/g, '')}|${(h?.address || '').replace(/\s/g, '')}`;
+}
+
+export default function HospitalLocator({ user, onOpenLogin }) {
   const [filter24h, setFilter24h] = useState(true);
+
+  // 담아둔 병원을 이름+주소 열쇠로 들고 있는다.
+  // 배열로 두고 매번 찾으면 병원 수만큼 훑어야 하지만 Set 은 바로 확인된다.
+  const [bookmarkKeys, setBookmarkKeys] = useState(() => new Set());
+  const [bookmarkBusy, setBookmarkBusy] = useState('');
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -22,6 +33,57 @@ export default function HospitalLocator() {
 
   const [locating, setLocating] = useState(false);
   const [selectedHospital, setSelectedHospital] = useState(null);
+
+  // 로그인/로그아웃할 때마다 다시 부른다.
+  // 로그아웃하면 목록을 비워야 남은 별표가 그대로 보이지 않는다.
+  useEffect(() => {
+    if (!user) {
+      setBookmarkKeys(new Set());
+      return;
+    }
+
+    async function loadBookmarks() {
+      const saved = await hospitalApi.getBookmarks();
+      setBookmarkKeys(new Set(saved.map(hospitalKey)));
+    }
+    loadBookmarks();
+  }, [user]);
+
+  // 북마크 담기/빼기. 서버가 돌려준 결과로 화면 상태를 맞춘다.
+  async function handleToggleBookmark(hospital) {
+    if (!user) {
+      alert('로그인 후 병원을 저장할 수 있습니다.');
+      onOpenLogin?.();
+      return;
+    }
+
+    const key = hospitalKey(hospital);
+
+    // 연달아 누르면 같은 병원에 요청이 겹쳐 담김/빠짐이 뒤집힌다.
+    if (bookmarkBusy === key) return;
+    setBookmarkBusy(key);
+
+    try {
+      const result = await hospitalApi.toggleBookmark(hospital);
+
+      // 화면에서 직접 뒤집지 않고 서버가 알려준 값을 따른다.
+      setBookmarkKeys((prev) => {
+        const next = new Set(prev);
+        if (result.bookmarked) next.add(key);
+        else next.delete(key);
+        return next;
+      });
+    } catch (error) {
+      if (error?.status === 401) {
+        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        onOpenLogin?.();
+        return;
+      }
+      alert('병원 저장에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setBookmarkBusy('');
+    }
+  }
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -547,6 +609,28 @@ export default function HospitalLocator() {
                       </div>
 
                       <div style={{ display: 'flex', gap: '8px' }}>
+                        {/* 담긴 상태를 색만이 아니라 별 모양(☆ / ★)으로도 구분한다.
+                            색만 바꾸면 색을 구분하기 어려운 사람이 상태를 알 수 없다. */}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleToggleBookmark(h); }}
+                          disabled={bookmarkBusy === hospitalKey(h)}
+                          aria-pressed={bookmarkKeys.has(hospitalKey(h))}
+                          aria-label={bookmarkKeys.has(hospitalKey(h)) ? '단골 병원에서 빼기' : '단골 병원으로 저장'}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            fontFamily: 'inherit',
+                            cursor: 'pointer',
+                            borderRadius: '8px',
+                            border: bookmarkKeys.has(hospitalKey(h)) ? '1px solid #fcd34d' : '1px solid #e2e8f0',
+                            background: bookmarkKeys.has(hospitalKey(h)) ? '#fffbeb' : '#ffffff',
+                            color: bookmarkKeys.has(hospitalKey(h)) ? '#b45309' : '#64748b'
+                          }}
+                        >
+                          {bookmarkKeys.has(hospitalKey(h)) ? '★ 단골' : '☆ 단골'}
+                        </button>
                         <a
                           href={`tel:${h.phone}`}
                           onClick={(e) => e.stopPropagation()}
