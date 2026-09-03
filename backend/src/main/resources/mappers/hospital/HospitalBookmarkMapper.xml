@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.petcare.backend.domain.hospital.HospitalBookmarkMapper">
+
+    <select id="countByUserIdAndHospitalId" resultType="int">
+        SELECT COUNT(*) FROM hospital_bookmarks
+        WHERE user_id = #{userId} AND hospital_id = #{hospitalId}
+    </select>
+
+    <!--
+      테이블에 (user_id, hospital_id) 유니크 제약이 없어 SQL로 중복을 막는다.
+      이미 북마크했으면 SELECT가 아무 행도 만들지 않아 INSERT가 0건으로 끝난다.
+      post_likes와 같은 상황이라 같은 방식으로 처리한다.
+    -->
+    <insert id="insertIfAbsent">
+        INSERT INTO hospital_bookmarks (user_id, hospital_id)
+        SELECT #{userId}, #{hospitalId}
+        WHERE NOT EXISTS (
+            SELECT 1 FROM hospital_bookmarks
+            WHERE user_id = #{userId} AND hospital_id = #{hospitalId}
+        )
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM hospital_bookmarks
+        WHERE user_id = #{userId} AND hospital_id = #{hospitalId}
+    </delete>
+
+    <!--
+      user_id 조건이 없으면 남의 북마크까지 나온다. 반드시 건다.
+      최근에 담은 것이 위로 오도록 내림차순으로 정렬한다.
+    -->
+    <select id="findBookmarkedHospitals" resultType="com.petcare.backend.domain.hospital.HospitalDTO">
+        SELECT h.id, h.name, h.phone, h.address, h.detail_address AS detailAddress,
+               h.latitude, h.longitude, h.is_emergency_24h AS isEmergency24h,
+               h.business_hours AS businessHours, h.rating, h.review_count AS reviewCount,
+               h.naver_place_url AS naverPlaceUrl, h.is_active AS isActive
+        FROM hospital_bookmarks b
+        JOIN hospitals h ON h.id = b.hospital_id
+        WHERE b.user_id = #{userId}
+        ORDER BY b.id DESC
+    </select>
+
+</mapper>

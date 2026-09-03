@@ -193,7 +193,10 @@ export default function App() {
                 네이버 지역검색으로 확인된 병원만 표시합니다. 이동 전 병원에 전화해 진료 가능 여부를 확인하세요.
               </p>
             </div>
-            <HospitalLocator />
+            <HospitalLocator
+              user={user}
+              onOpenLogin={() => setActiveTab('login')}
+            />
           </div>
         );
 
