@@ -26,6 +26,17 @@ export const communityApi = Object.freeze({
     return body?.data;
   },
 
+  // 글 수정. 본인 글이 아니면 서버가 403을 돌려준다.
+  updateCommunityPost: async (id, payload) => {
+    const body = await httpClient.put(`/community/${id}`, payload);
+    return body?.data;
+  },
+
+  // 글 삭제. 딸린 댓글·좋아요는 DB가 함께 지운다.
+  deleteCommunityPost: async (id) => {
+    await httpClient.delete(`/community/${id}`);
+  },
+
   // 한 게시글의 댓글 목록. GET /api/v1/community/{postId}/comments
   // 댓글은 없을 수도 있는 것이라 실패하면 빈 배열로 넘긴다.
   getComments: async (postId) => {

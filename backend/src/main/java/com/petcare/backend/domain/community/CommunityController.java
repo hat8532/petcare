@@ -65,10 +65,7 @@ public class CommunityController {
     public ResponseEntity<Map<String, Object>> getMyAttachableReports(Authentication authentication) {
         String email = resolveEmail(authentication);
         if (email == null) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("status", "ERROR");
-            error.put("message", "로그인이 필요합니다.");
-            return ResponseEntity.status(401).body(error);
+            return error(401, "로그인이 필요합니다.");
         }
 
         List<AttachableReportDTO> reports = communityPostMapper.findAttachableReports(email);
@@ -85,10 +82,7 @@ public class CommunityController {
     public ResponseEntity<Map<String, Object>> getCommunityPostDetail(@PathVariable("id") Long id) {
         CommunityPostDTO post = communityPostMapper.findById(id);
         if (post == null) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("status", "ERROR");
-            error.put("message", "해당 게시글을 찾을 수 없습니다.");
-            return ResponseEntity.status(404).body(error);
+            return error(404, "해당 게시글을 찾을 수 없습니다.");
         }
         applyTimeAgo(post);
 
@@ -108,22 +102,8 @@ public class CommunityController {
         post.setUserId(authorId);
         post.setPetId(resolvePetId(authorId));
 
-        // 첨부 리포트도 요청 본문에서 그대로 받으면 안 된다.
-        // id만 바꿔 보내면 남의 진단 결과를 내 글에 붙일 수 있다.
-        if (post.getDiagnosisRecordId() != null) {
-            String email = resolveEmail(authentication);
-
-            // findByIdAndOwner 는 diagnosis_records -> pets -> users 를 타고 올라가
-            // email 이 일치할 때만 행을 돌려준다. null 이면 내 것이 아니다.
-            boolean mine = email != null
-                    && diagnosisRecordMapper.findByIdAndOwner(post.getDiagnosisRecordId(), email) != null;
-
-            if (!mine) {
-                Map<String, Object> error = new HashMap<>();
-                error.put("status", "ERROR");
-                error.put("message", "본인의 진단 리포트만 첨부할 수 있습니다.");
-                return ResponseEntity.status(403).body(error);
-            }
+        if (!ownsAttachedReport(post.getDiagnosisRecordId(), authentication)) {
+            return error(403, "본인의 진단 리포트만 첨부할 수 있습니다.");
         }
 
         communityPostMapper.insert(post);
@@ -138,6 +118,103 @@ public class CommunityController {
         response.put("data", saved);
 
         return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> updatePost(@PathVariable("id") Long id,
+                                                          @RequestBody CommunityPostDTO post,
+                                                          Authentication authentication) {
+        Long requesterId = resolveOwnerId(authentication);
+        if (requesterId == null) {
+            return error(401, "로그인이 필요합니다.");
+        }
+
+        if (isBlank(post.getTitle()) || isBlank(post.getContent())) {
+            return error(400, "제목과 내용을 모두 입력해주세요.");
+        }
+
+        if (communityPostMapper.findById(id) == null) {
+            return error(404, "해당 게시글을 찾을 수 없습니다.");
+        }
+
+        // 첨부 리포트를 바꾸는 경우도 작성할 때와 똑같이 소유권을 확인해야 한다.
+        // 작성할 때만 막으면 수정으로 남의 리포트를 붙일 수 있다.
+        if (!ownsAttachedReport(post.getDiagnosisRecordId(), authentication)) {
+            return error(403, "본인의 진단 리포트만 첨부할 수 있습니다.");
+        }
+
+        // 지워진 행 수가 0이면 남의 글이라 조건에 걸리지 않은 것이다.
+        if (communityPostMapper.updateByIdAndUserId(id, requesterId, post) == 0) {
+            return error(403, "본인이 작성한 글만 수정할 수 있습니다.");
+        }
+
+        CommunityPostDTO saved = communityPostMapper.findById(id);
+        applyTimeAgo(saved);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "SUCCESS");
+        response.put("message", "게시글이 수정되었습니다.");
+        response.put("data", saved);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> deletePost(@PathVariable("id") Long id,
+                                                          Authentication authentication) {
+        Long requesterId = resolveOwnerId(authentication);
+        if (requesterId == null) {
+            return error(401, "로그인이 필요합니다.");
+        }
+
+        if (communityPostMapper.findById(id) == null) {
+            return error(404, "해당 게시글을 찾을 수 없습니다.");
+        }
+
+        // 딸린 댓글·좋아요는 posts를 ON DELETE CASCADE로 참조하므로 DB가 함께 지운다.
+        if (communityPostMapper.deleteByIdAndUserId(id, requesterId) == 0) {
+            return error(403, "본인이 작성한 글만 삭제할 수 있습니다.");
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "SUCCESS");
+        response.put("message", "게시글이 삭제되었습니다.");
+
+        return ResponseEntity.ok(response);
+    }
+
+    // 첨부하려는 리포트가 본인 것인지 확인한다. 첨부가 없으면(null) 확인할 게 없어 통과.
+    //
+    // findByIdAndOwner 는 diagnosis_records -> pets -> users 를 타고 올라가
+    // email 이 일치할 때만 행을 돌려준다. null 이면 내 것이 아니다.
+    private boolean ownsAttachedReport(Long diagnosisRecordId, Authentication authentication) {
+        if (diagnosisRecordId == null) return true;
+
+        String email = resolveEmail(authentication);
+        return email != null
+                && diagnosisRecordMapper.findByIdAndOwner(diagnosisRecordId, email) != null;
+    }
+
+    // 수정·삭제는 "누구인지"가 확실해야 한다.
+    // 작성 쪽 resolveAuthorId 는 인증이 없으면 기본 작성자로 넘어가는데,
+    // 그 값을 여기 쓰면 비로그인 요청이 1번 사용자의 글을 지울 수 있다.
+    private Long resolveOwnerId(Authentication authentication) {
+        String email = resolveEmail(authentication);
+        if (email == null) return null;
+
+        UserDTO currentUser = userMapper.findByEmail(email);
+        return (currentUser != null) ? currentUser.getId() : null;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private ResponseEntity<Map<String, Object>> error(int httpStatus, String message) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("status", "ERROR");
+        body.put("message", message);
+        return ResponseEntity.status(httpStatus).body(body);
     }
 
     // 로그인한 사용자의 id를 돌려준다.
