@@ -76,9 +76,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/diagnosis/symptoms").permitAll()
                 .requestMatchers("/api/v1/diagnosis/**").authenticated()
                 .requestMatchers("/api/v1/chat/**").permitAll()
-                // 반려동물 관련 API 및 주소록 API는 인증된 사용자만 접근 가능 (보호된 API)
+                // 반려동물 관련 API, 주소록 API 및 회원 마이페이지 API는 인증된 사용자만 접근 가능 (보호된 API)
                 .requestMatchers("/api/v1/pets/**").authenticated()
                 .requestMatchers("/api/v1/addresses/**").authenticated()
+                .requestMatchers("/api/v1/users/**").authenticated()
                 // 그 외 모든 요청은 기본 허용
                 .anyRequest().permitAll()
             )

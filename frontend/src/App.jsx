@@ -13,8 +13,13 @@ import CommunityPostDetail from './components/CommunityPostDetail';
 import LoginPage from './components/LoginPage';
 import OAuth2CallbackPage from './components/OAuth2CallbackPage';
 import PetEditModal from './components/PetEditModal';
+import MyPage from './components/MyPage';
 import Footer from './components/Footer';
+
+
 import { petApi } from './api/petApi';
+import { authApi } from './api/authApi';
+import { AUTH_EXPIRED_EVENT } from './api/common/httpClient';
 
 const OFFICIAL_HOSPITAL_SEARCH_URL = 'https://map.naver.com/p/search/24시%20동물병원';
 
@@ -69,6 +74,18 @@ export default function App() {
     setLatestDiagnosis(null);
   }, [selectedPet?.id]);
 
+  // Handle auth session expiration (e.g. refresh token failure)
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setUser(null);
+      setPets([]);
+      setSelectedPet(null);
+      setEditingPet(null);
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+  }, []);
+
   const handlePetAdded = (newPet) => {
     setPets((prev) => [...prev, newPet]);
     setSelectedPet(newPet);
@@ -119,6 +136,8 @@ export default function App() {
             onOpenEditPet={(petToEdit) => setEditingPet(petToEdit)}
           />
         );
+
+
 
       case 'daily-ai':
         return (
@@ -261,8 +280,39 @@ export default function App() {
           />
         );
 
+      case 'mypage':
+
+        return (
+          <MyPage
+            user={user}
+            pets={pets}
+            onUserUpdated={(updatedUser) => setUser(updatedUser)}
+            onLogout={async () => {
+              await authApi.logout();
+              setUser(null);
+              setActiveTab('home');
+            }}
+            onWithdraw={async () => {
+              if (window.confirm('정말로 탈퇴하시겠습니까? 탈퇴 후 기존 정보는 안전하게 보존되지만 로그인이 제한됩니다.')) {
+                try {
+                  await authApi.withdraw();
+                  setUser(null);
+                  setActiveTab('home');
+                  alert('회원 탈퇴 처리가 완료되었습니다.');
+                } catch (e) {
+                  alert(e.message || '탈퇴 처리에 실패했습니다.');
+                }
+              }
+            }}
+            onNavigateHome={() => setActiveTab('home')}
+          />
+        );
+
       case 'home':
       default:
+
+
+
         return (
           <>
             {/* Unified Hero Section */}
@@ -272,204 +322,333 @@ export default function App() {
               onFindHospital={() => setActiveTab('hospitals')}
             />
 
-            {/* 1. Toss / Apple Style 4 Core Service Cards */}
-            <div className="container" style={{ padding: '60px 20px 70px 20px', maxWidth: '1040px' }}>
-              <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '800', color: '#059669', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '4px 14px', borderRadius: '9999px' }}>
-                  CORE FEATURES
+            {/* 1. Toss / Apple Style 4 Core Service Cards - Arranged in a clean Single Row */}
+            <div className="container" style={{ padding: '70px 20px 80px 20px', maxWidth: '1240px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '44px' }}>
+                <span style={{
+                  fontSize: '11.5px',
+                  fontWeight: '800',
+                  color: '#047857',
+                  background: '#ecfdf5',
+                  border: '1px solid #a7f3d0',
+                  padding: '4px 14px',
+                  borderRadius: '9999px',
+                  letterSpacing: '0.5px'
+                }}>
+                  CORE SERVICES
                 </span>
-                <h2 style={{ fontSize: '32px', fontWeight: '900', color: '#0f172a', marginTop: '10px', letterSpacing: '-0.5px' }}>
+                <h2 style={{ fontSize: '34px', fontWeight: '900', color: '#0b0f19', marginTop: '12px', letterSpacing: '-1px' }}>
                   스마트 헬스케어 주요 기능
                 </h2>
-                <p style={{ fontSize: '15px', color: '#64748b', marginTop: '6px' }}>
-                  원하시는 기능을 선택하여 우리 아이 맞춤 헬스케어를 경험해 보세요.
+                <p style={{ fontSize: '15.5px', color: '#64748b', marginTop: '8px', fontWeight: '500' }}>
+                  원하시는 서비스를 선택하여 반려동물 맞춤 헬스케어를 경험해 보세요.
                 </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: '20px'
+              }}>
                 
-                {/* Feature 1 */}
+                {/* Feature 1: AI 질병 진단 */}
                 <button
                   type="button"
                   onClick={() => setActiveTab('diagnosis')}
+                  className="card-hover-lift"
                   style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '32px 24px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+                    background: 'rgba(255, 255, 255, 0.88)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    borderRadius: '26px',
+                    padding: '30px 22px',
+                    border: '1px solid rgba(226, 232, 240, 0.85)',
+                    boxShadow: '0 10px 30px -10px rgba(15, 23, 42, 0.05), 0 2px 8px -2px rgba(15, 23, 42, 0.02)',
                     cursor: 'pointer',
                     textAlign: 'left',
                     width: '100%',
                     font: 'inherit',
-                    transition: 'all 0.2s ease',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'space-between'
+                    justifyContent: 'space-between',
+                    minHeight: '260px'
                   }}
-                  className="harmonious-card"
                 >
                   <div>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#ecfdf5', color: '#059669', fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px', border: '1px solid #a7f3d0' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)',
+                      color: '#10b981',
+                      fontSize: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '18px',
+                      border: '1px solid #a7f3d0',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
+                    }}>
                       🩺
                     </div>
-                    <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>
+                    <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#0b0f19', marginBottom: '8px', letterSpacing: '-0.3px' }}>
                       AI 질병 진단 스튜디오
                     </h3>
-                    <p style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.55', margin: 0 }}>
-                      환부 사진과 증상 입력 시 Vision AI 분류 및 Gemini RAG 수의학 맞춤 소견 발급
+                    <p style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.55', margin: 0, fontWeight: '500' }}>
+                      환부 사진과 증상 입력 시 Vision AI 정밀 분류 및 수의학 맞춤 소견 발급
                     </p>
                   </div>
-                  <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#059669', marginTop: '20px' }}>
-                    진단 시작하기 ➔
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#059669', marginTop: '18px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>진단 시작하기</span>
+                    <span>→</span>
                   </div>
                 </button>
 
-                {/* Feature 2 */}
+                {/* Feature 2: 건강 대시보드 */}
                 <button
                   type="button"
                   onClick={() => setActiveTab('dashboard')}
+                  className="card-hover-lift"
                   style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '32px 24px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+                    background: 'rgba(255, 255, 255, 0.88)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    borderRadius: '26px',
+                    padding: '30px 22px',
+                    border: '1px solid rgba(226, 232, 240, 0.85)',
+                    boxShadow: '0 10px 30px -10px rgba(15, 23, 42, 0.05), 0 2px 8px -2px rgba(15, 23, 42, 0.02)',
                     cursor: 'pointer',
                     textAlign: 'left',
                     width: '100%',
                     font: 'inherit',
-                    transition: 'all 0.2s ease',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'space-between'
+                    justifyContent: 'space-between',
+                    minHeight: '260px'
                   }}
-                  className="harmonious-card"
                 >
                   <div>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#eff6ff', color: '#2563eb', fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px', border: '1px solid #bfdbfe' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)',
+                      color: '#2563eb',
+                      fontSize: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '18px',
+                      border: '1px solid #bfdbfe',
+                      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.15)'
+                    }}>
                       📊
                     </div>
-                    <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>
+                    <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#0b0f19', marginBottom: '8px', letterSpacing: '-0.3px' }}>
                       건강 관리 대시보드
                     </h3>
-                    <p style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.55', margin: 0 }}>
+                    <p style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.55', margin: 0, fontWeight: '500' }}>
                       기초 바이탈, 1초 데일리 케어 루틴, 체중/체온 변화 추이 및 백신 D-Day 알림
                     </p>
                   </div>
-                  <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#2563eb', marginTop: '20px' }}>
-                    대시보드 열기 ➔
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#2563eb', marginTop: '18px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>대시보드 열기</span>
+                    <span>→</span>
                   </div>
                 </button>
 
-                {/* Feature 3 */}
+                {/* Feature 3: 경과 관찰 타임라인 */}
                 <button
                   type="button"
                   onClick={() => setActiveTab('timeline')}
+                  className="card-hover-lift"
                   style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '32px 24px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+                    background: 'rgba(255, 255, 255, 0.88)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    borderRadius: '26px',
+                    padding: '30px 22px',
+                    border: '1px solid rgba(226, 232, 240, 0.85)',
+                    boxShadow: '0 10px 30px -10px rgba(15, 23, 42, 0.05), 0 2px 8px -2px rgba(15, 23, 42, 0.02)',
                     cursor: 'pointer',
                     textAlign: 'left',
                     width: '100%',
                     font: 'inherit',
-                    transition: 'all 0.2s ease',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'space-between'
+                    justifyContent: 'space-between',
+                    minHeight: '260px'
                   }}
-                  className="harmonious-card"
                 >
                   <div>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#f5f3ff', color: '#7c3aed', fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px', border: '1px solid #ddd6fe' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, #f5f3ff 0%, #faf5ff 100%)',
+                      color: '#7c3aed',
+                      fontSize: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '18px',
+                      border: '1px solid #ddd6fe',
+                      boxShadow: '0 4px 12px rgba(124, 58, 237, 0.15)'
+                    }}>
                       🔍
                     </div>
-                    <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>
+                    <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#0b0f19', marginBottom: '8px', letterSpacing: '-0.3px' }}>
                       경과 관찰 타임라인
                     </h3>
-                    <p style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.55', margin: 0 }}>
+                    <p style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.55', margin: 0, fontWeight: '500' }}>
                       동일 환부를 3일 뒤 대조 촬영하여 Before/After 슬라이더로 증상 호전도 추적
                     </p>
                   </div>
-                  <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#7c3aed', marginTop: '20px' }}>
-                    타임라인 확인 ➔
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#7c3aed', marginTop: '18px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>타임라인 확인</span>
+                    <span>→</span>
                   </div>
                 </button>
 
-                {/* Feature 4 */}
+                {/* Feature 4: 24시 응급 병원 찾기 */}
                 <button
                   type="button"
                   onClick={() => setActiveTab('hospitals')}
+                  className="card-hover-lift"
                   style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '32px 24px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+                    background: 'rgba(255, 255, 255, 0.88)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    borderRadius: '26px',
+                    padding: '30px 22px',
+                    border: '1px solid rgba(226, 232, 240, 0.85)',
+                    boxShadow: '0 10px 30px -10px rgba(15, 23, 42, 0.05), 0 2px 8px -2px rgba(15, 23, 42, 0.02)',
                     cursor: 'pointer',
                     textAlign: 'left',
                     width: '100%',
                     font: 'inherit',
-                    transition: 'all 0.2s ease',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'space-between'
+                    justifyContent: 'space-between',
+                    minHeight: '260px'
                   }}
-                  className="harmonious-card"
                 >
                   <div>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fff1f2', color: '#e11d48', fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px', border: '1px solid #fecdd3' }}>
-                      🏥
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%)',
+                      color: '#e11d48',
+                      fontSize: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '18px',
+                      border: '1px solid #fecdd3',
+                      boxShadow: '0 4px 12px rgba(225, 29, 72, 0.15)'
+                    }}>
+                      🚨
                     </div>
-                    <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>
-                      24시 응급 동물병원
+                    <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#0b0f19', marginBottom: '8px', letterSpacing: '-0.3px' }}>
+                      24시 응급 병원 찾기
                     </h3>
-                    <p style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.55', margin: 0 }}>
-                      내 위치 기반 최단 거리 계산으로 야간 및 응급 진료 가능한 동물병원 실시간 안내
+                    <p style={{ fontSize: '13px', color: '#64748b', lineHeight: '1.55', margin: 0, fontWeight: '500' }}>
+                      현재 GPS 기준 가장 가까운 야간 응급 동물병원 실시간 거리순 매칭 및 바로 전화
                     </p>
                   </div>
-                  <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#e11d48', marginTop: '20px' }}>
-                    응급실 찾기 ➔
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#e11d48', marginTop: '18px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>응급실 찾기</span>
+                    <span>→</span>
                   </div>
                 </button>
 
               </div>
             </div>
 
-            {/* 2. 3-Step Simple Guide (Toss Style) */}
-            <div style={{ background: '#f8fafc', padding: '60px 20px', borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9' }}>
-              <div className="container" style={{ maxWidth: '1040px', textAlign: 'center' }}>
-                <span style={{ fontSize: '12px', fontWeight: '800', color: '#64748b', background: '#ffffff', border: '1px solid #e2e8f0', padding: '4px 12px', borderRadius: '9999px' }}>
+
+            {/* 2. 3-Step Simple Guide (Apple / Toss Style) */}
+            <div style={{ background: '#fbfcfd', padding: '70px 20px 76px 20px', borderTop: '1px solid rgba(226, 232, 240, 0.7)', borderBottom: '1px solid rgba(226, 232, 240, 0.7)' }}>
+              <div className="container" style={{ maxWidth: '1060px', textAlign: 'center' }}>
+                <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#64748b', background: '#ffffff', border: '1px solid #e2e8f0', padding: '4px 14px', borderRadius: '9999px', letterSpacing: '0.5px' }}>
                   HOW IT WORKS
                 </span>
-                <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a', marginTop: '10px', letterSpacing: '-0.5px' }}>
-                  간편한 3단계 건강 케어 프로세스
+                <h2 style={{ fontSize: '32px', fontWeight: '900', color: '#0b0f19', marginTop: '12px', letterSpacing: '-0.8px' }}>
+                  간편한 3단계 스마트 케어 프로세스
                 </h2>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginTop: '36px', textAlign: 'left' }}>
-                  <div style={{ background: '#ffffff', borderRadius: '20px', padding: '24px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '20px', fontWeight: '900', color: '#059669', marginBottom: '8px' }}>01</div>
-                    <h4 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '6px' }}>환부 사진 촬영 & 업로드</h4>
-                    <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: '1.5' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '22px', marginTop: '40px', textAlign: 'left' }}>
+                  <div className="card-hover-lift" style={{
+                    background: 'rgba(255, 255, 255, 0.85)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    borderRadius: '24px',
+                    padding: '28px 24px',
+                    border: '1px solid rgba(226, 232, 240, 0.85)',
+                    boxShadow: '0 8px 24px -6px rgba(15, 23, 42, 0.04)'
+                  }}>
+                    <div style={{
+                      fontSize: '18px',
+                      fontWeight: '900',
+                      background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      marginBottom: '10px'
+                    }}>
+                      STEP 01
+                    </div>
+                    <h4 style={{ fontSize: '17px', fontWeight: '900', color: '#0b0f19', marginBottom: '8px' }}>환부 사진 촬영 & 업로드</h4>
+                    <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>
                       피부나 안구 등 이상 증상이 의심되는 부위를 촬영하여 간편하게 등록합니다.
                     </p>
                   </div>
 
-                  <div style={{ background: '#ffffff', borderRadius: '20px', padding: '24px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '20px', fontWeight: '900', color: '#059669', marginBottom: '8px' }}>02</div>
-                    <h4 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '6px' }}>AI 수의학 맞춤 분석</h4>
-                    <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: '1.5' }}>
+                  <div className="card-hover-lift" style={{
+                    background: 'rgba(255, 255, 255, 0.85)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    borderRadius: '24px',
+                    padding: '28px 24px',
+                    border: '1px solid rgba(226, 232, 240, 0.85)',
+                    boxShadow: '0 8px 24px -6px rgba(15, 23, 42, 0.04)'
+                  }}>
+                    <div style={{
+                      fontSize: '18px',
+                      fontWeight: '900',
+                      background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      marginBottom: '10px'
+                    }}>
+                      STEP 02
+                    </div>
+                    <h4 style={{ fontSize: '17px', fontWeight: '900', color: '#0b0f19', marginBottom: '8px' }}>AI 수의학 정밀 판독</h4>
+                    <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>
                       Vision AI와 Gemini RAG가 실시간 임상 소견 및 위험도 가이드를 발급합니다.
                     </p>
                   </div>
 
-                  <div style={{ background: '#ffffff', borderRadius: '20px', padding: '24px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '20px', fontWeight: '900', color: '#059669', marginBottom: '8px' }}>03</div>
-                    <h4 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '6px' }}>대시보드 & 응급 연계</h4>
-                    <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: '1.5' }}>
+                  <div className="card-hover-lift" style={{
+                    background: 'rgba(255, 255, 255, 0.85)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    borderRadius: '24px',
+                    padding: '28px 24px',
+                    border: '1px solid rgba(226, 232, 240, 0.85)',
+                    boxShadow: '0 8px 24px -6px rgba(15, 23, 42, 0.04)'
+                  }}>
+                    <div style={{
+                      fontSize: '18px',
+                      fontWeight: '900',
+                      background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      marginBottom: '10px'
+                    }}>
+                      STEP 03
+                    </div>
+                    <h4 style={{ fontSize: '17px', fontWeight: '900', color: '#0b0f19', marginBottom: '8px' }}>대시보드 & 응급 연계</h4>
+                    <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>
                       데일리 체크리스트로 일상을 기록하고 필요 시 가까운 24시 응급실로 연결합니다.
                     </p>
                   </div>
@@ -477,42 +656,59 @@ export default function App() {
               </div>
             </div>
 
-            {/* 3. Bottom Clean CTA Banner */}
-            <div className="container" style={{ padding: '60px 20px 80px 20px', maxWidth: '1040px' }}>
+            {/* 3. Bottom Clean Apple Dark CTA Banner */}
+            <div className="container" style={{ padding: '70px 20px 90px 20px', maxWidth: '1060px' }}>
               <div style={{
-                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                borderRadius: '28px',
-                padding: '48px 32px',
+                background: 'linear-gradient(135deg, #0b0f19 0%, #1e293b 100%)',
+                borderRadius: '32px',
+                padding: '56px 36px',
                 color: '#ffffff',
                 textAlign: 'center',
-                boxShadow: '0 12px 35px rgba(5, 150, 105, 0.2)'
+                boxShadow: '0 20px 50px -15px rgba(11, 15, 25, 0.35)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                position: 'relative',
+                overflow: 'hidden'
               }}>
-                <h2 style={{ fontSize: '30px', fontWeight: '900', margin: '0 0 10px 0', letterSpacing: '-0.5px' }}>
-                  지금 우리 아이 맞춤 헬스케어를 시작하세요
+                <div style={{
+                  position: 'absolute',
+                  top: '-100px',
+                  right: '-50px',
+                  width: '300px',
+                  height: '300px',
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%)',
+                  filter: 'blur(50px)',
+                  pointerEvents: 'none'
+                }} />
+
+                <h2 style={{ fontSize: '32px', fontWeight: '900', margin: '0 0 12px 0', letterSpacing: '-0.8px' }}>
+                  지금 반려동물 맞춤 헬스케어를 시작하세요
                 </h2>
-                <p style={{ fontSize: '15px', color: '#d1fae5', maxWidth: '560px', margin: '0 auto 28px auto', lineHeight: '1.6' }}>
-                  사진 한 장으로 간편하게 시작하는 AI 질병 분석과 스마트 건강 기록
+                <p style={{ fontSize: '15.5px', color: '#94a3b8', maxWidth: '560px', margin: '0 auto 32px auto', lineHeight: '1.65', fontWeight: '500' }}>
+                  사진 한 장으로 간편하게 시작하는 AI 질병 분석과 스마트 바이탈 기록
                 </p>
                 <button
                   type="button"
                   onClick={() => setActiveTab('diagnosis')}
+                  className="card-hover-lift"
                   style={{
-                    padding: '14px 32px',
-                    borderRadius: '16px',
+                    padding: '14px 34px',
+                    borderRadius: '9999px',
                     background: '#ffffff',
-                    color: '#047857',
+                    color: '#0b0f19',
                     fontSize: '15px',
                     fontWeight: '800',
                     border: 'none',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-                    transition: 'all 0.2s ease'
+                    boxShadow: '0 6px 20px rgba(0, 0, 0, 0.2)',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                   }}
                 >
                   🩺 AI 질병 진단 시작하기
                 </button>
               </div>
             </div>
+
           </>
         );
     }
@@ -532,7 +728,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
       {/* Top Unified Navbar */}
       <Navbar
         user={user}
@@ -550,9 +746,10 @@ export default function App() {
       />
 
       {/* Main Dynamic Content */}
-      <main style={{ flex: 1 }}>
+      <main style={{ flex: 1, marginTop: '8px' }}>
         {renderTabContent()}
       </main>
+
 
       {/* Pet Edit Modal */}
       <PetEditModal
@@ -565,6 +762,9 @@ export default function App() {
 
       {/* Footer */}
       <Footer />
+
+
+
     </div>
   );
 }
