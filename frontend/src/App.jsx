@@ -240,6 +240,8 @@ export default function App() {
             <CommunityPostDetail
               postId={selectedPostId}
               onBack={() => setActiveTab('community')}
+              user={user}
+              onOpenLogin={() => setActiveTab('login')}
             />
           </div>
         );
