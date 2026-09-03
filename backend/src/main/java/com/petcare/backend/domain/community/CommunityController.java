@@ -20,8 +20,9 @@ import java.util.Map;
 @CrossOrigin(origins = "*")
 public class CommunityController {
 
-    // 비로그인 상태에서 글을 쓸 때 사용할 기본 작성자/반려동물 (씨앗 데이터의 초코마미·초코).
-    // POST /api/v1/community 는 현재 비로그인도 허용되어 있어 폴백이 필요하다.
+    // 인증 정보를 찾지 못했을 때 사용할 기본 작성자/반려동물 (씨앗 데이터의 초코마미·초코).
+    // SecurityConfig 에서 POST /api/v1/community 를 인증 필수로 막고 있어
+    // 평소에는 쓰이지 않지만, 설정이 바뀌었을 때 예외로 터지지 않도록 남겨 둔다.
     private static final Long DEFAULT_USER_ID = 1L;
     private static final Long DEFAULT_PET_ID = 1L;
 
@@ -93,8 +94,12 @@ public class CommunityController {
         return ResponseEntity.ok(response);
     }
 
-    // 로그인했으면 그 사용자의 id를, 아니면 기본 작성자를 돌려준다.
-    // JwtAuthenticationFilter가 principal에 email을 담으므로 email로 사용자를 찾는다.
+    // 로그인한 사용자의 id를 돌려준다.
+    // JwtAuthenticationFilter 가 principal 에 email 을 담으므로 email 로 사용자를 찾는다.
+    //
+    // 아래 비인증 분기는 SecurityConfig 가 POST 를 막고 있어 평소에는 실행되지 않는다.
+    // 설정이 바뀌어 인증 없이 들어오더라도 NullPointerException 대신
+    // 기본 작성자로 처리하기 위한 안전장치다.
     private Long resolveAuthorId(Authentication authentication) {
         if (authentication == null
                 || !authentication.isAuthenticated()

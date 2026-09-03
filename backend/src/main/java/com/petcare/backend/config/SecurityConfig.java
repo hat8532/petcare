@@ -63,6 +63,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**", "/oauth2/**", "/login/**", "/error", "/h2-console/**").permitAll()
                 // 공개 조회 API 허용
                 .requestMatchers(HttpMethod.GET, "/api/v1/hospitals/**", "/api/v1/news/**", "/api/v1/community/**", "/api/v1/timelines/**").permitAll()
+                // 커뮤니티 글 작성은 로그인한 사용자만 허용
+                .requestMatchers(HttpMethod.POST, "/api/v1/community", "/api/v1/community/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/diagnosis/symptoms").permitAll()
                 .requestMatchers("/api/v1/diagnosis/**").authenticated()
                 .requestMatchers("/api/v1/chat/**").permitAll()
