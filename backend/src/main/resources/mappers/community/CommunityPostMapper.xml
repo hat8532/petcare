@@ -19,17 +19,34 @@
             ELSE pt.name || ' (' || COALESCE(pt.breed, '') || ' ' || COALESCE(pt.age, '') || ')'
         END                         AS petInfo,
         p.title                     AS title,
-        CAST(NULL AS VARCHAR)       AS attachedReport,
+        p.diagnosis_record_id       AS diagnosisRecordId,
+        <include refid="reportLabel"/> AS attachedReport,
         p.content                   AS content,
         (SELECT COUNT(*) FROM comments c    WHERE c.post_id = p.id) AS commentsCount,
         (SELECT COUNT(*) FROM post_likes l  WHERE l.post_id = p.id) AS likesCount,
         p.created_at                AS createdAt
     </sql>
 
+    <!--
+      첨부 리포트는 화면에 한 줄로 보여줘야 해서 부위·위험도·날짜를 이어 붙인다.
+      예) "안구 · 결막염 의심 (2026.09.03)"
+      첨부가 없으면(diagnosis_record_id가 NULL) LEFT JOIN 결과도 NULL이라
+      화면의 {post.attachedReport && (...)} 조건이 알아서 카드를 숨긴다.
+    -->
+    <sql id="reportLabel">
+        CASE
+            WHEN dr.id IS NULL THEN NULL
+            ELSE COALESCE(dr.affected_area, '진단')
+                 || ' · ' || COALESCE(dr.risk_label, '결과 없음')
+                 || ' (' || TO_CHAR(dr.created_at, 'YYYY.MM.DD') || ')'
+        END
+    </sql>
+
     <sql id="postJoins">
         FROM posts p
         LEFT JOIN users u  ON u.id  = p.user_id
         LEFT JOIN pets  pt ON pt.id = p.pet_id
+        LEFT JOIN diagnosis_records dr ON dr.id = p.diagnosis_record_id
     </sql>
 
     <select id="findAll" resultType="com.petcare.backend.domain.community.CommunityPostDTO">
@@ -49,8 +66,30 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO posts (user_id, pet_id, title, content)
-        VALUES (#{userId}, #{petId}, #{title}, #{content})
+        INSERT INTO posts (user_id, pet_id, diagnosis_record_id, title, content)
+        VALUES (#{userId}, #{petId}, #{diagnosisRecordId}, #{title}, #{content})
     </insert>
+
+    <!--
+      내가 첨부할 수 있는 리포트만 고른다.
+      pets, users까지 타고 올라가 email로 거르므로 남의 리포트는 애초에 나오지 않는다.
+      DiagnosisRecordMapper.findByIdAndOwner와 같은 조건이다.
+    -->
+    <select id="findAttachableReports" resultType="com.petcare.backend.domain.community.AttachableReportDTO">
+        SELECT dr.id                    AS id,
+               dr.affected_area         AS affectedArea,
+               dr.risk_label            AS riskLabel,
+               dr.risk_level            AS riskLevel,
+               COALESCE(dr.affected_area, '진단')
+                   || ' · ' || COALESCE(dr.risk_label, '결과 없음')
+                   || ' (' || TO_CHAR(dr.created_at, 'YYYY.MM.DD') || ')' AS label,
+               dr.created_at            AS createdAt
+        FROM diagnosis_records dr
+        JOIN pets  p ON p.id = dr.pet_id
+        JOIN users u ON u.id = p.user_id
+        WHERE u.email = #{email}
+          AND dr.user_id = u.id
+        ORDER BY dr.id DESC
+    </select>
 
 </mapper>

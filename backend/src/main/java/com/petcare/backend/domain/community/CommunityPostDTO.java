@@ -14,6 +14,10 @@ public class CommunityPostDTO {
     // posts 테이블은 작성자/반려동물을 id로 저장한다 (authorName, petInfo는 조회 시 JOIN으로 채움)
     private Long userId;
     private Long petId;
+
+    // 첨부한 AI 진단 리포트. 없으면 null.
+    private Long diagnosisRecordId;
+
     private String authorName;
     private String petInfo;
     private String title;

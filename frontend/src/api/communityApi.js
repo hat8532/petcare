@@ -50,6 +50,19 @@ export const communityApi = Object.freeze({
     await httpClient.delete(`/community/${postId}/comments/${commentId}`);
   },
 
+  // 글쓰기 화면에서 첨부할 수 있는 내 AI 진단 리포트 목록.
+  // 로그인해야만 내려오므로 publicRequest를 쓰지 않는다(토큰이 실려야 한다).
+  // 진단 기록이 없는 사람도 글은 써야 하므로 실패하면 빈 배열로 넘긴다.
+  getMyReports: async () => {
+    try {
+      const body = await httpClient.get('/community/my-reports');
+      return body?.data || [];
+    } catch (error) {
+      console.warn('첨부 가능한 리포트 조회 실패:', error);
+      return [];
+    }
+  },
+
   // 좋아요 개수와 내가 눌렀는지. 비로그인이면 liked는 항상 false다.
   // publicRequest를 쓰지 않는 이유: 토큰이 있어야 서버가 liked를 판단할 수 있다.
   // 로그인 전에는 토큰이 없어도 200이 오므로 그대로 두면 된다.
