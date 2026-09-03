@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { communityApi } from '../api/communityApi';
 
+// 배경 없는 글씨 버튼. 컴포넌트 밖에 두어 매 렌더마다 객체를 새로 만들지 않는다.
+const textButtonStyle = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  cursor: 'pointer',
+  fontSize: '12px',
+  color: '#94a3b8',
+  fontFamily: 'inherit'
+};
+
 // 커뮤니티 글 상세 화면.
 // 목록에서 "글 상세보기"를 누르면 App.jsx 가 activeTab 을 바꾸면서 이 화면을 띄운다.
 export default function CommunityPostDetail({ postId, onBack, user, onOpenLogin }) {
@@ -16,6 +27,12 @@ export default function CommunityPostDetail({ postId, onBack, user, onOpenLogin 
   // 좋아요는 개수와 "내가 눌렀는지"를 함께 들고 있어야 버튼 모양을 정할 수 있다.
   const [likes, setLikes] = useState({ count: 0, liked: false });
   const [isLiking, setIsLiking] = useState(false);
+
+  // 수정은 별도 화면으로 넘기지 않고 이 자리에서 제목·내용을 입력창으로 바꾼다.
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
     // postId 가 없으면 조회할 대상이 없다.
@@ -84,6 +101,67 @@ export default function CommunityPostDetail({ postId, onBack, user, onOpenLogin 
       alert('댓글 등록에 실패했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  // 수정 시작: 지금 글 내용을 입력창의 초기값으로 채운다.
+  function handleStartEdit() {
+    setEditTitle(post.title);
+    setEditContent(post.content);
+    setIsEditing(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editTitle.trim() || !editContent.trim()) {
+      alert('제목과 내용을 모두 입력해주세요.');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      // 첨부 리포트는 이 화면에서 바꾸지 않으므로 원래 값을 그대로 실어 보낸다.
+      // 빼고 보내면 서버가 null로 덮어써서 첨부가 사라진다.
+      const updated = await communityApi.updateCommunityPost(postId, {
+        title: editTitle.trim(),
+        content: editContent.trim(),
+        diagnosisRecordId: post.diagnosisRecordId ?? null
+      });
+      setPost(updated);
+      setIsEditing(false);
+    } catch (error) {
+      if (error?.status === 401) {
+        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        onOpenLogin?.();
+        return;
+      }
+      if (error?.status === 403) {
+        alert('본인이 작성한 글만 수정할 수 있습니다.');
+        return;
+      }
+      alert('글 수정에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  async function handleDeletePost() {
+    // 댓글까지 함께 사라지므로 무엇이 지워지는지 알려주고 확인받는다.
+    if (!window.confirm('글을 삭제할까요? 달린 댓글과 좋아요도 함께 사라집니다.')) return;
+
+    try {
+      await communityApi.deleteCommunityPost(postId);
+      onBack?.();
+    } catch (error) {
+      if (error?.status === 401) {
+        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        onOpenLogin?.();
+        return;
+      }
+      if (error?.status === 403) {
+        alert('본인이 작성한 글만 삭제할 수 있습니다.');
+        return;
+      }
+      alert('글 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.');
     }
   }
 
@@ -172,12 +250,41 @@ export default function CommunityPostDetail({ postId, onBack, user, onOpenLogin 
                 <span style={{ color: '#64748b', fontWeight: '500' }}> ({post.petInfo})</span>
               )}
             </div>
-            <span style={{ fontSize: '12px', color: '#64748b' }}>{post.timeAgo}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>{post.timeAgo}</span>
+
+              {/* 내 글에만 보여준다. 서버도 다시 확인하므로 이건 편의용이다. */}
+              {user?.id === post.userId && !isEditing && (
+                <>
+                  <button type="button" onClick={handleStartEdit} style={textButtonStyle}>수정</button>
+                  <button type="button" onClick={handleDeletePost} style={textButtonStyle}>삭제</button>
+                </>
+              )}
+            </div>
           </div>
 
-          <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', lineHeight: '1.4', marginBottom: '20px' }}>
-            {post.title}
-          </h2>
+          {isEditing ? (
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                fontSize: '18px',
+                fontWeight: '800',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                boxSizing: 'border-box',
+                marginBottom: '12px',
+                fontFamily: 'inherit'
+              }}
+            />
+          ) : (
+            <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', lineHeight: '1.4', marginBottom: '20px' }}>
+              {post.title}
+            </h2>
+          )}
 
           {post.attachedReport && (
             <div style={{
@@ -198,16 +305,64 @@ export default function CommunityPostDetail({ postId, onBack, user, onOpenLogin 
             </div>
           )}
 
-          {/* whiteSpace: pre-wrap 이라야 본문의 줄바꿈이 화면에도 그대로 보인다. */}
-          <p style={{
-            fontSize: '15px',
-            color: '#334155',
-            lineHeight: '1.8',
-            whiteSpace: 'pre-wrap',
-            marginBottom: '24px'
-          }}>
-            {post.content}
-          </p>
+          {isEditing ? (
+            <div style={{ marginBottom: '24px' }}>
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                rows={6}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  fontSize: '15px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  boxSizing: 'border-box',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  lineHeight: '1.7'
+                }}
+              />
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  style={{
+                    padding: '9px 18px',
+                    fontSize: '13.5px',
+                    fontWeight: '700',
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    color: '#64748b',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  취소
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSaveEdit}
+                  disabled={isSavingEdit}
+                  style={{ padding: '9px 18px', fontSize: '13.5px' }}
+                >
+                  {isSavingEdit ? '저장 중…' : '저장'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* whiteSpace: pre-wrap 이라야 본문의 줄바꿈이 화면에도 그대로 보인다. */
+            <p style={{
+              fontSize: '15px',
+              color: '#334155',
+              lineHeight: '1.8',
+              whiteSpace: 'pre-wrap',
+              marginBottom: '24px'
+            }}>
+              {post.content}
+            </p>
+          )}
 
           <div style={{
             borderTop: '1px solid #e2e8f0',

@@ -26,6 +26,17 @@ export const communityApi = Object.freeze({
     return body?.data;
   },
 
+  // 글 수정. 본인 글이 아니면 서버가 403을 돌려준다.
+  updateCommunityPost: async (id, payload) => {
+    const body = await httpClient.put(`/community/${id}`, payload);
+    return body?.data;
+  },
+
+  // 글 삭제. 딸린 댓글·좋아요는 DB가 함께 지운다.
+  deleteCommunityPost: async (id) => {
+    await httpClient.delete(`/community/${id}`);
+  },
+
   // 한 게시글의 댓글 목록. GET /api/v1/community/{postId}/comments
   // 댓글은 없을 수도 있는 것이라 실패하면 빈 배열로 넘긴다.
   getComments: async (postId) => {
@@ -48,6 +59,19 @@ export const communityApi = Object.freeze({
   // 댓글 삭제. 본인 것이 아니면 서버가 403을 돌려준다.
   deleteComment: async (postId, commentId) => {
     await httpClient.delete(`/community/${postId}/comments/${commentId}`);
+  },
+
+  // 글쓰기 화면에서 첨부할 수 있는 내 AI 진단 리포트 목록.
+  // 로그인해야만 내려오므로 publicRequest를 쓰지 않는다(토큰이 실려야 한다).
+  // 진단 기록이 없는 사람도 글은 써야 하므로 실패하면 빈 배열로 넘긴다.
+  getMyReports: async () => {
+    try {
+      const body = await httpClient.get('/community/my-reports');
+      return body?.data || [];
+    } catch (error) {
+      console.warn('첨부 가능한 리포트 조회 실패:', error);
+      return [];
+    }
   },
 
   // 좋아요 개수와 내가 눌렀는지. 비로그인이면 liked는 항상 false다.

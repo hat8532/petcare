@@ -7,6 +7,11 @@ export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
 
+  // 첨부할 수 있는 내 진단 리포트 목록과, 그중 고른 것.
+  // 고르지 않으면 빈 문자열이고 전송할 때 null로 바꾼다.
+  const [myReports, setMyReports] = useState([]);
+  const [selectedReportId, setSelectedReportId] = useState('');
+
 
   useEffect(() => {
     async function loadCommunity() {
@@ -25,9 +30,13 @@ export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
     return false;
   }
 
-  function handleOpenWrite() {
+  async function handleOpenWrite() {
     if (!requireLogin()) return;
     setIsWriteOpen(true);
+
+    // 폼을 열 때 불러온다. 커뮤니티 화면에 들어오기만 한 사람에게는
+    // 필요 없는 요청이라 처음부터 부르지 않는다.
+    setMyReports(await communityApi.getMyReports());
   }
 
   // 글 작성: 유효성 검사 → 저장 → 목록 새로고침 → 폼 초기화
@@ -43,7 +52,9 @@ export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
       await communityApi.createCommunityPost({
         title: newTitle,
         content: newContent,
-        petInfo: '초코 (푸들 4살)'
+        petInfo: '초코 (푸들 4살)',
+        // 안 고르면 빈 문자열이라 그대로 보내면 서버가 숫자로 못 읽는다.
+        diagnosisRecordId: selectedReportId ? Number(selectedReportId) : null
       });
 
       const data = await communityApi.getCommunityPosts();
@@ -51,11 +62,18 @@ export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
 
       setNewTitle('');
       setNewContent('');
+      setSelectedReportId('');
       setIsWriteOpen(false);
     } catch (e) {
       if (e?.status === 401) {
         alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
         onOpenLogin?.();
+        return;
+      }
+
+      // 403은 남의 리포트를 붙이려 한 경우다. 다시 로그인해도 해결되지 않는다.
+      if (e?.status === 403) {
+        alert('본인의 진단 리포트만 첨부할 수 있습니다.');
         return;
       }
 
@@ -96,6 +114,44 @@ export default function CommunitySection({ user, onOpenLogin, onOpenDetail }) {
               rows={4}
               style={{ width: '100%', padding: '10px 14px', fontSize: '14px', border: '1px solid #e2e8f0', borderRadius: '8px', boxSizing: 'border-box', marginTop: '12px', resize: 'vertical', fontFamily: 'inherit' }}
             />
+
+            {/* AI 진단 리포트 첨부. 진단 기록이 없으면 고를 게 없으므로 안내만 보여준다. */}
+            <div style={{ marginTop: '12px' }}>
+              <label
+                htmlFor="attach-report"
+                style={{ display: 'block', fontSize: '12.5px', fontWeight: '700', color: '#0f172a', marginBottom: '6px' }}
+              >
+                📄 AI 진단 리포트 첨부 <span style={{ color: '#64748b', fontWeight: '500' }}>(선택)</span>
+              </label>
+
+              {myReports.length === 0 ? (
+                <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
+                  첨부할 수 있는 진단 리포트가 없습니다. AI 진단을 먼저 받아보세요.
+                </p>
+              ) : (
+                <select
+                  id="attach-report"
+                  value={selectedReportId}
+                  onChange={(e) => setSelectedReportId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    fontSize: '14px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    boxSizing: 'border-box',
+                    fontFamily: 'inherit',
+                    background: '#ffffff',
+                    color: '#0f172a'
+                  }}
+                >
+                  <option value="">첨부하지 않음</option>
+                  {myReports.map((r) => (
+                    <option key={r.id} value={r.id}>{r.label}</option>
+                  ))}
+                </select>
+              )}
+            </div>
 
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
               <button
