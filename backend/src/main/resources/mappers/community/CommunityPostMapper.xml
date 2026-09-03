@@ -55,6 +55,40 @@
         ORDER BY p.id DESC
     </select>
 
+    <!--
+      제목과 내용에서 검색한다.
+      LOWER() 로 양쪽을 소문자로 맞춰야 "AI" 로 쳐도 "ai" 가 걸린다.
+      #{keyword} 는 값이 통째로 들어가는 자리라 CONCAT 으로 %를 붙인다.
+      '%' || #{keyword} || '%' 처럼 문자열을 이어 붙여도 되지만 CONCAT 이 더 읽기 쉽다.
+    -->
+    <sql id="keywordFilter">
+        <if test="keyword != null and keyword != ''">
+            AND (LOWER(p.title)   LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+              OR LOWER(p.content) LIKE LOWER(CONCAT('%', #{keyword}, '%')))
+        </if>
+    </sql>
+
+    <!--
+      LIMIT / OFFSET 으로 한 페이지만 잘라 온다.
+      OFFSET 은 "앞에서 몇 건을 건너뛸지"라 (페이지번호 * 페이지크기)가 된다.
+      WHERE 1=1 은 뒤에 오는 조건이 항상 AND 로 시작할 수 있게 하는 자리 채우기다.
+    -->
+    <select id="findPage" resultType="com.petcare.backend.domain.community.CommunityPostDTO">
+        SELECT <include refid="postColumns"/>
+        <include refid="postJoins"/>
+        WHERE 1 = 1
+        <include refid="keywordFilter"/>
+        ORDER BY p.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByKeyword" resultType="int">
+        SELECT COUNT(*)
+        FROM posts p
+        WHERE 1 = 1
+        <include refid="keywordFilter"/>
+    </select>
+
     <select id="findById" resultType="com.petcare.backend.domain.community.CommunityPostDTO">
         SELECT <include refid="postColumns"/>
         <include refid="postJoins"/>

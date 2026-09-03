@@ -3,13 +3,25 @@ import { httpClient } from './common/httpClient';
 const publicRequest = Object.freeze({ auth: false });
 
 export const communityApi = Object.freeze({
-  getCommunityPosts: async () => {
+  // 글 목록. 페이지 단위로 잘라서 받는다.
+  // 목록 배열만이 아니라 hasNext 같은 페이지 정보도 화면이 써야 해서 응답을 통째로 넘긴다.
+  // 실패해도 화면이 터지지 않도록 빈 페이지 모양을 그대로 맞춰서 돌려준다.
+  getCommunityPosts: async ({ page = 0, size = 10, keyword = '' } = {}) => {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    // 빈 검색어까지 붙여 보내면 주소가 지저분해진다. 값이 있을 때만 넣는다.
+    if (keyword.trim()) params.set('keyword', keyword.trim());
+
     try {
-      const body = await httpClient.get('/community', publicRequest);
-      return body?.data || [];
+      const body = await httpClient.get(`/community?${params}`, publicRequest);
+      return {
+        data: body?.data || [],
+        page: body?.page ?? 0,
+        totalCount: body?.totalCount ?? 0,
+        hasNext: body?.hasNext ?? false
+      };
     } catch (error) {
       console.warn('Backend API error:', error);
-      return [];
+      return { data: [], page: 0, totalCount: 0, hasNext: false };
     }
   },
 

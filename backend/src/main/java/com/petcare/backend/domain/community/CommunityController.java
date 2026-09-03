@@ -41,14 +41,42 @@ public class CommunityController {
         this.diagnosisRecordMapper = diagnosisRecordMapper;
     }
 
+    // 페이지 크기 상한. 화면이 size=100000 을 보내면 DB 를 통째로 긁게 되므로 막는다.
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final int DEFAULT_PAGE_SIZE = 10;
+
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getCommunityPosts() {
-        List<CommunityPostDTO> posts = communityPostMapper.findAll();
+    public ResponseEntity<Map<String, Object>> getCommunityPosts(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "keyword", required = false) String keyword) {
+
+        // 화면이 음수나 지나치게 큰 값을 보내도 서버가 알아서 정상 범위로 맞춘다.
+        int safePage = Math.max(page, 0);
+        int safeSize = (size <= 0) ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
+
+        // 공백만 친 검색어는 검색하지 않은 것으로 본다.
+        String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+
+        int totalCount = communityPostMapper.countByKeyword(safeKeyword);
+        List<CommunityPostDTO> posts =
+                communityPostMapper.findPage(safeKeyword, safeSize, safePage * safeSize);
         posts.forEach(this::applyTimeAgo);
+
+        // 나눗셈이 딱 떨어지지 않을 때를 위해 올림한다. 11건을 10개씩 나누면 2페이지다.
+        int totalPages = (totalCount + safeSize - 1) / safeSize;
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", "SUCCESS");
+        // count 는 이번에 내려준 건수. 기존 화면이 이 값을 쓰고 있어 이름을 바꾸지 않았다.
         response.put("count", posts.size());
+        response.put("page", safePage);
+        response.put("size", safeSize);
+        response.put("keyword", safeKeyword);
+        response.put("totalCount", totalCount);
+        response.put("totalPages", totalPages);
+        // 화면의 "더 보기" 버튼은 이 값만 보면 된다. 직접 계산하게 두면 어긋난다.
+        response.put("hasNext", (safePage + 1) * safeSize < totalCount);
         response.put("data", posts);
 
         return ResponseEntity.ok(response);
