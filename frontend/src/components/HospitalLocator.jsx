@@ -352,9 +352,9 @@ export default function HospitalLocator() {
         
         {/* Header */}
         <div className="section-header">
-          <span className="badge badge-rose" style={{ marginBottom: '12px' }}>LOCATION & NAVER MAP API</span>
+          <span className="badge badge-rose" style={{ marginBottom: '12px' }}>OPENSTREETMAP &amp; NAVER LOCAL SEARCH</span>
           <h2>주변 24시 응급 동물병원 찾기</h2>
-          <p>마우스로 지도를 움직이면 이동한 구역(신림, 사당, 강남, 여의도 등)의 24시 동물병원이 실시간으로 자동 변경됩니다.</p>
+          <p>마우스로 지도를 움직이면 이동한 구역(신림, 사당, 강남, 여의도 등)의 동물병원을 네이버 지역검색으로 다시 조회합니다.</p>
         </div>
 
         {/* Filter & Geolocation Controls Bar */}

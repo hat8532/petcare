@@ -214,7 +214,7 @@ export default function NewsSection() {
           }}>
             <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#059669', display: 'inline-block' }} className="pulse-dot" />
             <span style={{ fontSize: '13px', fontWeight: '800', color: '#047857', letterSpacing: '0.5px' }}>
-              NAVER API HUB • REAL-TIME PET KNOWLEDGE SEARCH
+              NAVER 뉴스 검색 API
             </span>
           </div>
 
@@ -222,7 +222,7 @@ export default function NewsSection() {
             실시간 반려동물 백과 & 라이프 지식 센터
           </h2>
           <p style={{ fontSize: '16px', color: '#475569', marginTop: '10px', maxWidth: '680px', margin: '10px auto 0 auto', lineHeight: '1.6' }}>
-            궁금한 질병 증상, 사료 영양, 행동 교정 키워드를 검색하면 NAVER 최신 검증 지식 정보를 실시간으로 끌어와 보여드립니다.
+            질병 증상, 사료 영양, 행동 교정 키워드로 검색하면 네이버 뉴스에서 관련 기사를 찾아 보여드립니다.
           </p>
         </div>
 
