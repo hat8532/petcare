@@ -1,0 +1,484 @@
+import React, { useState, useEffect } from 'react';
+import { communityApi } from '../api/communityApi';
+
+// 배경 없는 글씨 버튼. 컴포넌트 밖에 두어 매 렌더마다 객체를 새로 만들지 않는다.
+const textButtonStyle = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  cursor: 'pointer',
+  fontSize: '12px',
+  color: '#94a3b8',
+  fontFamily: 'inherit'
+};
+
+// 커뮤니티 글 상세 화면.
+// 목록에서 "글 상세보기"를 누르면 App.jsx 가 activeTab 을 바꾸면서 이 화면을 띄운다.
+export default function CommunityPostDetail({ postId, onBack, user, onOpenLogin }) {
+  const [post, setPost] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // 댓글은 글 본문과 별개로 불러오고 별개로 갱신되므로 상태를 따로 둔다.
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 좋아요는 개수와 "내가 눌렀는지"를 함께 들고 있어야 버튼 모양을 정할 수 있다.
+  const [likes, setLikes] = useState({ count: 0, liked: false });
+  const [isLiking, setIsLiking] = useState(false);
+
+  // 수정은 별도 화면으로 넘기지 않고 이 자리에서 제목·내용을 입력창으로 바꾼다.
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  useEffect(() => {
+    // postId 가 없으면 조회할 대상이 없다.
+    if (!postId) {
+      setErrorMessage('글 번호가 없습니다.');
+      setIsLoading(false);
+      return;
+    }
+
+    async function loadPost() {
+      setIsLoading(true);
+      setErrorMessage('');
+
+      try {
+        const data = await communityApi.getCommunityPost(postId);
+        if (!data) {
+          setErrorMessage('글을 찾을 수 없습니다. 삭제되었을 수 있습니다.');
+        }
+        setPost(data);
+
+        // 댓글·좋아요 조회는 실패해도 기본값이라 본문 표시를 막지 않는다.
+        setComments(await communityApi.getComments(postId));
+        setLikes(await communityApi.getLikes(postId));
+      } catch (error) {
+        console.warn('글 상세 조회 실패:', error);
+        // 백엔드는 없는 글에 404 를 돌려준다.
+        setErrorMessage(
+          error?.status === 404
+            ? '글을 찾을 수 없습니다. 삭제되었을 수 있습니다.'
+            : '글을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+        );
+      } finally {
+        // 성공하든 실패하든 로딩 표시는 반드시 끈다.
+        setIsLoading(false);
+      }
+    }
+
+    loadPost();
+  }, [postId]);
+
+  // 댓글 작성. 목록을 다시 불러와 서버가 채워준 작성자 이름·시간을 반영한다.
+  async function handleAddComment() {
+    if (!user) {
+      alert('로그인 후 댓글을 작성할 수 있습니다.');
+      onOpenLogin?.();
+      return;
+    }
+
+    if (!newComment.trim()) {
+      alert('댓글 내용을 입력해주세요.');
+      return;
+    }
+
+    // 등록 중에 버튼을 또 누르면 같은 댓글이 두 번 달린다.
+    setIsSubmitting(true);
+    try {
+      await communityApi.createComment(postId, newComment.trim());
+      setComments(await communityApi.getComments(postId));
+      setNewComment('');
+    } catch (error) {
+      if (error?.status === 401) {
+        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        onOpenLogin?.();
+        return;
+      }
+      alert('댓글 등록에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // 수정 시작: 지금 글 내용을 입력창의 초기값으로 채운다.
+  function handleStartEdit() {
+    setEditTitle(post.title);
+    setEditContent(post.content);
+    setIsEditing(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editTitle.trim() || !editContent.trim()) {
+      alert('제목과 내용을 모두 입력해주세요.');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      // 첨부 리포트는 이 화면에서 바꾸지 않으므로 원래 값을 그대로 실어 보낸다.
+      // 빼고 보내면 서버가 null로 덮어써서 첨부가 사라진다.
+      const updated = await communityApi.updateCommunityPost(postId, {
+        title: editTitle.trim(),
+        content: editContent.trim(),
+        diagnosisRecordId: post.diagnosisRecordId ?? null
+      });
+      setPost(updated);
+      setIsEditing(false);
+    } catch (error) {
+      if (error?.status === 401) {
+        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        onOpenLogin?.();
+        return;
+      }
+      if (error?.status === 403) {
+        alert('본인이 작성한 글만 수정할 수 있습니다.');
+        return;
+      }
+      alert('글 수정에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  async function handleDeletePost() {
+    // 댓글까지 함께 사라지므로 무엇이 지워지는지 알려주고 확인받는다.
+    if (!window.confirm('글을 삭제할까요? 달린 댓글과 좋아요도 함께 사라집니다.')) return;
+
+    try {
+      await communityApi.deleteCommunityPost(postId);
+      onBack?.();
+    } catch (error) {
+      if (error?.status === 401) {
+        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        onOpenLogin?.();
+        return;
+      }
+      if (error?.status === 403) {
+        alert('본인이 작성한 글만 삭제할 수 있습니다.');
+        return;
+      }
+      alert('글 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    }
+  }
+
+  // 좋아요 토글. 개수는 화면에서 +1 하지 않고 서버가 준 값으로 덮어쓴다.
+  // 그 사이 다른 사람이 눌렀으면 화면이 직접 센 값과 어긋나기 때문이다.
+  async function handleToggleLike() {
+    if (!user) {
+      alert('로그인 후 좋아요를 누를 수 있습니다.');
+      onOpenLogin?.();
+      return;
+    }
+
+    setIsLiking(true);
+    try {
+      setLikes(await communityApi.toggleLike(postId));
+    } catch (error) {
+      if (error?.status === 401) {
+        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        onOpenLogin?.();
+        return;
+      }
+      alert('좋아요 처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsLiking(false);
+    }
+  }
+
+  async function handleDeleteComment(commentId) {
+    if (!window.confirm('댓글을 삭제할까요?')) return;
+
+    try {
+      await communityApi.deleteComment(postId, commentId);
+      setComments(await communityApi.getComments(postId));
+    } catch (error) {
+      // 403은 남의 댓글이라 거절된 것이라 로그인 화면으로 보내도 소용없다.
+      if (error?.status === 403) {
+        alert('본인이 작성한 댓글만 삭제할 수 있습니다.');
+        return;
+      }
+      if (error?.status === 401) {
+        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        onOpenLogin?.();
+        return;
+      }
+      alert('댓글 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    }
+  }
+
+  return (
+    <section style={{ padding: '20px 0 60px 0' }}>
+      <button
+        onClick={onBack}
+        style={{
+          padding: '8px 16px',
+          fontSize: '13.5px',
+          fontWeight: '700',
+          border: '1px solid #e2e8f0',
+          background: '#ffffff',
+          color: '#64748b',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          marginBottom: '20px'
+        }}
+      >
+        ← 목록으로
+      </button>
+
+      {isLoading && (
+        <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+          글을 불러오는 중입니다…
+        </div>
+      )}
+
+      {!isLoading && errorMessage && (
+        <div className="glass-card" style={{ padding: '40px', textAlign: 'center', background: '#ffffff' }}>
+          <p style={{ color: '#e11d48', fontWeight: '700', margin: 0 }}>{errorMessage}</p>
+        </div>
+      )}
+
+      {!isLoading && !errorMessage && post && (
+        <article className="glass-card" style={{ padding: '32px', background: '#ffffff' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#0f172a' }}>
+              👤 {post.authorName}
+              {post.petInfo && (
+                <span style={{ color: '#64748b', fontWeight: '500' }}> ({post.petInfo})</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>{post.timeAgo}</span>
+
+              {/* 내 글에만 보여준다. 서버도 다시 확인하므로 이건 편의용이다. */}
+              {user?.id === post.userId && !isEditing && (
+                <>
+                  <button type="button" onClick={handleStartEdit} style={textButtonStyle}>수정</button>
+                  <button type="button" onClick={handleDeletePost} style={textButtonStyle}>삭제</button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {isEditing ? (
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                fontSize: '18px',
+                fontWeight: '800',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                boxSizing: 'border-box',
+                marginBottom: '12px',
+                fontFamily: 'inherit'
+              }}
+            />
+          ) : (
+            <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', lineHeight: '1.4', marginBottom: '20px' }}>
+              {post.title}
+            </h2>
+          )}
+
+          {post.attachedReport && (
+            <div style={{
+              background: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              borderRadius: 'var(--radius-sm)',
+              padding: '10px 14px',
+              fontSize: '12px',
+              color: '#047857',
+              fontWeight: '700',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>📄 첨부 리포트:</span>
+              <span>{post.attachedReport}</span>
+            </div>
+          )}
+
+          {isEditing ? (
+            <div style={{ marginBottom: '24px' }}>
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                rows={6}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  fontSize: '15px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  boxSizing: 'border-box',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  lineHeight: '1.7'
+                }}
+              />
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  style={{
+                    padding: '9px 18px',
+                    fontSize: '13.5px',
+                    fontWeight: '700',
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    color: '#64748b',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  취소
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSaveEdit}
+                  disabled={isSavingEdit}
+                  style={{ padding: '9px 18px', fontSize: '13.5px' }}
+                >
+                  {isSavingEdit ? '저장 중…' : '저장'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* whiteSpace: pre-wrap 이라야 본문의 줄바꿈이 화면에도 그대로 보인다. */
+            <p style={{
+              fontSize: '15px',
+              color: '#334155',
+              lineHeight: '1.8',
+              whiteSpace: 'pre-wrap',
+              marginBottom: '24px'
+            }}>
+              {post.content}
+            </p>
+          )}
+
+          <div style={{
+            borderTop: '1px solid #e2e8f0',
+            paddingTop: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '12.5px',
+            color: '#64748b'
+          }}>
+            {/* 눌렀을 때는 채운 하트에 배경을 주고, 안 눌렀을 때는 빈 하트로 둔다.
+                색만 바꾸면 색을 구분하기 어려운 사람이 상태를 알 수 없다. */}
+            <button
+              type="button"
+              onClick={handleToggleLike}
+              disabled={isLiking}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 14px',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                fontFamily: 'inherit',
+                cursor: isLiking ? 'default' : 'pointer',
+                borderRadius: '9999px',
+                border: likes.liked ? '1px solid #fecdd3' : '1px solid #e2e8f0',
+                background: likes.liked ? '#fff1f2' : '#ffffff',
+                color: likes.liked ? '#e11d48' : '#64748b'
+              }}
+            >
+              <span>{likes.liked ? '❤️' : '🤍'}</span>
+              <span>좋아요 {likes.count}</span>
+            </button>
+
+            <span>💬 댓글 {comments.length}</span>
+          </div>
+        </article>
+      )}
+
+      {!isLoading && !errorMessage && post && (
+        <section className="glass-card" style={{ padding: '28px 32px', background: '#ffffff', marginTop: '20px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 20px 0' }}>
+            댓글 {comments.length}
+          </h3>
+
+          {comments.length === 0 && (
+            <p style={{ fontSize: '13.5px', color: '#64748b', margin: '0 0 20px 0' }}>
+              아직 댓글이 없습니다. 첫 댓글을 남겨보세요!
+            </p>
+          )}
+
+          {comments.map((c) => (
+            <div key={c.id} style={{ borderTop: '1px solid #f1f5f9', padding: '14px 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>
+                  👤 {c.authorName}
+                  <span style={{ color: '#64748b', fontWeight: '500', marginLeft: '8px', fontSize: '11.5px' }}>
+                    {c.timeAgo}
+                  </span>
+                </div>
+
+                {/* 내 댓글에만 삭제 버튼을 보여준다. 서버도 다시 확인하므로 이건 편의용이다. */}
+                {user?.id === c.userId && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteComment(c.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      fontSize: '11.5px',
+                      color: '#94a3b8',
+                      fontFamily: 'inherit'
+                    }}
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
+
+              <p style={{ fontSize: '14px', color: '#334155', lineHeight: '1.7', whiteSpace: 'pre-wrap', margin: 0 }}>
+                {c.content}
+              </p>
+            </div>
+          ))}
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
+            <input
+              type="text"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !isSubmitting) handleAddComment(); }}
+              placeholder={user ? '댓글을 입력하세요' : '로그인 후 댓글을 작성할 수 있습니다'}
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                fontSize: '14px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                boxSizing: 'border-box',
+                fontFamily: 'inherit'
+              }}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={handleAddComment}
+              disabled={isSubmitting}
+              style={{ padding: '9px 20px', fontSize: '13.5px', whiteSpace: 'nowrap' }}
+            >
+              {isSubmitting ? '등록 중…' : '등록'}
+            </button>
+          </div>
+        </section>
+      )}
+    </section>
+  );
+}

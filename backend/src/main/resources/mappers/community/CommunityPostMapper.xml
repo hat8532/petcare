@@ -19,23 +19,74 @@
             ELSE pt.name || ' (' || COALESCE(pt.breed, '') || ' ' || COALESCE(pt.age, '') || ')'
         END                         AS petInfo,
         p.title                     AS title,
-        CAST(NULL AS VARCHAR)       AS attachedReport,
+        p.diagnosis_record_id       AS diagnosisRecordId,
+        <include refid="reportLabel"/> AS attachedReport,
         p.content                   AS content,
         (SELECT COUNT(*) FROM comments c    WHERE c.post_id = p.id) AS commentsCount,
         (SELECT COUNT(*) FROM post_likes l  WHERE l.post_id = p.id) AS likesCount,
         p.created_at                AS createdAt
     </sql>
 
+    <!--
+      첨부 리포트는 화면에 한 줄로 보여줘야 해서 부위·위험도·날짜를 이어 붙인다.
+      예) "안구 · 결막염 의심 (2026.09.03)"
+      첨부가 없으면(diagnosis_record_id가 NULL) LEFT JOIN 결과도 NULL이라
+      화면의 {post.attachedReport && (...)} 조건이 알아서 카드를 숨긴다.
+    -->
+    <sql id="reportLabel">
+        CASE
+            WHEN dr.id IS NULL THEN NULL
+            ELSE COALESCE(dr.affected_area, '진단')
+                 || ' · ' || COALESCE(dr.risk_label, '결과 없음')
+                 || ' (' || TO_CHAR(dr.created_at, 'YYYY.MM.DD') || ')'
+        END
+    </sql>
+
     <sql id="postJoins">
         FROM posts p
         LEFT JOIN users u  ON u.id  = p.user_id
         LEFT JOIN pets  pt ON pt.id = p.pet_id
+        LEFT JOIN diagnosis_records dr ON dr.id = p.diagnosis_record_id
     </sql>
 
     <select id="findAll" resultType="com.petcare.backend.domain.community.CommunityPostDTO">
         SELECT <include refid="postColumns"/>
         <include refid="postJoins"/>
         ORDER BY p.id DESC
+    </select>
+
+    <!--
+      제목과 내용에서 검색한다.
+      LOWER() 로 양쪽을 소문자로 맞춰야 "AI" 로 쳐도 "ai" 가 걸린다.
+      #{keyword} 는 값이 통째로 들어가는 자리라 CONCAT 으로 %를 붙인다.
+      '%' || #{keyword} || '%' 처럼 문자열을 이어 붙여도 되지만 CONCAT 이 더 읽기 쉽다.
+    -->
+    <sql id="keywordFilter">
+        <if test="keyword != null and keyword != ''">
+            AND (LOWER(p.title)   LIKE LOWER(CONCAT('%', #{keyword}, '%'))
+              OR LOWER(p.content) LIKE LOWER(CONCAT('%', #{keyword}, '%')))
+        </if>
+    </sql>
+
+    <!--
+      LIMIT / OFFSET 으로 한 페이지만 잘라 온다.
+      OFFSET 은 "앞에서 몇 건을 건너뛸지"라 (페이지번호 * 페이지크기)가 된다.
+      WHERE 1=1 은 뒤에 오는 조건이 항상 AND 로 시작할 수 있게 하는 자리 채우기다.
+    -->
+    <select id="findPage" resultType="com.petcare.backend.domain.community.CommunityPostDTO">
+        SELECT <include refid="postColumns"/>
+        <include refid="postJoins"/>
+        WHERE 1 = 1
+        <include refid="keywordFilter"/>
+        ORDER BY p.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByKeyword" resultType="int">
+        SELECT COUNT(*)
+        FROM posts p
+        WHERE 1 = 1
+        <include refid="keywordFilter"/>
     </select>
 
     <select id="findById" resultType="com.petcare.backend.domain.community.CommunityPostDTO">
@@ -49,8 +100,52 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO posts (user_id, pet_id, title, content)
-        VALUES (#{userId}, #{petId}, #{title}, #{content})
+        INSERT INTO posts (user_id, pet_id, diagnosis_record_id, title, content)
+        VALUES (#{userId}, #{petId}, #{diagnosisRecordId}, #{title}, #{content})
     </insert>
+
+    <!--
+      updated_at을 함께 갱신해 수정 시각을 남긴다.
+      user_id 조건이 없으면 남의 글도 고쳐진다. 반드시 함께 건다.
+    -->
+    <update id="updateByIdAndUserId">
+        UPDATE posts
+        SET title               = #{post.title},
+            content             = #{post.content},
+            diagnosis_record_id = #{post.diagnosisRecordId},
+            updated_at          = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND user_id = #{userId}
+    </update>
+
+    <!--
+      comments와 post_likes는 posts를 ON DELETE CASCADE로 참조하므로
+      글을 지우면 딸린 댓글·좋아요도 DB가 함께 지운다.
+    -->
+    <delete id="deleteByIdAndUserId">
+        DELETE FROM posts
+        WHERE id = #{id} AND user_id = #{userId}
+    </delete>
+
+    <!--
+      내가 첨부할 수 있는 리포트만 고른다.
+      pets, users까지 타고 올라가 email로 거르므로 남의 리포트는 애초에 나오지 않는다.
+      DiagnosisRecordMapper.findByIdAndOwner와 같은 조건이다.
+    -->
+    <select id="findAttachableReports" resultType="com.petcare.backend.domain.community.AttachableReportDTO">
+        SELECT dr.id                    AS id,
+               dr.affected_area         AS affectedArea,
+               dr.risk_label            AS riskLabel,
+               dr.risk_level            AS riskLevel,
+               COALESCE(dr.affected_area, '진단')
+                   || ' · ' || COALESCE(dr.risk_label, '결과 없음')
+                   || ' (' || TO_CHAR(dr.created_at, 'YYYY.MM.DD') || ')' AS label,
+               dr.created_at            AS createdAt
+        FROM diagnosis_records dr
+        JOIN pets  p ON p.id = dr.pet_id
+        JOIN users u ON u.id = p.user_id
+        WHERE u.email = #{email}
+          AND dr.user_id = u.id
+        ORDER BY dr.id DESC
+    </select>
 
 </mapper>
