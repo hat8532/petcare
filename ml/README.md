@@ -1,6 +1,6 @@
 # PetCare FastAPI Vision Service
 
-현재 단계는 Spring과 FastAPI 사이의 Image Inference Contract를 검증한다. Gemini Multimodal은 명시적으로 활성화한 Local MVP Provider이며, 비활성 상태이거나 호출에 실패하면 실제 분석 성공으로 위장하지 않고 안정된 Failure Code를 반환한다.
+현재 단계는 Spring과 FastAPI 사이의 Image Inference Contract를 검증한다. Gemini Multimodal과 소규모 수의학 자료 검색을 결합한 Local RAG Prototype을 명시적으로 활성화할 수 있으며, 비활성 상태이거나 호출에 실패하면 실제 분석 성공으로 위장하지 않고 안정된 Failure Code를 반환한다.
 
 ## Local Run
 
@@ -25,7 +25,7 @@ PETCARE_EXPERIMENTAL_DEMO_ENABLED=true
 
 Demo는 `DOG·CAT + SKIN` 요청만 받고 `EXPERIMENTAL_DEMO` Mode와 예시 후보를 반환한다. Score는 임상 확률이나 Model 성능이 아니며 실제 평가 Evidence로 사용할 수 없다.
 
-## Gemini Multimodal MVP
+## Gemini + RAG Prototype
 
 Gemini Adapter는 기본 비활성화다. Local `dev` 환경에서 승인된 Sample Image로 확인할 때만 FastAPI Process에 다음 환경변수를 전달한다.
 
@@ -35,11 +35,23 @@ PETCARE_GEMINI_API_KEY=<local secret>
 PETCARE_GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
+기본 Corpus는 `knowledge/veterinary_skin_prototype.json`이다. 별도 파일을 검증할 때만 아래 경로를 추가한다.
+
+```text
+PETCARE_RAG_CORPUS=/absolute/path/to/corpus.json
+```
+
 - API Key는 Git·Log·명령 출력에 남기지 않는다.
 - 실제 사용자 Image 전송과 운영 활성화는 별도 Privacy·비용·Secret Gate를 통과한 뒤 진행한다.
-- 응답은 Structured JSON Validator를 통과해야 하며, `confidence`는 임상 확률이나 검증된 정확도가 아니다.
+- 응답은 제한된 관찰·한계 Code와 검색된 Source ID만 허용하는 Structured JSON Validator를 통과해야 하며, `confidence`는 임상 확률이나 검증된 정확도가 아니다.
 - Provider 인증·Rate limit·Timeout·Model 부재·Contract 불일치는 안정된 Failure Code로 축소한다.
-- Gemini 분석 성공 시 `GEMINI_MULTIMODAL` Mode와 Model·Version·Limitations를 보존한다.
+- Gemini 호출 전 `DOG·CAT + SKIN` 범위의 Source를 TF-IDF 방식으로 최대 3건 검색한다.
+- 사용자 입력과 RAG 문맥을 보내기 전에 별도 Gemini Image Gate를 호출하며, 실제 반려동물 피부 환부가 선명한 사진이 아니면 `PROVIDER_REJECTED`로 실패 처리하고 본 분석을 호출하지 않는다.
+- Gemini는 자유 형식 Report를 작성하지 않는다. 검색 결과에서 관련 Source ID만 선택하고, 사용자에게 보이는 Report는 선택된 로컬 한국어 요약을 그대로 조합한다.
+- Spring은 허용된 6개 Source의 ID·제목·발행처·URL과 로컬 요약문을 다시 대조해 일치하지 않는 응답을 폐기한다.
+- 분석 성공 시 `GEMINI_RAG_PROTOTYPE` Mode와 Model·Version·Report·Source·Limitations를 보존한다.
+- 이 구현은 작은 실제 검색 Prototype이지 Vector DB·Embedding·FAISS 기반 Production RAG가 아니다. 이미지 Gate도 별도 학습된 독립 검증 Model이 아니라 분리된 Gemini 요청이므로 임상 검증으로 간주하지 않는다.
+- Corpus는 원문을 복제하지 않고 직접 작성한 한국어 요약과 출처 링크만 보관한다. 상용 사용 전에는 출처별 이용 조건을 다시 검토한다.
 
 ## Endpoints
 
@@ -53,7 +65,7 @@ PETCARE_GEMINI_MODEL=gemini-3.1-flash-lite
 PYTHONPATH=. .venv/bin/python -m pytest -q
 ```
 
-Model Loader를 추가할 때는 Dataset·License·Label Map·Model Version·Preprocessing·Threshold를 결속한 Manifest를 먼저 승인받아야 한다.
+Model Loader를 추가할 때는 Dataset·License·Label Map·Model Version·Preprocessing·Threshold를 결속한 Manifest를 먼저 승인받아야 한다. 현재 Custom PyTorch Vision Model은 구현된 것으로 간주하지 않는다.
 
 ## Model Gate
 

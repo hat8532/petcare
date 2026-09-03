@@ -61,7 +61,7 @@ class DiagnosisServiceTest {
         assertThat(captor.getValue().getSymptomsJson()).isEqualTo("[\"가려움/긁음\"]");
         assertThat(captor.getValue().getUserId()).isEqualTo(7L);
         assertThat(captor.getValue().getDiseasesJson())
-                .contains("diagnosis-analysis@1", "RULE_FALLBACK", "MODEL_UNAVAILABLE");
+                .contains("diagnosis-analysis@2", "RULE_FALLBACK", "MODEL_UNAVAILABLE");
         assertThat(captor.getValue().getReportContent()).isNotBlank();
         assertThat(response.analysisMode()).isEqualTo("RULE_FALLBACK");
         assertThat(response.failureCode()).isEqualTo("MODEL_UNAVAILABLE");
@@ -107,14 +107,23 @@ class DiagnosisServiceTest {
     }
 
     @Test
-    void preservesGeminiMultimodalModeWithoutSecondTextProviderCall() {
+    void preservesGeminiRagReportAndSourcesWithoutChangingSafetyTriage() {
         when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
                 new VisionInferenceResult(
-                        "GEMINI_MULTIMODAL",
+                        "GEMINI_RAG_PROTOTYPE",
                         "gemini-test",
                         "test-version",
                         List.of(new VisionInferenceResult.Prediction("피부 발적 소견", 72.5)),
                         List.of("사진 한 장만 분석했습니다."),
+                        "가려움은 하나의 질병명이 아니라 여러 원인에서 나타나는 증상이다. "
+                                + "개에서는 기생충, 감염, 알레르기 등이 흔한 원인 범주이며, "
+                                + "털 빠짐·각질·냄새·분비물이 동반되면 감염 가능성도 함께 평가해야 한다. "
+                                + "[merck-dog-pruritus]",
+                        List.of(new VisionInferenceResult.RagSource(
+                                "merck-dog-pruritus",
+                                "Itching (Pruritus) in Dogs",
+                                "Merck Veterinary Manual",
+                                "https://www.merckvetmanual.com/dog-owners/skin-disorders-of-dogs/itching-pruritus-in-dogs")),
                         null,
                         invocation.getArgument(2)));
         doAnswer(invocation -> {
@@ -128,9 +137,17 @@ class DiagnosisServiceTest {
                 1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
                 "붉은 부위를 계속 긁습니다.", Map.of()), pngImage(), "owner@example.com");
 
-        assertThat(response.analysisMode()).isEqualTo("GEMINI_MULTIMODAL");
+        assertThat(response.analysisMode()).isEqualTo("GEMINI_RAG_PROTOTYPE");
         assertThat(response.ragReport())
-                .contains("AI 이미지 의심 소견", "피부 발적 소견", "확정 진단이나 처방이 아니며");
+                .contains("AI 이미지 의심 소견", "피부 발적 소견", "근거 기반 참고 안내",
+                        "[merck-dog-pruritus]", "확정 진단이나 처방이 아니며")
+                .doesNotContain("https://www.merckvetmanual.com");
+        assertThat(response.ragSources())
+                .containsExactly(new DiagnosisResultResponse.RagSource(
+                        "merck-dog-pruritus",
+                        "Itching (Pruritus) in Dogs",
+                        "Merck Veterinary Manual",
+                        "https://www.merckvetmanual.com/dog-owners/skin-disorders-of-dogs/itching-pruritus-in-dogs"));
     }
 
     @Test

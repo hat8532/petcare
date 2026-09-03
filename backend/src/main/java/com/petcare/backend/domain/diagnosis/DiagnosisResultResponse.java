@@ -17,6 +17,7 @@ public record DiagnosisResultResponse(
         String riskLabel,
         List<DiseasePrediction> visionTopDiseases,
         String ragReport,
+        List<RagSource> ragSources,
         String analysisMode,
         String model,
         String modelVersion,
@@ -31,6 +32,52 @@ public record DiagnosisResultResponse(
     public record DiseasePrediction(String diseaseName, double probability) {
     }
 
+    public record RagSource(String sourceId, String title, String publisher, String sourceUrl) {
+    }
+
+    public DiagnosisResultResponse(
+            Long diagnosisId,
+            Long petId,
+            String affectedArea,
+            String description,
+            String imageUrl,
+            String riskLevel,
+            String riskLabel,
+            List<DiseasePrediction> visionTopDiseases,
+            String ragReport,
+            String analysisMode,
+            String model,
+            String modelVersion,
+            String failureCode,
+            List<String> limitations,
+            String requestId,
+            List<String> riskReasons,
+            List<String> actionCodes,
+            List<String> actionGuidance,
+            LocalDateTime createdAt) {
+        this(
+                diagnosisId,
+                petId,
+                affectedArea,
+                description,
+                imageUrl,
+                riskLevel,
+                riskLabel,
+                visionTopDiseases,
+                ragReport,
+                List.of(),
+                analysisMode,
+                model,
+                modelVersion,
+                failureCode,
+                limitations,
+                requestId,
+                riskReasons,
+                actionCodes,
+                actionGuidance,
+                createdAt);
+    }
+
     public static DiagnosisResultResponse from(DiagnosisRecordDTO record, ObjectMapper objectMapper) {
         ParsedAnalysis analysis = readAnalysis(record.getDiseasesJson(), objectMapper);
         return new DiagnosisResultResponse(
@@ -43,6 +90,7 @@ public record DiagnosisResultResponse(
                 record.getRiskLabel() == null ? riskLabelOf(record.getRiskLevel()) : record.getRiskLabel(),
                 analysis.predictions(),
                 record.getReportContent(),
+                analysis.ragSources(),
                 analysis.analysisMode(),
                 analysis.model(),
                 analysis.modelVersion(),
@@ -91,6 +139,7 @@ public record DiagnosisResultResponse(
                     nullableText(root, "modelVersion"),
                     nullableText(root, "failureCode"),
                     stringList(root.path("limitations")),
+                    readRagSources(root.path("ragSources")),
                     nullableText(root, "requestId"),
                     stringList(root.path("riskReasons")),
                     stringList(root.path("actionCodes")),
@@ -133,6 +182,23 @@ public record DiagnosisResultResponse(
         return List.copyOf(values);
     }
 
+    private static List<RagSource> readRagSources(JsonNode root) {
+        if (!root.isArray()) {
+            return List.of();
+        }
+        List<RagSource> sources = new ArrayList<>();
+        for (JsonNode item : root) {
+            String sourceId = nullableText(item, "sourceId");
+            String title = nullableText(item, "title");
+            String publisher = nullableText(item, "publisher");
+            String sourceUrl = nullableText(item, "sourceUrl");
+            if (sourceId != null && title != null && publisher != null && sourceUrl != null) {
+                sources.add(new RagSource(sourceId, title, publisher, sourceUrl));
+            }
+        }
+        return List.copyOf(sources);
+    }
+
     private static String textOrDefault(JsonNode node, String field, String fallback) {
         String value = nullableText(node, field);
         return value == null ? fallback : value;
@@ -155,6 +221,7 @@ public record DiagnosisResultResponse(
             String modelVersion,
             String failureCode,
             List<String> limitations,
+            List<RagSource> ragSources,
             String requestId,
             List<String> riskReasons,
             List<String> actionCodes,
@@ -168,6 +235,7 @@ public record DiagnosisResultResponse(
                     null,
                     "PROVENANCE_NOT_STORED",
                     List.of("이 기록에는 과거 분석 Mode·Model Version이 저장되지 않았습니다."),
+                    List.of(),
                     null,
                     List.of(),
                     List.of(),

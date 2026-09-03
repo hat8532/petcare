@@ -10,6 +10,7 @@ from app.gemini_adapter import (
     GeminiStructuredAnalysis,
 )
 from app.main import app
+from app.rag_retriever import RagCorpusError, RagEvidence
 
 client = TestClient(app)
 
@@ -40,6 +41,8 @@ def test_health_and_version_expose_service_state():
     assert version.json()["serviceVersion"] == "0.1.0"
     assert version.json()["modelAvailable"] is False
     assert version.json()["modelStateCode"] == "MODEL_MANIFEST_MISSING"
+    assert version.json()["ragAvailable"] is True
+    assert version.json()["ragCorpusId"] == "veterinary-skin-prototype-ko"
 
 
 def test_inference_returns_model_unavailable_without_artifact():
@@ -159,12 +162,27 @@ def test_gemini_multimodal_result_preserves_mode_and_limitations(monkeypatch):
                 model=self.model,
                 model_version="test-version",
                 analysis=GeminiStructuredAnalysis(
-                    findings=[GeminiFinding(finding="피부 발적 소견", confidence=72.5)],
-                    limitations=["사진 한 장만 분석했습니다."],
+                    findings=[GeminiFinding(findingCode="REDNESS", confidence=72.5)],
+                    relevantSourceIds=["vet-source-1"],
+                    limitationCodes=["SINGLE_IMAGE_ONLY"],
                 ),
             )
 
+    class FakeRagRetriever:
+        def search(self, **_kwargs):
+            return [
+                RagEvidence(
+                    source_id="vet-source-1",
+                    title="Veterinary Source",
+                    publisher="Veterinary Publisher",
+                    source_url="https://example.org/source",
+                    excerpt="가려움은 여러 피부 원인에서 나타날 수 있다.",
+                    score=0.8,
+                )
+            ]
+
     monkeypatch.setattr("app.main.get_gemini_adapter", lambda: FakeGeminiAdapter())
+    monkeypatch.setattr("app.main.get_rag_retriever", lambda: FakeRagRetriever())
 
     response = client.post(
         "/v1/diagnoses/infer",
@@ -181,13 +199,24 @@ def test_gemini_multimodal_result_preserves_mode_and_limitations(monkeypatch):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["mode"] == "GEMINI_MULTIMODAL"
+    assert body["mode"] == "GEMINI_RAG_PROTOTYPE"
     assert body["model"] == "gemini-test"
     assert body["modelVersion"] == "test-version"
     assert body["predictions"] == [
         {"diseaseName": "피부 발적 소견", "probability": 72.5}
     ]
     assert any("임상 확률" in limitation for limitation in body["limitations"])
+    assert body["ragReport"] == (
+        "가려움은 여러 피부 원인에서 나타날 수 있다. [vet-source-1]"
+    )
+    assert body["ragSources"] == [
+        {
+            "sourceId": "vet-source-1",
+            "title": "Veterinary Source",
+            "publisher": "Veterinary Publisher",
+            "sourceUrl": "https://example.org/source",
+        }
+    ]
 
 
 def test_inference_rejects_image_larger_than_ten_megabytes():
@@ -280,11 +309,74 @@ def test_unknown_provider_failure_is_normalized(monkeypatch):
             "petId": "1",
             "species": "DOG",
             "affectedArea": "SKIN",
-            "symptoms": "[]",
-            "description": "환부 설명",
+            "symptoms": '["가려움/긁음"]',
+            "description": "가려운 피부를 계속 긁습니다.",
             "requestId": "request-normalized",
         },
     )
 
     assert response.status_code == 503
     assert response.json()["detail"]["failureCode"] == "PROVIDER_UNAVAILABLE"
+
+
+def test_gemini_route_rejects_unrelated_text_without_rag_evidence(monkeypatch):
+    class ConfiguredGeminiAdapter:
+        model = "gemini-test"
+
+        def is_configured(self):
+            return True
+
+    monkeypatch.setattr("app.main.get_gemini_adapter", lambda: ConfiguredGeminiAdapter())
+
+    response = client.post(
+        "/v1/diagnoses/infer",
+        files={"image": ("lesion.png", png_image(), "image/png")},
+        data={
+            "petId": "1",
+            "species": "DOG",
+            "affectedArea": "SKIN",
+            "symptoms": '["우주선"]',
+            "description": "자동차 엔진 점검",
+            "requestId": "request-rag-no-evidence",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == {
+        "failureCode": "RAG_NO_EVIDENCE",
+        "requestId": "request-rag-no-evidence",
+    }
+
+
+def test_gemini_route_fails_closed_when_rag_corpus_is_unavailable(monkeypatch):
+    class ConfiguredGeminiAdapter:
+        model = "gemini-test"
+
+        def is_configured(self):
+            return True
+
+    class UnavailableRagRetriever:
+        def search(self, **_kwargs):
+            raise RagCorpusError()
+
+    monkeypatch.setattr("app.main.get_gemini_adapter", lambda: ConfiguredGeminiAdapter())
+    monkeypatch.setattr("app.main.get_rag_retriever", lambda: UnavailableRagRetriever())
+
+    response = client.post(
+        "/v1/diagnoses/infer",
+        files={"image": ("lesion.png", png_image(), "image/png")},
+        data={
+            "petId": "1",
+            "species": "DOG",
+            "affectedArea": "SKIN",
+            "symptoms": '["가려움/긁음"]',
+            "description": "붉은 부위를 계속 긁습니다.",
+            "requestId": "request-rag-unavailable",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "failureCode": "RAG_CORPUS_UNAVAILABLE",
+        "requestId": "request-rag-unavailable",
+    }
