@@ -13,6 +13,10 @@ export default function CommunityPostDetail({ postId, onBack, user, onOpenLogin 
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 좋아요는 개수와 "내가 눌렀는지"를 함께 들고 있어야 버튼 모양을 정할 수 있다.
+  const [likes, setLikes] = useState({ count: 0, liked: false });
+  const [isLiking, setIsLiking] = useState(false);
+
   useEffect(() => {
     // postId 가 없으면 조회할 대상이 없다.
     if (!postId) {
@@ -32,8 +36,9 @@ export default function CommunityPostDetail({ postId, onBack, user, onOpenLogin 
         }
         setPost(data);
 
-        // 댓글 조회는 실패해도 빈 배열이라 본문 표시를 막지 않는다.
+        // 댓글·좋아요 조회는 실패해도 기본값이라 본문 표시를 막지 않는다.
         setComments(await communityApi.getComments(postId));
+        setLikes(await communityApi.getLikes(postId));
       } catch (error) {
         console.warn('글 상세 조회 실패:', error);
         // 백엔드는 없는 글에 404 를 돌려준다.
@@ -79,6 +84,30 @@ export default function CommunityPostDetail({ postId, onBack, user, onOpenLogin 
       alert('댓글 등록에 실패했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  // 좋아요 토글. 개수는 화면에서 +1 하지 않고 서버가 준 값으로 덮어쓴다.
+  // 그 사이 다른 사람이 눌렀으면 화면이 직접 센 값과 어긋나기 때문이다.
+  async function handleToggleLike() {
+    if (!user) {
+      alert('로그인 후 좋아요를 누를 수 있습니다.');
+      onOpenLogin?.();
+      return;
+    }
+
+    setIsLiking(true);
+    try {
+      setLikes(await communityApi.toggleLike(postId));
+    } catch (error) {
+      if (error?.status === 401) {
+        alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+        onOpenLogin?.();
+        return;
+      }
+      alert('좋아요 처리에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsLiking(false);
     }
   }
 
@@ -183,10 +212,38 @@ export default function CommunityPostDetail({ postId, onBack, user, onOpenLogin 
           <div style={{
             borderTop: '1px solid #e2e8f0',
             paddingTop: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
             fontSize: '12.5px',
             color: '#64748b'
           }}>
-            💬 댓글 {comments.length} · ❤️ 좋아요 {post.likesCount ?? 0}
+            {/* 눌렀을 때는 채운 하트에 배경을 주고, 안 눌렀을 때는 빈 하트로 둔다.
+                색만 바꾸면 색을 구분하기 어려운 사람이 상태를 알 수 없다. */}
+            <button
+              type="button"
+              onClick={handleToggleLike}
+              disabled={isLiking}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 14px',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                fontFamily: 'inherit',
+                cursor: isLiking ? 'default' : 'pointer',
+                borderRadius: '9999px',
+                border: likes.liked ? '1px solid #fecdd3' : '1px solid #e2e8f0',
+                background: likes.liked ? '#fff1f2' : '#ffffff',
+                color: likes.liked ? '#e11d48' : '#64748b'
+              }}
+            >
+              <span>{likes.liked ? '❤️' : '🤍'}</span>
+              <span>좋아요 {likes.count}</span>
+            </button>
+
+            <span>💬 댓글 {comments.length}</span>
           </div>
         </article>
       )}

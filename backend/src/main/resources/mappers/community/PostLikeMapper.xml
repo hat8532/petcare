@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.petcare.backend.domain.community.PostLikeMapper">
+
+    <select id="countByPostId" resultType="int">
+        SELECT COUNT(*) FROM post_likes WHERE post_id = #{postId}
+    </select>
+
+    <select id="countByPostIdAndUserId" resultType="int">
+        SELECT COUNT(*) FROM post_likes
+        WHERE post_id = #{postId} AND user_id = #{userId}
+    </select>
+
+    <!--
+      테이블에 (post_id, user_id) 유니크 제약이 없어서 SQL로 중복을 막는다.
+      이미 눌렀으면 SELECT가 아무 행도 만들지 않아 INSERT가 0건으로 끝난다.
+      동시에 두 번 눌리면 여전히 2행이 들어갈 수 있지만, 취소는 그 쌍을
+      전부 지우므로 눌렀다 취소하면 원래대로 돌아온다.
+    -->
+    <insert id="insertIfAbsent">
+        INSERT INTO post_likes (post_id, user_id)
+        SELECT #{postId}, #{userId}
+        WHERE NOT EXISTS (
+            SELECT 1 FROM post_likes WHERE post_id = #{postId} AND user_id = #{userId}
+        )
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM post_likes
+        WHERE post_id = #{postId} AND user_id = #{userId}
+    </delete>
+
+</mapper>

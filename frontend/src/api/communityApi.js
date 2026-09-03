@@ -48,5 +48,24 @@ export const communityApi = Object.freeze({
   // 댓글 삭제. 본인 것이 아니면 서버가 403을 돌려준다.
   deleteComment: async (postId, commentId) => {
     await httpClient.delete(`/community/${postId}/comments/${commentId}`);
+  },
+
+  // 좋아요 개수와 내가 눌렀는지. 비로그인이면 liked는 항상 false다.
+  // publicRequest를 쓰지 않는 이유: 토큰이 있어야 서버가 liked를 판단할 수 있다.
+  // 로그인 전에는 토큰이 없어도 200이 오므로 그대로 두면 된다.
+  getLikes: async (postId) => {
+    try {
+      const body = await httpClient.get(`/community/${postId}/likes`);
+      return body?.data ?? { count: 0, liked: false };
+    } catch (error) {
+      console.warn('좋아요 조회 실패:', error);
+      return { count: 0, liked: false };
+    }
+  },
+
+  // 같은 주소로 누르면 켜지고 다시 누르면 꺼진다. 바뀐 결과를 서버가 돌려준다.
+  toggleLike: async (postId) => {
+    const body = await httpClient.post(`/community/${postId}/likes`);
+    return body?.data ?? { count: 0, liked: false };
   }
 });
