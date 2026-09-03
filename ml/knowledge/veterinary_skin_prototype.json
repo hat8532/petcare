@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "petcare-rag-corpus@1",
+  "corpusId": "veterinary-skin-prototype-ko",
+  "version": "2026-09-03",
+  "description": "개와 고양이의 피부 증상 안내를 위한 소규모 검색 Prototype. 원문을 복제하지 않고 출처를 바탕으로 직접 작성한 한국어 요약만 포함한다.",
+  "documents": [
+    {
+      "id": "merck-dermatitis-overview",
+      "species": ["DOG", "CAT"],
+      "areas": ["SKIN"],
+      "title": "Dermatitis in Animals",
+      "publisher": "Merck Veterinary Manual",
+      "sourceUrl": "https://www.merckvetmanual.com/integumentary-system/integumentary-system-introduction/dermatitis-in-animals",
+      "sourceSection": "Clinical Findings",
+      "accessedAt": "2026-09-03",
+      "licenseStatus": "link-and-original-paraphrase-only",
+      "keywords": ["피부염", "가려움", "발적", "각질", "탈모", "악취", "진물", "세균", "효모"],
+      "content": "피부 문제에서는 가려움, 붉어짐, 각질, 피부가 두꺼워지는 변화, 색소 변화, 냄새, 탈모 등이 함께 관찰될 수 있다. 손상된 피부에는 세균이나 효모 감염이 뒤따를 수 있으므로 사진만으로 원인을 하나로 단정하면 안 된다."
+    },
+    {
+      "id": "merck-dog-pruritus",
+      "species": ["DOG"],
+      "areas": ["SKIN"],
+      "title": "Itching (Pruritus) in Dogs",
+      "publisher": "Merck Veterinary Manual",
+      "sourceUrl": "https://www.merckvetmanual.com/dog-owners/skin-disorders-of-dogs/itching-pruritus-in-dogs",
+      "sourceSection": "Causes and Signs",
+      "accessedAt": "2026-09-03",
+      "licenseStatus": "link-and-original-paraphrase-only",
+      "keywords": ["개", "강아지", "가려움", "긁음", "핥음", "기생충", "감염", "알레르기", "냄새", "분비물"],
+      "content": "가려움은 하나의 질병명이 아니라 여러 원인에서 나타나는 증상이다. 개에서는 기생충, 감염, 알레르기 등이 흔한 원인 범주이며, 털 빠짐·각질·냄새·분비물이 동반되면 감염 가능성도 함께 평가해야 한다."
+    },
+    {
+      "id": "cornell-canine-atopy",
+      "species": ["DOG"],
+      "areas": ["SKIN"],
+      "title": "Atopic Dermatitis (Atopy)",
+      "publisher": "Cornell University College of Veterinary Medicine",
+      "sourceUrl": "https://www.vet.cornell.edu/departments-centers-and-institutes/riney-canine-health-center/canine-health-topics/atopic-dermatitis-atopy",
+      "sourceSection": "Symptoms",
+      "accessedAt": "2026-09-03",
+      "licenseStatus": "link-and-original-paraphrase-only",
+      "keywords": ["개", "강아지", "아토피", "알레르기", "가려움", "긁음", "핥음", "발적", "탈모", "이차 감염"],
+      "content": "개 아토피 피부염에서는 심한 가려움이 흔하며 반복해서 긁거나 핥는 행동 때문에 붉어짐과 탈모가 생길 수 있다. 피부 장벽이 손상되면 이차 감염이 동반될 수 있어 지속되거나 악화되는 증상은 수의사의 진료가 필요하다."
+    },
+    {
+      "id": "merck-flea-allergy",
+      "species": ["DOG", "CAT"],
+      "areas": ["SKIN"],
+      "title": "Flea Allergy Dermatitis in Dogs and Cats",
+      "publisher": "Merck Veterinary Manual",
+      "sourceUrl": "https://www.merckvetmanual.com/integumentary-system/fleas-and-flea-allergy-dermatitis/flea-allergy-dermatitis-in-dogs-and-cats",
+      "sourceSection": "Clinical Findings and Diagnosis",
+      "accessedAt": "2026-09-03",
+      "licenseStatus": "link-and-original-paraphrase-only",
+      "keywords": ["벼룩", "기생충", "알레르기", "가려움", "꼬리", "허리", "등", "머리", "목"],
+      "content": "벼룩 알레르기 피부염은 개와 고양이 모두에서 심한 가려움을 만들 수 있다. 개는 허리 아래쪽과 꼬리 시작 부위, 고양이는 머리·목·등에서 병변이 관찰될 수 있지만, 병력과 임상 소견 및 다른 원인의 배제가 함께 필요하다."
+    },
+    {
+      "id": "merck-dermatophytosis",
+      "species": ["DOG", "CAT"],
+      "areas": ["SKIN"],
+      "title": "Dermatophytosis in Dogs and Cats",
+      "publisher": "Merck Veterinary Manual",
+      "sourceUrl": "https://www.merckvetmanual.com/integumentary-system/dermatophytosis/dermatophytosis-in-dogs-and-cats",
+      "sourceSection": "Clinical Findings and Diagnosis",
+      "accessedAt": "2026-09-03",
+      "licenseStatus": "link-and-original-paraphrase-only",
+      "keywords": ["피부사상균", "진균", "곰팡이", "탈모", "각질", "딱지", "발적", "가려움", "사람 전파"],
+      "content": "피부사상균증에서는 탈모, 각질, 딱지, 붉어짐과 정도가 다양한 가려움이 나타날 수 있다. 겉모습만으로 확진할 수 없고 모발·각질 검사나 배양 등 여러 검사를 조합하며, 사람에게 전파될 가능성도 고려해야 한다."
+    },
+    {
+      "id": "avma-pet-first-aid",
+      "species": ["DOG", "CAT"],
+      "areas": ["SKIN"],
+      "title": "Pet First Aid",
+      "publisher": "American Veterinary Medical Association",
+      "sourceUrl": "https://ebusiness.avma.org/files/productdownloads/mcm-client-brochures-pet-first-aid-2023.pdf",
+      "sourceSection": "General first-aid guidance",
+      "accessedAt": "2026-09-03",
+      "licenseStatus": "link-and-original-paraphrase-only",
+      "keywords": ["응급", "호흡 곤란", "청색증", "출혈", "의식", "쓰러짐", "동물병원", "임의 투약"],
+      "content": "응급 징후가 있으면 보호자용 안내나 응급처치는 동물병원 진료를 대신할 수 없다. 즉시 수의사 또는 응급 동물병원에 연락하고, 전문가 지시 없이 사람용 약이나 검증되지 않은 처치를 적용하지 않는다."
+    }
+  ]
+}

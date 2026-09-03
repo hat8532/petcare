@@ -175,6 +175,10 @@ public class DiagnosisService {
                     + "입력 내용만으로 질환명이나 확률을 생성하지 않습니다.");
         }
 
+        if (visionResult.ragReport() != null && !visionResult.ragReport().isBlank()) {
+            sections.add("[근거 기반 참고 안내]\n" + visionResult.ragReport());
+        }
+
         sections.add("[안전 위험도]\n" + triageResult.riskLevel().label()
                 + "\n위험도는 생성형 AI가 아닌 입력 기반 Safety Triage가 결정합니다.");
         sections.add("[권장 다음 행동]\n- " + String.join("\n- ", triageResult.actionGuidance()));
@@ -216,6 +220,8 @@ public class DiagnosisService {
             String modelVersion,
             String failureCode,
             List<String> limitations,
+            String ragReport,
+            List<VisionInferenceResult.RagSource> ragSources,
             String requestId,
             List<String> riskReasons,
             List<String> actionCodes,
@@ -225,13 +231,15 @@ public class DiagnosisService {
                 VisionInferenceResult visionResult,
                 DiagnosisSafetyTriage.TriageResult triageResult) {
             return new StoredAnalysis(
-                    "diagnosis-analysis@1",
+                    "diagnosis-analysis@2",
                     visionResult.predictions(),
                     visionResult.mode(),
                     visionResult.model(),
                     visionResult.modelVersion(),
                     visionResult.failureCode(),
                     visionResult.limitations(),
+                    visionResult.ragReport(),
+                    visionResult.ragSources(),
                     visionResult.requestId(),
                     triageResult.reasons(),
                     triageResult.actionCodes(),

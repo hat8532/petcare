@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.gemini_adapter import GeminiAdapterError, GeminiMultimodalAdapter
 from app.image_validation import ImageValidationError, read_validated_image
 from app.manifest import ManifestState, inspect_model_manifest
+from app.rag_retriever import RagCorpusError, RagRetriever
 
 SERVICE_VERSION = "0.1.0"
 DEMO_MODEL_NAME = "petcare-contract-demo"
@@ -33,9 +34,22 @@ def get_gemini_adapter() -> GeminiMultimodalAdapter:
     return GeminiMultimodalAdapter.from_environment()
 
 
+def get_rag_retriever() -> RagRetriever:
+    return RagRetriever.from_environment()
+
+
 class Prediction(BaseModel):
     disease_name: str = Field(alias="diseaseName")
     probability: float = Field(ge=0, le=100)
+
+    model_config = {"populate_by_name": True}
+
+
+class RagSource(BaseModel):
+    source_id: str = Field(alias="sourceId")
+    title: str
+    publisher: str
+    source_url: str = Field(alias="sourceUrl")
 
     model_config = {"populate_by_name": True}
 
@@ -46,6 +60,8 @@ class InferenceResponse(BaseModel):
     model_version: str | None = Field(alias="modelVersion")
     predictions: list[Prediction]
     limitations: list[str]
+    rag_report: str | None = Field(default=None, alias="ragReport")
+    rag_sources: list[RagSource] = Field(default_factory=list, alias="ragSources")
     failure_code: str | None = Field(alias="failureCode")
     request_id: str = Field(alias="requestId")
 
@@ -83,9 +99,13 @@ def health() -> dict[str, str]:
 
 
 @app.get("/version")
-def version() -> dict[str, str | bool | None]:
+def version() -> dict[str, str | bool | int | None]:
     state = model_state()
     gemini = get_gemini_adapter()
+    try:
+        rag_metadata = get_rag_retriever().metadata()
+    except RagCorpusError:
+        rag_metadata = None
     return {
         "serviceVersion": SERVICE_VERSION,
         "modelAvailable": False,
@@ -98,6 +118,11 @@ def version() -> dict[str, str | bool | None]:
         "experimentalDemoEnabled": experimental_demo_enabled(),
         "geminiEnabled": gemini.is_configured(),
         "geminiModel": gemini.model if gemini.is_configured() else None,
+        "ragAvailable": rag_metadata is not None,
+        "ragMode": "LEXICAL_TFIDF_PROTOTYPE" if rag_metadata else None,
+        "ragCorpusId": rag_metadata.corpus_id if rag_metadata else None,
+        "ragCorpusVersion": rag_metadata.version if rag_metadata else None,
+        "ragDocumentCount": rag_metadata.document_count if rag_metadata else 0,
     }
 
 
@@ -157,6 +182,25 @@ async def infer(
                 detail={"failureCode": "OUT_OF_SCOPE", "requestId": request_id},
             )
         try:
+            evidence = get_rag_retriever().search(
+                species=species,
+                affected_area=affected_area,
+                query=f"{symptoms}\n{description}",
+            )
+        except RagCorpusError as exception:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "failureCode": exception.failure_code,
+                    "requestId": request_id,
+                },
+            ) from exception
+        if not evidence:
+            raise HTTPException(
+                status_code=422,
+                detail={"failureCode": "RAG_NO_EVIDENCE", "requestId": request_id},
+            )
+        try:
             result = await gemini.analyze(
                 image_bytes=validated_image.content,
                 mime_type=validated_image.mime_type,
@@ -164,6 +208,7 @@ async def infer(
                 affected_area=affected_area,
                 symptoms=symptoms,
                 description=description,
+                evidence=evidence,
             )
         except GeminiAdapterError as exception:
             failure_code = (
@@ -182,8 +227,18 @@ async def infer(
                 detail={"failureCode": failure_code, "requestId": request_id},
             ) from exception
 
+        evidence_by_id = {item.source_id: item for item in evidence}
+        selected_evidence = [
+            evidence_by_id[source_id]
+            for source_id in result.analysis.relevant_source_ids
+        ]
+        rag_report = "\n\n".join(
+            f"{item.excerpt} [{item.source_id}]"
+            for item in selected_evidence
+        )
+
         return InferenceResponse(
-            mode="GEMINI_MULTIMODAL",
+            mode="GEMINI_RAG_PROTOTYPE",
             model=result.model,
             modelVersion=result.model_version,
             predictions=[
@@ -194,6 +249,16 @@ async def infer(
                 *result.analysis.limitations,
                 "표시 Score는 임상 확률이나 검증된 정확도가 아닌 Model confidence입니다.",
                 "확정 진단과 치료 판단은 수의사의 진료가 필요합니다.",
+            ],
+            ragReport=rag_report,
+            ragSources=[
+                RagSource(
+                    sourceId=item.source_id,
+                    title=item.title,
+                    publisher=item.publisher,
+                    sourceUrl=item.source_url,
+                )
+                for item in selected_evidence
             ],
             failureCode=None,
             requestId=request_id,

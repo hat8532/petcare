@@ -20,8 +20,18 @@ const RETRYABLE_FAILURE_CODES = new Set([
   'PROVIDER_UNAVAILABLE',
   'PROVIDER_RATE_LIMITED',
   'PROVIDER_MODEL_UNAVAILABLE',
-  'INVALID_PROVIDER_RESPONSE'
+  'INVALID_PROVIDER_RESPONSE',
+  'RAG_CORPUS_UNAVAILABLE'
 ]);
+
+const FAILURE_GUIDANCE = Object.freeze({
+  PROVIDER_REJECTED: '실제 반려동물의 환부가 선명하게 보이는 근접 사진으로 다시 등록해 주세요.',
+  RAG_CORPUS_UNAVAILABLE: '수의학 참고 자료를 불러오지 못해 AI 소견을 폐기했습니다. 잠시 후 다시 시도해 주세요.',
+  RAG_NO_EVIDENCE: '입력 증상과 연결할 수 있는 검증된 참고 자료가 없어 AI 소견을 생성하지 않았습니다.'
+});
+
+const failureGuidance = (failureCode) => FAILURE_GUIDANCE[failureCode]
+  || '외부 Image 분석 Provider 응답을 검증하지 못해 입력 기반 Safety Triage만 저장했습니다.';
 
 const ACTION_TITLES = Object.freeze({
   MONITOR_AND_RECORD: '집에서 경과 기록',
@@ -227,7 +237,7 @@ export default function DiagnosisDropzone({
       if (result.riskLevel !== 'EMERGENCY' && result.failureCode) {
         setAnalysisFailure({
           code: result.failureCode,
-          message: '외부 Image 분석 Provider 응답을 검증하지 못해 입력 기반 Safety Triage만 저장했습니다.',
+          message: failureGuidance(result.failureCode),
           canRetry: RETRYABLE_FAILURE_CODES.has(result.failureCode)
         });
       }
@@ -265,6 +275,8 @@ export default function DiagnosisDropzone({
     && (affectedArea !== 'CUSTOM' || customAreaText.trim())
   );
   const findings = analysisResult?.visionTopDiseases || [];
+  const ragSources = analysisResult?.ragSources || [];
+  const isRagPrototype = analysisResult?.analysisMode === 'GEMINI_RAG_PROTOTYPE';
   const resultImageUrl = storedImagePreview
     || (analysisResult?.diagnosisId === previewDiagnosisId ? imagePreview : '');
 
@@ -634,12 +646,19 @@ export default function DiagnosisDropzone({
                 </div>
 
                 <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>
-                  {analysisResult.analysisMode === 'GEMINI_MULTIMODAL' ? 'AI Image 의심 소견 안내' : '진단 분석 결과 리포트'}
+                  {['GEMINI_MULTIMODAL', 'GEMINI_RAG_PROTOTYPE'].includes(analysisResult.analysisMode)
+                    ? 'AI Image 의심 소견 안내'
+                    : '진단 분석 결과 리포트'}
                 </h3>
 
                 <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '10px', fontSize: '12px', color: '#475569' }}>
                   <strong>분석 Mode:</strong> {analysisResult.analysisMode || 'UNKNOWN'}
                   {analysisResult.model && <span> · <strong>Model:</strong> {analysisResult.model} {analysisResult.modelVersion || ''}</span>}
+                  {isRagPrototype && (
+                    <div style={{ color: '#047857', marginTop: '6px', fontWeight: '700' }}>
+                      소규모 RAG Prototype · 검색된 수의학 자료 {ragSources.length}건을 참고한 안내입니다.
+                    </div>
+                  )}
                   {analysisResult.failureCode && (
                     <div style={{ color: '#b45309', marginTop: '6px' }}>
                       <strong>Image 분석 상태:</strong> {analysisResult.failureCode}
@@ -648,8 +667,9 @@ export default function DiagnosisDropzone({
                           type="button"
                           onClick={() => setAnalysisFailure({
                             code: analysisResult.failureCode,
-                            message: '외부 Image 분석 Provider 응답을 검증하지 못했습니다.',
+                            message: failureGuidance(analysisResult.failureCode),
                             canRetry: Boolean(imageFile)
+                              && RETRYABLE_FAILURE_CODES.has(analysisResult.failureCode)
                           })}
                           className="btn btn-secondary diagnosis-no-print"
                           style={{ marginLeft: '8px', padding: '4px 8px' }}
@@ -709,6 +729,23 @@ export default function DiagnosisDropzone({
                   <div style={{ whiteSpace: 'pre-line', fontSize: '13.5px', lineHeight: '1.7', color: '#064e3b' }}>
                     {analysisResult.ragReport}
                   </div>
+
+                  {ragSources.length > 0 && (
+                    <div style={{ display: 'grid', gap: '7px', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #a7f3d0' }}>
+                      <strong style={{ color: '#047857', fontSize: '12.5px' }}>RAG 참고 출처</strong>
+                      {ragSources.map((source) => (
+                        <a
+                          key={source.sourceId}
+                          href={source.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: '#0369a1', fontSize: '12px', lineHeight: 1.5, overflowWrap: 'anywhere' }}
+                        >
+                          [{source.sourceId}] {source.title} · {source.publisher}
+                        </a>
+                      ))}
+                    </div>
+                  )}
 
                   {(analysisResult.actionGuidance || []).length > 0 && (
                     <div style={{ display: 'grid', gap: '8px', marginTop: '14px' }}>

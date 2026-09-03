@@ -93,7 +93,9 @@ export default function DiagnosisFailureDialog({ failure, isRetrying, onRetry, o
         <p style={{ color: '#64748b', fontSize: '13px', lineHeight: 1.6 }}>
           {failure.canRetry
             ? '실패 상태에서는 질환명이나 확률을 임의로 생성하지 않습니다. 입력은 유지되며 사용자가 직접 다시 시도할 수 있습니다.'
-            : '실패 상태에서는 질환명이나 확률을 임의로 생성하지 않습니다. 입력 기반 Safety Triage 결과만 저장했으며 Provider 환경이 준비된 뒤 새로 실행할 수 있습니다.'}
+            : failure.code === 'PROVIDER_REJECTED'
+              ? '질환명이나 확률은 생성하지 않았습니다. 안내에 맞는 새 Image를 선택한 뒤 다시 실행해 주세요.'
+              : '실패 상태에서는 질환명이나 확률을 임의로 생성하지 않습니다. 입력 기반 Safety Triage 결과만 저장했습니다.'}
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '20px' }}>
           {failure.canRetry && (

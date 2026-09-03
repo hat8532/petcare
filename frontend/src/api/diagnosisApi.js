@@ -62,6 +62,7 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  * @property {string} riskLabel
  * @property {{diseaseName: string, probability: number}[]} visionTopDiseases
  * @property {string|null} ragReport
+ * @property {{sourceId: string, title: string, publisher: string, sourceUrl: string}[]} ragSources
  * @property {string} analysisMode
  * @property {string|null} model
  * @property {string|null} modelVersion
