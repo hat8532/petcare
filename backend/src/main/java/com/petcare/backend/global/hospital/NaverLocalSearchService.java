@@ -131,9 +131,11 @@ public class NaverLocalSearchService {
                     .phone(telephone.isBlank() ? null : telephone)
                     .latitude(lat)
                     .longitude(lng)
-                    // "24시 동물병원"으로 검색했지만 실제 24시 운영 여부는 확인할 수 없다.
-                    // 단정하지 않고 null로 둔다.
-                    .isEmergency24h(null)
+                    // 업체가 스스로 상호에 "24시"를 넣었는지로 판단한다.
+                    // 지역검색은 영업시간을 내려주지 않아 이것 말고는 근거가 없다.
+                    // null로 두면 화면의 24시 필터가 전부 걸러내 0건이 된다.
+                    .isEmergency24h(looksLike24Hours(name))
+                    // 실제 영업시간은 확인할 수 없다. 지어내지 않고 비워 둔다.
                     .businessHours(null)
                     .naverPlaceUrl(buildPlaceSearchUrl(name))
                     .isActive(true)
@@ -141,6 +143,24 @@ public class NaverLocalSearchService {
         }
 
         return result;
+    }
+
+    // 상호에 24시간 운영을 뜻하는 표기가 있는지 본다.
+    //
+    // 근거가 상호뿐이라 정확하지는 않다. 상호에 안 적고 24시로 운영하는 곳도 있고,
+    // 상호만 그대로 두고 야간 진료를 접은 곳도 있다.
+    // 다만 값을 비워 두면 필터가 통째로 동작하지 않으므로, 확인 가능한 근거로 채운다.
+    //
+    // 공백을 지우고 보는 이유: "24시 동물병원"과 "24시동물병원"이 섞여 들어온다.
+    private Boolean looksLike24Hours(String name) {
+        if (name == null || name.isBlank()) return false;
+
+        String compact = name.replaceAll("\\s+", "").toUpperCase();
+        return compact.contains("24시")
+                || compact.contains("24H")
+                || compact.contains("24시간")
+                || compact.contains("야간응급")
+                || compact.contains("응급의료센터");
     }
 
     private String buildPlaceSearchUrl(String name) {
