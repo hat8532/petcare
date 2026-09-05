@@ -71,7 +71,7 @@ class VisionInferenceClientTest {
                     new ObjectMapper());
             DiagnosisAnalyzeRequest request = new DiagnosisAnalyzeRequest(
                     1L, "초코", "DOG", "SKIN", "", List.of("가려움/긁음"),
-                    "붉은 부위를 계속 긁습니다.", Map.of());
+                    "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001");
             MockMultipartFile image = new MockMultipartFile(
                     "image", "lesion.jpg", "image/jpeg",
                     DiagnosisTestImages.jpegBytes(2, 2));
@@ -117,7 +117,7 @@ class VisionInferenceClientTest {
                     new ObjectMapper());
             DiagnosisAnalyzeRequest request = new DiagnosisAnalyzeRequest(
                     1L, "초코", "DOG", "SKIN", "", List.of("가려움/긁음"),
-                    "붉은 부위를 계속 긁습니다.", Map.of());
+                    "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001");
             MockMultipartFile image = new MockMultipartFile(
                     "image", "lesion.jpg", "image/jpeg",
                     DiagnosisTestImages.jpegBytes(2, 2));

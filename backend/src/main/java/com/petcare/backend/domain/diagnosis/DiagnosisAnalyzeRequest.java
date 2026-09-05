@@ -21,7 +21,9 @@ public record DiagnosisAnalyzeRequest(
         @Size(max = 100) String customAreaText,
         @NotEmpty @Size(max = 20) List<@NotBlank @Size(max = 100) String> symptoms,
         @NotBlank @Size(max = 2000) String description,
-        Map<String, Object> healthProfile
+        Map<String, Object> healthProfile,
+        @NotBlank @Pattern(regexp = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+        String idempotencyKey
 ) {
     public DiagnosisAnalyzeRequest {
         petName = petName == null || petName.isBlank() ? "반려동물" : petName;

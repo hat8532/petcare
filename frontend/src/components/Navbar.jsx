@@ -20,7 +20,7 @@ export default function Navbar({
   const [showPetRegisterModal, setShowPetRegisterModal] = useState(false);
 
   const handleLogout = async () => {
-    await authApi.logout();
+    if (!await authApi.logout()) return;
     if (onUserChange) onUserChange(null);
   };
 

@@ -57,7 +57,7 @@ class DiagnosisServiceTest {
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
-                "붉은 부위를 계속 긁습니다.", Map.of()), pngImage(), "owner@example.com");
+                "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
 
         ArgumentCaptor<DiagnosisRecordDTO> captor = ArgumentCaptor.forClass(DiagnosisRecordDTO.class);
         verify(mapper).insert(captor.capture());
@@ -93,7 +93,7 @@ class DiagnosisServiceTest {
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "CAT", "SKIN", null, List.of("가려움/긁음"),
-                "구조 검증용 피부 증상 설명입니다.", Map.of()), pngImage(), "owner@example.com");
+                "구조 검증용 피부 증상 설명입니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
 
         ArgumentCaptor<DiagnosisAnalyzeRequest> trustedRequest = ArgumentCaptor.forClass(DiagnosisAnalyzeRequest.class);
         verify(visionInferenceClient).infer(trustedRequest.capture(), any(), any());
@@ -139,7 +139,7 @@ class DiagnosisServiceTest {
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
-                "붉은 부위를 계속 긁습니다.", Map.of()), pngImage(), "owner@example.com");
+                "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
 
         assertThat(response.analysisMode()).isEqualTo("GEMINI_RAG_PROTOTYPE");
         assertThat(response.ragReport())
@@ -166,7 +166,7 @@ class DiagnosisServiceTest {
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("통증/예민"),
-                "상처에서 피가 납니다.", Map.of()), pngImage(), "owner@example.com");
+                "상처에서 피가 납니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
 
         assertThat(response.riskLevel()).isEqualTo("EMERGENCY");
     }
@@ -190,7 +190,7 @@ class DiagnosisServiceTest {
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("통증/예민"),
-                "호흡 곤란과 청색증이 있습니다.", Map.of()), pngImage(), "owner@example.com");
+                "호흡 곤란과 청색증이 있습니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
 
         assertThat(response.riskLevel()).isEqualTo("EMERGENCY");
         assertThat(response.riskReasons()).contains("RED_FLAG_REPORTED");
@@ -219,7 +219,7 @@ class DiagnosisServiceTest {
 
         assertThatThrownBy(() -> service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
-                "붉은 부위를 계속 긁습니다.", Map.of()), pngImage(), "other@example.com"))
+                "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "other@example.com"))
                 .isInstanceOf(DiagnosisAccessException.class);
 
         verify(visionInferenceClient, never()).infer(any(), any(), any());
@@ -234,7 +234,7 @@ class DiagnosisServiceTest {
 
         assertThatThrownBy(() -> service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
-                "붉은 부위를 계속 긁습니다.", Map.of()), pngImage(), "owner@example.com"))
+                "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com"))
                 .isInstanceOf(IllegalStateException.class);
 
         verify(imageStorage).deleteQuietly("user-1/00000000-0000-0000-0000-000000000001.png");

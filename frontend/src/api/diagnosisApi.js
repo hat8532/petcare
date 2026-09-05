@@ -39,6 +39,7 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  *
  * @typedef {Object} DiagnosisAnalyzeRequest
  * @property {number} petId
+ * @property {string} idempotencyKey 동일 제출 재전송에 재사용하는 UUID
  * @property {string} petName
  * @property {string} petSpecies
  * @property {string} affectedArea

@@ -7,6 +7,7 @@ import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { before, after, test } from 'node:test';
 import { build } from 'vite';
+import { readFile, mkdir } from 'node:fs/promises';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const entry = `${root}tests/diagnosis-race-fixture.jsx`;
@@ -107,11 +108,13 @@ before(async () => {
   assert.equal(hospitalApiMocked, true, '실제 병원 API 대신 Mock이 연결돼야 한다');
   const outputs = (Array.isArray(bundle) ? bundle : [bundle]).flatMap(item => item.output);
   const script = outputs.find(item => item.type === 'chunk').code;
+  // 실제 디자인을 검증하되 외부 Font 다운로드는 하지 않는다.
+  const css = (await readFile(`${root}src/index.css`, 'utf8')).replace(/^@import .*$/gm, '');
   server = createServer((request, response) => {
     response.setHeader('Content-Type', request.url === '/fixture.js'
       ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8');
     response.end(request.url === '/fixture.js' ? script
-      : '<div id="root"></div><script src="/fixture.js"></script>');
+      : `<style>${css}</style><div id="root"></div><script src="/fixture.js"></script>`);
   }).listen(0, '127.0.0.1');
   await once(server, 'listening');
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -192,6 +195,64 @@ async function runAnalysis(page) {
 
 const resultIds = page => page.evaluate(() => window.results.map(result => result.diagnosisId));
 const detailButton = (page, id) => page.getByRole('button', { name: new RegExp('^#' + id + ' ·') });
+
+test('인쇄에도 진단·Pet·환부·생성 시각이 남고 인쇄 버튼은 숨겨진다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history([101]));
+  await detailButton(page, 101).click();
+  await settle(page, 'detail', { ...record(101), createdAt: '2026-09-05T12:34:00' });
+  const visualDir = process.env.DIAGNOSIS_VISUAL_DIR;
+  if (visualDir) {
+    await mkdir(visualDir, { recursive: true });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.screenshot({ path: `${visualDir}/diagnosis-desktop.png`, fullPage: true, animations: 'disabled' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.screenshot({ path: `${visualDir}/diagnosis-mobile.png`, fullPage: true, animations: 'disabled' });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  }
+  await page.emulateMedia({ media: 'print' });
+  const report = page.locator('#diagnosis-print-report');
+  assert.match(await report.innerText(), /진단 #101 · 반려동물 #1 \(테스트 Pet 1\) · 환부: 피부\/모피/);
+  assert.equal(await report.getByText(/2026.*12:34/).isVisible(), true);
+  assert.equal(await page.getByRole('button', { name: 'PDF 저장·인쇄' }).isVisible(), false);
+  if (visualDir) {
+    await page.pdf({ path: `${visualDir}/diagnosis-print.pdf`, format: 'A4', printBackground: true,
+      margin: { top: '12mm', bottom: '12mm', left: '12mm', right: '12mm' } });
+  }
+});
+
+test('전송 오류 재시도는 같은 Key, 저장된 Provider 실패의 새 분석은 다른 Key를 쓴다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await runAnalysis(page);
+  const key = await page.evaluate(() => window.requests.find(r => r.kind === 'analyze').args[0].idempotencyKey);
+  assert.match(key, /^[0-9a-f-]{36}$/);
+  await settle(page, 'analyze', '전송 실패', { reject: true });
+  await page.getByRole('button', { name: '다시 시도', exact: true }).click();
+  await page.waitForFunction(() => window.requests.filter(r => r.kind === 'analyze').length === 2);
+  assert.equal(await page.evaluate(() => window.requests.filter(r => r.kind === 'analyze')[1].args[0].idempotencyKey), key);
+  await settle(page, 'analyze', { ...record(102), failureCode: 'PROVIDER_UNAVAILABLE' });
+  await settle(page, 'history', history([102]));
+  await page.getByRole('button', { name: '다시 시도', exact: true }).click();
+  await page.waitForFunction(() => window.requests.filter(r => r.kind === 'analyze').length === 3);
+  assert.notEqual(await page.evaluate(() => window.requests.filter(r => r.kind === 'analyze')[2].args[0].idempotencyKey), key);
+});
+
+test('무시된 과거 성공이 진행 중인 같은 제출의 재시도 Key를 지우지 않는다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history([101]));
+  await runAnalysis(page);
+  const key = await page.evaluate(() => window.requests.find(r => r.kind === 'analyze').args[0].idempotencyKey);
+  await detailButton(page, 101).click();
+  await page.getByRole('button', { name: /AI 질병 진단 실행하기/ }).click();
+  await page.waitForFunction(() => window.requests.filter(r => r.kind === 'analyze').length === 2);
+  await settle(page, 'analyze', record(102));
+  await settle(page, 'analyze', '응답 유실', { reject: true });
+  await page.getByRole('button', { name: '다시 시도', exact: true }).click();
+  await page.waitForFunction(() => window.requests.filter(r => r.kind === 'analyze').length === 3);
+  assert.deepEqual(await page.evaluate(() => window.requests.filter(r => r.kind === 'analyze').map(r => r.args[0].idempotencyKey)), [key, key, key]);
+});
 
 test('Pet 전환 후 이전 생성 성공은 부모 결과·현재 이력을 바꾸지 않는다', async t => {
   const page = await openFixture(t);

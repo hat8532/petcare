@@ -178,6 +178,13 @@ CREATE TABLE IF NOT EXISTS diagnosis_records (
     report_content      TEXT,
     vision_result_json  TEXT,
     rag_report          TEXT,
+    idempotency_key     VARCHAR(36),
+    request_hash        VARCHAR(64),
+    CONSTRAINT diagnosis_owner_request_unique UNIQUE (user_id, idempotency_key),
+    CONSTRAINT diagnosis_request_pair_check CHECK (
+        (idempotency_key IS NULL AND request_hash IS NULL)
+        OR (idempotency_key IS NOT NULL AND request_hash IS NOT NULL AND user_id IS NOT NULL)
+    ),
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -88,6 +88,7 @@ export default function DiagnosisDropzone({
   // 생성·상세는 같은 결과 영역을, 목록은 별도 영역을 갱신하므로 순번을 나눠 관리한다.
   const resultRequestRef = useRef(0);
   const historyRequestRef = useRef(0);
+  const submissionRef = useRef(null);
   const closeAnalysisFailure = useCallback(() => setAnalysisFailure(null), []);
 
   useLayoutEffect(() => () => {
@@ -223,6 +224,20 @@ export default function DiagnosisDropzone({
       return;
     }
 
+    const payload = {
+      petId: selectedPet.id,
+      petName: selectedPet.name || '반려동물',
+      petSpecies: selectedPet.species || 'UNKNOWN',
+      affectedArea, customAreaText, symptoms: selectedSymptoms,
+      description: description.trim(), healthProfile: selectedPet.healthProfile
+    };
+    const fingerprint = JSON.stringify(payload);
+    // 응답 유실/Timeout은 같은 제출을 재전송한다. 입력 변경·완료 뒤 새 분석은 새 Key다.
+    if (!submissionRef.current || submissionRef.current.fingerprint !== fingerprint
+        || submissionRef.current.image !== imageFile) {
+      submissionRef.current = { fingerprint, image: imageFile, key: crypto.randomUUID() };
+    }
+    const submission = submissionRef.current;
     const requestId = ++resultRequestRef.current;
     setIsAnalyzing(true);
     setAnalysisResult(null);
@@ -230,19 +245,11 @@ export default function DiagnosisDropzone({
     setAnalysisFailure(null);
 
     try {
-      const result = await diagnosisApi.analyze({
-        petId: selectedPet.id,
-        petName: selectedPet.name || '반려동물',
-        petSpecies: selectedPet.species || 'UNKNOWN',
-        affectedArea,
-        customAreaText,
-        symptoms: selectedSymptoms,
-        description: description.trim(),
-        healthProfile: selectedPet.healthProfile
-      }, imageFile);
+      const result = await diagnosisApi.analyze({ ...payload, idempotencyKey: submission.key }, imageFile);
 
       if (requestId !== resultRequestRef.current) return;
       if (result.petId !== selectedPet.id) throw new Error('선택한 반려동물의 진단 결과가 아닙니다.');
+      if (submissionRef.current === submission) submissionRef.current = null;
       setAnalysisResult(result);
       onDiagnosisResult?.(result);
       await loadHistory(0);
@@ -323,11 +330,20 @@ export default function DiagnosisDropzone({
       <AiBenchmarkModal isOpen={isBenchmarkOpen} onClose={() => setIsBenchmarkOpen(false)} />
       <style>{`
         @media print {
-          body * { visibility: hidden !important; }
-          #diagnosis-print-report, #diagnosis-print-report * { visibility: visible !important; }
+          body { margin: 0 !important; min-height: 0 !important; background: white !important; }
+          body *:not(:has(#diagnosis-print-report)):not(#diagnosis-print-report):not(#diagnosis-print-report *) {
+            display: none !important;
+          }
+          body *:has(#diagnosis-print-report) {
+            display: block !important; position: static !important;
+            height: auto !important; min-height: 0 !important;
+            margin: 0 !important; padding: 0 !important;
+          }
+          #diagnosis-print-report, #diagnosis-print-report * { animation: none !important; transform: none !important; }
           #diagnosis-print-report {
-            position: absolute !important;
-            inset: 0 auto auto 0 !important;
+            display: block !important;
+            position: static !important;
+            min-height: 0 !important;
             width: 100% !important;
             box-shadow: none !important;
             border: 0 !important;
@@ -665,9 +681,9 @@ export default function DiagnosisDropzone({
                   <span className={`badge ${riskBadgeClass(analysisResult.riskLevel)}`} style={{ fontSize: '14px', padding: '6px 14px' }}>
                     위험도: {analysisResult.riskLabel}
                   </span>
-                  <div className="diagnosis-no-print" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <span style={{ color: '#64748b', fontSize: '12px' }}>{formatDate(analysisResult.createdAt)}</span>
-                    <button type="button" onClick={printDiagnosisReport} className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '12px' }}>
+                    <button type="button" onClick={printDiagnosisReport} className="btn btn-secondary diagnosis-no-print" style={{ padding: '7px 12px', fontSize: '12px' }}>
                       PDF 저장·인쇄
                     </button>
                   </div>
@@ -678,6 +694,12 @@ export default function DiagnosisDropzone({
                     ? 'AI Image 의심 소견 안내'
                     : '진단 분석 결과 리포트'}
                 </h3>
+
+                <p style={{ marginBottom: '12px', color: '#64748b', fontSize: '12px', overflowWrap: 'anywhere' }}>
+                  진단 #{analysisResult.diagnosisId} · 반려동물 #{analysisResult.petId}
+                  {analysisResult.petId === selectedPet?.id && selectedPet.name ? ` (${selectedPet.name})` : ''}
+                  {' · 환부: '}{AREA_OPTIONS.find(area => area.id === analysisResult.affectedArea)?.label || analysisResult.affectedArea}
+                </p>
 
                 <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '10px', fontSize: '12px', color: '#475569' }}>
                   <strong>분석 Mode:</strong> {analysisResult.analysisMode || 'UNKNOWN'}

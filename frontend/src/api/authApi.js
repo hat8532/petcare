@@ -25,18 +25,25 @@ export const authApi = Object.freeze({
   },
 
   logout: async () => {
+    const session = sessionStorage.capture();
+    let ended = false;
     try {
-      await httpClient.post('/auth/logout');
+      await httpClient.post('/auth/logout', undefined, { retryOnUnauthorized: false });
     } catch (error) {
       console.warn('Logout request warning:', error);
     } finally {
-      sessionStorage.clear();
+      if (sessionStorage.isCurrent(session)) {
+        sessionStorage.clear();
+        ended = true;
+      }
     }
+    return ended;
   },
 
   withdraw: async () => {
+    const session = sessionStorage.capture();
     const data = await httpClient.post('/auth/withdraw');
-    sessionStorage.clear();
+    if (sessionStorage.isCurrent(session)) sessionStorage.clear();
     return data;
   },
 

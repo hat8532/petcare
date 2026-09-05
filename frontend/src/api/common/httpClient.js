@@ -7,7 +7,20 @@ const USER_KEY = 'petcare_user';
 
 export const AUTH_EXPIRED_EVENT = 'petcare:auth-expired';
 
+let sessionVersion = 0;
+const captureSession = () => ({ version: sessionVersion, user: localStorage.getItem(USER_KEY) });
+const isCurrentSession = (session) => session.version === sessionVersion
+  && session.user === localStorage.getItem(USER_KEY);
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === null || [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY].includes(event.key)) {
+      sessionVersion++;
+    }
+  });
+}
+
 const clearSession = () => {
+  sessionVersion++;
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
@@ -41,23 +54,30 @@ export class HttpClientError extends Error {
   }
 }
 
-let refreshPromise = null;
+let refreshOperation = null;
 
-const refreshAccessToken = async () => {
+const refreshAccessToken = async (session) => {
+  if (!isCurrentSession(session)) return null;
   const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
   if (!refreshToken) {
     clearSession();
     return null;
   }
 
-  if (!refreshPromise) {
-    refreshPromise = fetch(`${API_BASE_URL}/auth/refresh`, {
+  if (!refreshOperation || !isCurrentSession(refreshOperation.session)
+      || refreshOperation.refreshToken !== refreshToken) {
+    const operation = { session, refreshToken };
+    refreshOperation = operation;
+    const stillCurrent = () => isCurrentSession(session)
+      && localStorage.getItem(REFRESH_TOKEN_KEY) === refreshToken;
+    operation.promise = fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken })
     })
       .then(async (response) => {
         const body = await readResponseBody(response);
+        if (!stillCurrent()) return null;
         if (!response.ok || !body?.accessToken) {
           clearSession();
           return null;
@@ -67,15 +87,15 @@ const refreshAccessToken = async () => {
         return body.accessToken;
       })
       .catch(() => {
-        clearSession();
+        if (stillCurrent()) clearSession();
         return null;
       })
       .finally(() => {
-        refreshPromise = null;
+        if (refreshOperation === operation) refreshOperation = null;
       });
   }
 
-  return refreshPromise;
+  return refreshOperation.promise;
 };
 
 const request = async (endpoint, options = {}) => {
@@ -86,28 +106,38 @@ const request = async (endpoint, options = {}) => {
     headers: additionalHeaders,
     ...fetchOptions
   } = options;
+  const session = captureSession();
   const requestAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...fetchOptions,
     headers: createHeaders(additionalHeaders, auth)
   });
 
+  if (auth && !isCurrentSession(session)) {
+    throw new HttpClientError('로그인 상태가 변경되었습니다. 다시 요청해 주세요.', 401);
+  }
   if (response.status === 401 && auth && retryOnUnauthorized) {
-    const newAccessToken = await refreshAccessToken();
-    if (newAccessToken) {
+    // 같은 세션의 다른 요청이 이미 갱신했다면 다시 Refresh하지 않는다.
+    const currentToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const newAccessToken = currentToken && currentToken !== requestAccessToken
+      ? currentToken : await refreshAccessToken(session);
+    if (newAccessToken && isCurrentSession(session)) {
       return request(endpoint, { ...options, retryOnUnauthorized: false });
     }
   }
 
   // 갱신 후에도 거절된 세션만 종료한다. 늦은 401로 새 Login/갱신 Token을 지우지 않는다.
   if (response.status === 401 && auth && !retryOnUnauthorized
-      && requestAccessToken === localStorage.getItem(ACCESS_TOKEN_KEY)) {
+      && isCurrentSession(session) && requestAccessToken === localStorage.getItem(ACCESS_TOKEN_KEY)) {
     clearSession();
   }
 
   const responseBody = response.ok && responseType === 'blob'
     ? await response.blob()
     : await readResponseBody(response);
+  if (auth && response.ok && !isCurrentSession(session)) {
+    throw new HttpClientError('로그인 상태가 변경되었습니다. 다시 요청해 주세요.', 401);
+  }
   if (!response.ok) {
     throw new HttpClientError(
       responseBody?.message || `API 요청에 실패했습니다. (${response.status})`,
@@ -140,4 +170,15 @@ export const httpClient = Object.freeze({
   delete: (endpoint, options) => request(endpoint, { ...options, method: 'DELETE' })
 });
 
-export const sessionStorage = Object.freeze({ clear: clearSession });
+export const sessionStorage = Object.freeze({
+  clear: clearSession,
+  capture: captureSession,
+  isCurrent: isCurrentSession,
+  save: ({ accessToken, refreshToken, user }) => {
+    sessionVersion++;
+    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    else localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+});

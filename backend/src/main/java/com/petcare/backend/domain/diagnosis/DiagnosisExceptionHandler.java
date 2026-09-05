@@ -13,6 +13,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice(assignableTypes = {DiagnosisController.class, PetDiagnosisController.class})
 public class DiagnosisExceptionHandler {
 
+    @ExceptionHandler(DiagnosisConflictException.class)
+    public ResponseEntity<DiagnosisApiResponse<Void>> handleConflict(DiagnosisConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(DiagnosisApiResponse.error(409, exception.getMessage()));
+    }
+
     @ExceptionHandler(DiagnosisNotFoundException.class)
     public ResponseEntity<DiagnosisApiResponse<Void>> handleNotFound(DiagnosisNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

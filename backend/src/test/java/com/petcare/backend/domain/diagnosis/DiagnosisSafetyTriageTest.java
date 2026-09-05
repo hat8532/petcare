@@ -107,6 +107,6 @@ class DiagnosisSafetyTriageTest {
 
     private DiagnosisAnalyzeRequest request(String area, List<String> symptoms, String description) {
         return new DiagnosisAnalyzeRequest(
-                1L, "초코", "DOG", area, null, symptoms, description, Map.of());
+                1L, "초코", "DOG", area, null, symptoms, description, Map.of(), "00000000-0000-0000-0000-000000000001");
     }
 }

@@ -292,7 +292,7 @@ export default function App() {
             pets={pets}
             onUserUpdated={(updatedUser) => setUser(updatedUser)}
             onLogout={async () => {
-              await authApi.logout();
+              if (!await authApi.logout()) return;
               setUser(null);
               setActiveTab('home');
             }}

@@ -41,16 +41,21 @@ before(async () => {
         }
         if (id !== entry) return;
         return String.raw`
-          import React from 'react';
+          import React, { useState } from 'react';
           import { createRoot } from 'react-dom/client';
           import App from '../src/App.jsx';
-          import { httpClient } from '../src/api/common/httpClient.js';
+          import LiveLoginPage from '../src/components/LoginPage.jsx';
+          import { httpClient, sessionStorage } from '../src/api/common/httpClient.js';
+          import { authApi } from '../src/api/authApi.js';
+          window.fixtureSession = sessionStorage;
+          window.fixtureAuth = authApi;
           window.observed = {};
           window.pendingPets = [];
           window.pendingHttp = [];
           window.httpResults = {};
           window.fetchCalls = [];
           window.expiredEvents = 0;
+          window.loginResults = [];
           window.refreshSucceeds = false;
           window.addEventListener('petcare:auth-expired', () => window.expiredEvents++);
           const json = (body, status = 200) => new Response(JSON.stringify(body), {
@@ -67,7 +72,7 @@ before(async () => {
                 path, settle: (data, status = 200) => resolve(json({ data }, status))
               }));
             }
-            if (path === '/api/v1/fixture-controlled') return pending(path);
+            if (['/api/v1/fixture-controlled', '/api/v1/auth/logout', '/api/v1/auth/login'].includes(path)) return pending(path);
             if (path === '/api/v1/auth/refresh') {
               if (window.deferRefresh) return pending(path);
               return window.refreshSucceeds
@@ -92,9 +97,20 @@ before(async () => {
           };
           const app = createRoot(document.getElementById('root'));
           window.unmountApp = () => app.unmount();
+          function LoginFixture() {
+            const [revision, setRevision] = useState(0);
+            const [visible, setVisible] = useState(true);
+            window.replaceLogin = () => setRevision(value => value + 1);
+            window.hideLogin = () => setVisible(false);
+            return visible && React.createElement(LiveLoginPage, {
+              key: revision, isOpen: true, isEmbeddedPage: true,
+              onLoginSuccess: user => window.loginResults.push(user.id)
+            });
+          }
           app.render(React.createElement(
             new URLSearchParams(location.search).has('strict') ? React.StrictMode : React.Fragment,
-            null, React.createElement(App)
+            null, React.createElement(App),
+            new URLSearchParams(location.search).has('live-login') && React.createElement(LoginFixture)
           ));
         `;
       }
@@ -104,7 +120,7 @@ before(async () => {
   const outputs = (Array.isArray(bundle) ? bundle : [bundle]).flatMap(item => item.output);
   const code = outputs.find(item => item.type === 'chunk').code;
   server = createServer((request, response) => {
-    response.setHeader('Content-Type', request.url === '/fixture.js' ? 'text/javascript' : 'text/html');
+    response.setHeader('Content-Type', request.url === '/fixture.js' ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8');
     response.end(request.url === '/fixture.js' ? code : '<div id="root"></div><script src="/fixture.js"></script>');
   }).listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -116,7 +132,7 @@ after(async () => {
   if (server) await new Promise(resolve => server.close(resolve));
 });
 
-async function open(t, strict = false) {
+async function open(t, strict = false, liveLogin = false) {
   const page = await browser.newPage();
   page.setDefaultTimeout(3000);
   const errors = [];
@@ -127,7 +143,7 @@ async function open(t, strict = false) {
     return route.abort();
   });
   t.after(async () => { await page.close(); assert.deepEqual(errors, []); });
-  await page.goto(baseUrl + (strict ? '/?strict' : '/'));
+  await page.goto(baseUrl + '/?' + new URLSearchParams({ ...(strict ? { strict: '' } : {}), ...(liveLogin ? { 'live-login': '' } : {}) }));
   await page.waitForFunction(count => window.pendingPets.length === count, strict ? 2 : 1);
   await page.evaluate(() => window.observed.Navbar.setActiveTab('diagnosis'));
   await page.waitForFunction(() => window.observed.DiagnosisDropzone);
@@ -165,6 +181,94 @@ async function httpResult(page, key = 'request') {
   await page.waitForFunction(key => window.httpResults[key], key);
   return page.evaluate(key => window.httpResults[key], key);
 }
+
+test('실제 LoginPage: 종료된 A 로그인 응답은 재진입한 B 세션을 덮어쓰지 않는다', async t => {
+  const page = await open(t, false, true);
+  await page.getByPlaceholder('user@petcare.com').fill('a@fixture.test');
+  await page.locator('input[type="password"]').fill('Fixture123!');
+  await page.locator('button[type="submit"]').click();
+  await page.waitForFunction(() => window.pendingHttp.length === 1);
+  await page.evaluate(() => window.replaceLogin());
+  await flush(page);
+  await page.getByPlaceholder('user@petcare.com').fill('b@fixture.test');
+  await page.locator('input[type="password"]').fill('Fixture123!');
+  await page.locator('button[type="submit"]').click();
+  await settleHttp(page, 1, { accessToken: 'b-token', user: { id: 2 } });
+  await settleHttp(page, 0, { accessToken: 'a-token', user: { id: 1 } });
+  assert.deepEqual(await page.evaluate(() => window.loginResults), [2]);
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), 'b-token');
+});
+
+test('실제 LoginPage: 화면 종료 후 로그인 성공은 저장과 부모 Callback을 실행하지 않는다', async t => {
+  const page = await open(t, false, true);
+  await page.getByPlaceholder('user@petcare.com').fill('a@fixture.test');
+  await page.locator('input[type="password"]').fill('Fixture123!');
+  await page.locator('button[type="submit"]').click();
+  await page.evaluate(() => window.hideLogin());
+  await settleHttp(page, 0, { accessToken: 'stale-token', user: { id: 2 } });
+  assert.deepEqual(await page.evaluate(() => window.loginResults), []);
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), 'fixture-access-token');
+});
+
+for (const [label, body, status, reject] of [
+  ['성공', { accessToken: 'stale-token', refreshToken: 'stale-refresh' }, 200, false],
+  ['거절', {}, 401, false],
+  ['통신 실패', {}, null, true]
+]) {
+  for (const nextSession of ['login', 'logout']) {
+    test(`이전 Refresh ${label}가 새 ${nextSession} 상태를 변경하지 않는다`, async t => {
+      const page = await open(t);
+      await page.evaluate(() => { window.deferRefresh = true; window.startRequest('request'); });
+      await settleHttp(page, 0, {}, 401);
+      await page.evaluate(next => {
+        if (next === 'login') window.fixtureSession.save({ accessToken: 'new-token', user: { id: 2 } });
+        else window.fixtureSession.clear();
+      }, nextSession);
+      const before = await page.evaluate(() => ({ storage: { ...localStorage }, events: window.expiredEvents }));
+      await settleHttp(page, 1, body, status, reject);
+      assert.equal((await httpResult(page)).status, 401);
+      assert.deepEqual(await page.evaluate(() => ({ storage: { ...localStorage }, events: window.expiredEvents })), before);
+      assert.equal(await page.evaluate(() => window.pendingHttp.length), 2, '새 계정으로 이전 요청을 재전송하지 않는다');
+    });
+  }
+}
+
+test('새 로그인 이후 도착한 최초 401은 새 Refresh를 사용하지 않는다', async t => {
+  const page = await open(t);
+  await page.evaluate(() => {
+    window.startRequest('request');
+    window.fixtureSession.save({ accessToken: 'new-token', refreshToken: 'new-refresh', user: { id: 2 } });
+  });
+  await settleHttp(page, 0, {}, 401);
+  assert.equal((await httpResult(page)).status, 401);
+  assert.equal(await page.evaluate(() => window.fetchCalls.filter(p => p.endsWith('/refresh')).length), 0);
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), 'new-token');
+});
+
+test('같은 사용자 재로그인도 이전 Refresh를 무효화하고 없는 Refresh Token을 제거한다', async t => {
+  const page = await open(t);
+  await page.evaluate(() => { window.deferRefresh = true; window.startRequest('request'); });
+  await settleHttp(page, 0, {}, 401);
+  await page.evaluate(() => window.fixtureSession.save({
+    accessToken: 'new-token', user: JSON.parse(localStorage.getItem('petcare_user'))
+  }));
+  await settleHttp(page, 1, { accessToken: 'stale-token', refreshToken: 'stale-refresh' });
+  assert.equal((await httpResult(page)).status, 401);
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), 'new-token');
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_refresh_token')), null);
+});
+
+test('늦은 Logout 완료는 새 세션을 지우지 않고 UI 종료 여부를 false로 반환한다', async t => {
+  const page = await open(t);
+  await page.evaluate(() => {
+    window.fixtureAuth.logout().then(ended => { window.logoutEnded = ended; });
+    window.fixtureSession.save({ accessToken: 'new-token', user: { id: 2 } });
+  });
+  await settleHttp(page, 0, {});
+  await page.waitForFunction(() => window.logoutEnded !== undefined);
+  assert.equal(await page.evaluate(() => window.logoutEnded), false);
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), 'new-token');
+});
 
 test('갱신 실패: 기존 Pet·진단·저장된 세션을 정리한다', async t => {
   const page = await open(t);
