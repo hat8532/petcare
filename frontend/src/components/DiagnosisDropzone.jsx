@@ -31,7 +31,7 @@ const FAILURE_GUIDANCE = Object.freeze({
 });
 
 const failureGuidance = (failureCode) => FAILURE_GUIDANCE[failureCode]
-  || '외부 Image 분석 Provider 응답을 검증하지 못해 입력 기반 Safety Triage만 저장했습니다.';
+  || '외부 Image 분석 Provider 응답을 검증하지 못해 AI 소견을 제공하지 못했습니다.';
 
 const ACTION_TITLES = Object.freeze({
   MONITOR_AND_RECORD: '집에서 경과 기록',
@@ -251,6 +251,7 @@ export default function DiagnosisDropzone({
       if (result.riskLevel !== 'EMERGENCY' && result.failureCode) {
         setAnalysisFailure({
           code: result.failureCode,
+          diagnosisId: result.diagnosisId,
           message: failureGuidance(result.failureCode),
           canRetry: RETRYABLE_FAILURE_CODES.has(result.failureCode)
         });
@@ -694,6 +695,7 @@ export default function DiagnosisDropzone({
                           type="button"
                           onClick={() => setAnalysisFailure({
                             code: analysisResult.failureCode,
+                            diagnosisId: analysisResult.diagnosisId,
                             message: failureGuidance(analysisResult.failureCode),
                             canRetry: Boolean(imageFile)
                               && RETRYABLE_FAILURE_CODES.has(analysisResult.failureCode)

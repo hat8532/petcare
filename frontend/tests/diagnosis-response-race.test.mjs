@@ -131,14 +131,14 @@ async function openFixture(t, strict = false) {
   return page;
 }
 
-async function settle(page, kind, value, { index = 0, reject = false } = {}) {
+async function settle(page, kind, value, { index = 0, reject = false, status } = {}) {
   await page.waitForFunction(({ kind, index }) =>
     window.requests.filter(request => request.kind === kind && !request.settled)[index], { kind, index });
-  await page.evaluate(async ({ kind, value, index, reject }) => {
+  await page.evaluate(async ({ kind, value, index, reject, status }) => {
     const request = window.requests.filter(r => r.kind === kind && !r.settled)[index];
     if (!request) throw new Error('대기 중인 Mock 요청 없음: ' + kind);
     request.settled = true;
-    if (reject) request.reject(new Error(value));
+    if (reject) request.reject(Object.assign(new Error(value), { status }));
     else if (kind === 'image') {
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 1;
@@ -152,7 +152,7 @@ async function settle(page, kind, value, { index = 0, reject = false } = {}) {
     else request.resolve(value);
     await new Promise(requestAnimationFrame);
     await new Promise(requestAnimationFrame);
-  }, { kind, value, index, reject });
+  }, { kind, value, index, reject, status });
 }
 
 async function runAnalysis(page) {
@@ -430,4 +430,80 @@ test('R04: A→B→A 이력 이동에서 이미 해제한 A 사진 URL을 재사
   await settle(page, 'image', 102);
   assert.deepEqual((await imageEntries(page)).map(item => item.diagnosisId), [101, 101]);
   assert.equal(await resultImage(page).getAttribute('src'), (await imageEntries(page))[1].url);
+});
+
+const savedNotice = '입력 기반 Safety Triage 결과가 진단 이력에 저장되었습니다.';
+const unknownSaveNotice = '진단 결과의 저장 여부를 확인하지 못했습니다. 진단 이력을 확인해 주세요.';
+
+for (const status of [400, 401, 403, 500, 504, undefined]) {
+  test(`R05: ${status ? 'HTTP ' + status : 'Network'} 실패는 저장을 단정하지 않고 기존 재시도 정책을 유지한다`, async t => {
+    const page = await openFixture(t);
+    await settle(page, 'history', history());
+    await runAnalysis(page);
+    await settle(page, 'analyze', '요청 실패', { reject: true, status });
+    const dialog = page.getByRole('alertdialog');
+    assert.equal(await dialog.getByText(/저장했습니다|저장되었습니다/).count(), 0);
+    assert.ok((await dialog.textContent()).includes(unknownSaveNotice));
+    assert.equal(await dialog.getByRole('button', { name: '다시 시도', exact: true }).count(), !status || status >= 500 ? 1 : 0);
+    await dialog.getByRole('button', { name: '입력 화면으로 돌아가기', exact: true }).click();
+    assert.equal(await dialog.count(), 0);
+    assert.equal(await page.locator('#diagnosis-description').inputValue(), '회귀 검증용 입력입니다.');
+    assert.equal(await page.locator('#diagnosis-image').evaluate(input => input.files[0].name), 'fixture.png');
+    assert.deepEqual(await resultIds(page), []);
+  });
+}
+
+for (const [code, canRetry] of [['INFERENCE_TIMEOUT', true], ['RAG_NO_EVIDENCE', false], ['PROVIDER_REJECTED', false]]) {
+  test(`R05: 저장된 ${code} 결과는 재시도 가능 여부와 별개로 저장을 안내한다`, async t => {
+    const page = await openFixture(t);
+    await settle(page, 'history', history());
+    await runAnalysis(page);
+    await settle(page, 'analyze', record(103, 1, code));
+    await settle(page, 'history', history([103]));
+    const dialog = page.getByRole('alertdialog');
+    assert.ok((await dialog.textContent()).includes(savedNotice));
+    assert.ok(!(await dialog.textContent()).includes(unknownSaveNotice));
+    assert.equal(await dialog.getByRole('button', { name: '다시 시도', exact: true }).count(), canRetry ? 1 : 0);
+    if (code === 'PROVIDER_REJECTED') assert.ok((await dialog.textContent()).includes('새 Image를 선택'));
+    await dialog.getByRole('button', { name: '결과 화면 확인', exact: true }).click();
+    assert.deepEqual(await resultIds(page), [103]);
+  });
+}
+
+test('R05: 입력 사진이 없는 저장 이력의 재시도 안내에도 해당 기록의 저장 근거를 전달한다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await detailButton(page, 101).click();
+  await settle(page, 'detail', record(101, 1, 'INFERENCE_TIMEOUT'));
+  await page.getByRole('button', { name: '다시 시도 안내', exact: true }).click();
+  const dialog = page.getByRole('alertdialog');
+  assert.ok((await dialog.textContent()).includes(savedNotice));
+  assert.equal(await dialog.getByRole('button', { name: '다시 시도', exact: true }).count(), 0);
+  assert.equal(await dialog.getByRole('button', { name: '결과 화면 확인', exact: true }).count(), 1);
+});
+
+test('R05: 저장된 실패 결과에서 재시도한 요청이 거절되면 이전 저장 근거를 재사용하지 않는다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await runAnalysis(page);
+  await settle(page, 'analyze', record(103, 1, 'INFERENCE_TIMEOUT'));
+  await settle(page, 'history', history([103]));
+  await page.getByRole('alertdialog').getByRole('button', { name: '다시 시도', exact: true }).click();
+  await settle(page, 'analyze', '재시도 거절', { reject: true, status: 403 });
+  const dialog = page.getByRole('alertdialog');
+  assert.equal(await dialog.getByText(/저장했습니다|저장되었습니다/).count(), 0);
+  assert.ok((await dialog.textContent()).includes(unknownSaveNotice));
+  assert.equal(await dialog.getByRole('button', { name: '다시 시도', exact: true }).count(), 0);
+  assert.deepEqual(await resultIds(page), [103]);
+});
+
+test('R05: 유효한 진단 ID가 없는 분석 응답도 저장 완료로 안내하지 않는다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await runAnalysis(page);
+  await settle(page, 'analyze', record(0, 1, 'INFERENCE_TIMEOUT'));
+  await settle(page, 'history', history());
+  const dialog = page.getByRole('alertdialog');
+  assert.equal(await dialog.getByText(/저장했습니다|저장되었습니다/).count(), 0);
+  assert.ok((await dialog.textContent()).includes(unknownSaveNotice));
 });

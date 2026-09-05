@@ -53,6 +53,9 @@ export default function DiagnosisFailureDialog({ failure, isRetrying, onRetry, o
 
   if (!failure) return null;
 
+  // 재시도 가능 여부가 아니라 저장 응답의 진단 ID로 저장 완료 안내를 결정한다.
+  const hasSavedDiagnosis = Number.isInteger(failure.diagnosisId) && failure.diagnosisId > 0;
+
   return createPortal(
     <div
       role="alertdialog"
@@ -91,11 +94,14 @@ export default function DiagnosisFailureDialog({ failure, isRetrying, onRetry, o
           <p style={{ color: '#92400e', fontSize: '12px' }}>Failure code: {failure.code}</p>
         )}
         <p style={{ color: '#64748b', fontSize: '13px', lineHeight: 1.6 }}>
+          {hasSavedDiagnosis
+            ? '입력 기반 Safety Triage 결과가 진단 이력에 저장되었습니다. '
+            : '진단 결과의 저장 여부를 확인하지 못했습니다. 진단 이력을 확인해 주세요. '}
           {failure.canRetry
             ? '실패 상태에서는 질환명이나 확률을 임의로 생성하지 않습니다. 입력은 유지되며 사용자가 직접 다시 시도할 수 있습니다.'
             : failure.code === 'PROVIDER_REJECTED'
               ? '질환명이나 확률은 생성하지 않았습니다. 안내에 맞는 새 Image를 선택한 뒤 다시 실행해 주세요.'
-              : '실패 상태에서는 질환명이나 확률을 임의로 생성하지 않습니다. 입력 기반 Safety Triage 결과만 저장했습니다.'}
+              : '실패 상태에서는 질환명이나 확률을 임의로 생성하지 않습니다.'}
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '20px' }}>
           {failure.canRetry && (
@@ -110,7 +116,7 @@ export default function DiagnosisFailureDialog({ failure, isRetrying, onRetry, o
             </button>
           )}
           <button type="button" onClick={onClose} disabled={isRetrying} className="btn btn-secondary">
-            결과 화면 확인
+            {hasSavedDiagnosis ? '결과 화면 확인' : '입력 화면으로 돌아가기'}
           </button>
         </div>
       </div>
