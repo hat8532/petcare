@@ -9,6 +9,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,10 +17,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 class VisionInferenceClientTest {
 
     @Test
-    void readsValidatedRagPrototypeContract() throws Exception {
+    void fallbackDoesNotClaimTheImageWasNeverAnalyzed() {
+        VisionInferenceResult result = VisionInferenceResult.unavailable("INFERENCE_TIMEOUT", "request-timeout");
+
+        assertThat(result.limitations()).containsExactly(
+                "사용 가능한 AI 이미지 분석 결과를 확보하지 못했습니다. 위험도는 입력한 증상 규칙으로 계산했습니다.");
+        assertThat(result.predictions()).isEmpty();
+        assertThat(result.failureCode()).isEqualTo("INFERENCE_TIMEOUT");
+    }
+
+    @Test
+    void readsValidatedRagPrototypeAfterThePreviousTenSecondLimit() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/diagnoses/infer", exchange -> {
             exchange.getRequestBody().readAllBytes();
+            try {
+                // 이전 10초 설정에서는 실패하던 지연 응답을 실제 로컬 HTTP로 확인한다.
+                TimeUnit.SECONDS.sleep(11);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                exchange.close();
+                return;
+            }
             byte[] response = """
                     {
                       "mode":"GEMINI_RAG_PROTOTYPE",

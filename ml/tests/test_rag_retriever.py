@@ -1,6 +1,19 @@
 import json
 
+import pytest
+
 from app.rag_retriever import RagCorpusError, RagRetriever
+
+
+@pytest.mark.parametrize("raw", [None, [], "corpus", False, 1])
+def test_rejects_non_object_corpus_with_stable_failure_code(tmp_path, raw):
+    corpus_path = tmp_path / "invalid.json"
+    corpus_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(RagCorpusError) as failure:
+        RagRetriever(corpus_path).metadata()
+
+    assert failure.value.failure_code == "RAG_CORPUS_UNAVAILABLE"
 
 
 def write_corpus(path, documents):

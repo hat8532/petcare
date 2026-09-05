@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import os
@@ -145,12 +146,14 @@ class GeminiMultimodalAdapter:
         base_url: str = DEFAULT_BASE_URL,
         timeout_seconds: float = 15.0,
         transport: httpx.AsyncBaseTransport | None = None,
+        total_timeout_seconds: float = 30.0,
     ) -> None:
         self.api_key = api_key.strip()
         self.model = model.strip() or DEFAULT_MODEL
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.transport = transport
+        self.total_timeout_seconds = total_timeout_seconds
 
     @classmethod
     def from_environment(cls) -> "GeminiMultimodalAdapter":
@@ -179,6 +182,24 @@ class GeminiMultimodalAdapter:
         if not image_bytes or not evidence:
             raise GeminiAdapterError("INVALID_INPUT")
 
+        try:
+            return await asyncio.wait_for(
+                self._analyze(image_bytes, mime_type, species, affected_area, symptoms, description, evidence),
+                timeout=self.total_timeout_seconds,
+            )
+        except asyncio.TimeoutError as exception:
+            raise GeminiAdapterError("INFERENCE_TIMEOUT") from exception
+
+    async def _analyze(
+        self,
+        image_bytes: bytes,
+        mime_type: str,
+        species: str,
+        affected_area: str,
+        symptoms: str,
+        description: str,
+        evidence: list[RagEvidence],
+    ) -> GeminiAdapterResult:
         async with httpx.AsyncClient(
             timeout=self.timeout_seconds,
             transport=self.transport,
@@ -257,7 +278,10 @@ class GeminiMultimodalAdapter:
             payload = response.json()
             if not isinstance(payload, dict):
                 raise ValueError("provider response must be an object")
-            if payload.get("promptFeedback", {}).get("blockReason"):
+            feedback = payload.get("promptFeedback", {})
+            if not isinstance(feedback, dict):
+                raise ValueError("prompt feedback must be an object")
+            if feedback.get("blockReason"):
                 raise GeminiAdapterError("PROVIDER_REJECTED")
             return payload
         except GeminiAdapterError:

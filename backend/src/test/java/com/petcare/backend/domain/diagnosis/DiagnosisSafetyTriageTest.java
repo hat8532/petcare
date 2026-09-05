@@ -1,6 +1,8 @@
 package com.petcare.backend.domain.diagnosis;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.List;
 import java.util.Map;
@@ -10,6 +12,38 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DiagnosisSafetyTriageTest {
 
     private final DiagnosisSafetyTriage triage = new DiagnosisSafetyTriage();
+
+    @ParameterizedTest(name = "{0} → {1}")
+    @CsvSource({
+            "호흡이 없어요, EMERGENCY",
+            "호흡 없음, EMERGENCY",
+            "숨이 없어요, EMERGENCY",
+            "숨을 못 쉬어요, EMERGENCY",
+            "호흡 곤란은 없어요, OBSERVATION",
+            "발작은 없어요, OBSERVATION",
+            "경련이 없습니다., OBSERVATION",
+            "발작은 없지 않아요, EMERGENCY",
+            "발작이 없는 것 같아요, EMERGENCY",
+            "발작은 없어요?, EMERGENCY",
+            "발작은 없어요 ?, EMERGENCY",
+            "발작은 없어요 라고 확신할 수는 없어요., EMERGENCY",
+            "발작 없음 여부를 확인하지 못했습니다., EMERGENCY",
+            "호흡 곤란은 없어요 라고는 못하겠어요., EMERGENCY",
+            "호흡 곤란은 없어요. 하지만 호흡이 없어요, EMERGENCY",
+            "발작은 없어요. 지금은 발작이 있어요, EMERGENCY",
+            "발작은 없어요. 상처가 아파요, CAUTION"
+    })
+    void distinguishesAbsentBreathingFromNegatedSymptoms(
+            String description, DiagnosisSafetyTriage.RiskLevel expected) {
+        assertThat(triage.evaluate(request("SKIN", List.of("가려움/긁음"), description)).riskLevel())
+                .isEqualTo(expected);
+    }
+
+    @Test
+    void descriptionCannotNegateAnExplicitlySelectedSymptomAcrossFields() {
+        assertThat(triage.evaluate(request("SKIN", List.of("발작"), "없어요")).riskLevel())
+                .isEqualTo(DiagnosisSafetyTriage.RiskLevel.EMERGENCY);
+    }
 
     @Test
     void classifiesMildSkinObservationWithoutInventingTreatment() {

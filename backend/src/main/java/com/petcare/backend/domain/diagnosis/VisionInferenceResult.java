@@ -42,7 +42,7 @@ public record VisionInferenceResult(
                 null,
                 null,
                 List.of(),
-                List.of("승인된 Vision Model 결과가 아니며 Image는 형식 검증에만 사용됐습니다."),
+                List.of("사용 가능한 AI 이미지 분석 결과를 확보하지 못했습니다. 위험도는 입력한 증상 규칙으로 계산했습니다."),
                 failureCode,
                 requestId
         );

@@ -37,6 +37,84 @@ def provider_response(body, model_version=None):
     return httpx.Response(200, json=payload)
 
 
+@pytest.mark.parametrize("feedback", [None, [], "blocked", False, 1])
+def test_rejects_non_object_prompt_feedback_with_stable_failure_code(feedback):
+    adapter = GeminiMultimodalAdapter(
+        api_key="test-key",
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"promptFeedback": feedback})),
+    )
+
+    with pytest.raises(GeminiAdapterError) as failure:
+        asyncio.run(adapter.analyze(b"image", "image/jpeg", "DOG", "SKIN", "[]", "설명", EVIDENCE))
+
+    assert failure.value.failure_code == "INVALID_PROVIDER_RESPONSE"
+
+
+def test_total_deadline_covers_both_requests_and_cancels_pending_analysis():
+    request_count = 0
+    analysis_cancelled = False
+
+    async def handler(_request):
+        nonlocal request_count, analysis_cancelled
+        request_count += 1
+        try:
+            await asyncio.sleep(0.3)
+        except asyncio.CancelledError:
+            analysis_cancelled = request_count == 2
+            raise
+        if request_count == 1:
+            return provider_response({"imageSuitable": True, "reasonCode": "CLEAR_PET_SKIN_LESION"})
+        return provider_response({
+            "findings": [{"findingCode": "REDNESS", "confidence": 72.5}],
+            "relevantSourceIds": ["vet-source-1"],
+            "limitationCodes": ["SINGLE_IMAGE_ONLY"],
+        })
+
+    adapter = GeminiMultimodalAdapter(
+        api_key="test-key", timeout_seconds=1.0, total_timeout_seconds=0.5,
+        transport=httpx.MockTransport(handler),
+    )
+    with pytest.raises(GeminiAdapterError) as failure:
+        asyncio.run(adapter.analyze(b"image", "image/jpeg", "DOG", "SKIN", "[]", "설명", EVIDENCE))
+
+    assert failure.value.failure_code == "INFERENCE_TIMEOUT"
+    assert request_count == 2
+    assert analysis_cancelled
+
+
+def test_caller_cancellation_is_not_converted_to_provider_failure():
+    async def run():
+        started = asyncio.Event()
+        cancelled = asyncio.Event()
+
+        async def handler(_request):
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        adapter = GeminiMultimodalAdapter(api_key="test-key", transport=httpx.MockTransport(handler))
+        task = asyncio.create_task(adapter.analyze(b"image", "image/jpeg", "DOG", "SKIN", "[]", "설명", EVIDENCE))
+        await started.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert cancelled.is_set()
+
+    asyncio.run(run())
+
+
+def test_http_timeout_keeps_its_failure_code():
+    def handler(request):
+        raise httpx.ReadTimeout("test timeout", request=request)
+
+    adapter = GeminiMultimodalAdapter(api_key="test-key", transport=httpx.MockTransport(handler))
+    with pytest.raises(GeminiAdapterError) as failure:
+        asyncio.run(adapter.analyze(b"image", "image/jpeg", "DOG", "SKIN", "[]", "설명", EVIDENCE))
+    assert failure.value.failure_code == "INFERENCE_TIMEOUT"
+
+
 def test_sends_inline_image_and_validates_structured_response():
     captured_requests = []
 

@@ -89,8 +89,8 @@ public class DiagnosisService {
             diagnosisImageStorage.deleteQuietly(imageKey);
             throw exception;
         }
-        DiagnosisRecordDTO savedRecord = diagnosisRecordMapper.findByIdAndOwner(record.getId(), ownerEmail);
-        return DiagnosisResultResponse.from(savedRecord == null ? record : savedRecord, objectMapper);
+        // INSERT에서 DB가 만든 ID·시각을 함께 받으므로 저장 성공 뒤 SELECT 실패가 생기지 않는다.
+        return DiagnosisResultResponse.from(record, objectMapper);
     }
 
     public DiagnosisImageResource getDiagnosisImage(Long diagnosisId, String ownerEmail) {

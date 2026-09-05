@@ -49,7 +49,7 @@
           AND dr.user_id = u.id
     </select>
 
-    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id,createdAt" keyColumn="id,created_at">
         INSERT INTO diagnosis_records (
             user_id, pet_id, affected_area, symptoms_json, image_url, description,
             risk_level, risk_label, vision_result_json, rag_report
