@@ -86,6 +86,7 @@ const request = async (endpoint, options = {}) => {
     headers: additionalHeaders,
     ...fetchOptions
   } = options;
+  const requestAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...fetchOptions,
     headers: createHeaders(additionalHeaders, auth)
@@ -96,6 +97,12 @@ const request = async (endpoint, options = {}) => {
     if (newAccessToken) {
       return request(endpoint, { ...options, retryOnUnauthorized: false });
     }
+  }
+
+  // 갱신 후에도 거절된 세션만 종료한다. 늦은 401로 새 Login/갱신 Token을 지우지 않는다.
+  if (response.status === 401 && auth && !retryOnUnauthorized
+      && requestAccessToken === localStorage.getItem(ACCESS_TOKEN_KEY)) {
+    clearSession();
   }
 
   const responseBody = response.ok && responseType === 'blob'
