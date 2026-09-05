@@ -39,6 +39,19 @@ before(async () => {
           import DiagnosisDropzone from '../src/components/DiagnosisDropzone.jsx';
           window.requests = [];
           window.results = [];
+          window.objectUrls = [];
+          const createObjectURL = URL.createObjectURL.bind(URL);
+          const revokeObjectURL = URL.revokeObjectURL.bind(URL);
+          URL.createObjectURL = blob => {
+            const url = createObjectURL(blob);
+            window.objectUrls.push({ url, diagnosisId: blob.fixtureDiagnosisId ?? null, revoked: false });
+            return url;
+          };
+          URL.revokeObjectURL = url => {
+            const entry = window.objectUrls.find(item => item.url === url);
+            if (entry) entry.revoked = true;
+            revokeObjectURL(url);
+          };
           const pending = (kind, args) => new Promise((resolve, reject) => {
             window.requests.push({ kind, args, resolve, reject, settled: false });
           });
@@ -47,7 +60,7 @@ before(async () => {
             getHistoryByPet: (...args) => pending('history', args),
             getDiagnosis: (...args) => pending('detail', args),
             analyze: (...args) => pending('analyze', args),
-            getDiagnosisImage: async () => new Blob(['test'], { type: 'image/png' })
+            getDiagnosisImage: (...args) => pending('image', args)
           };
           const pets = [{ id: 1, name: '테스트 Pet 1', species: 'DOG' },
                         { id: 2, name: '테스트 Pet 2', species: 'CAT' }];
@@ -119,11 +132,23 @@ async function openFixture(t, strict = false) {
 }
 
 async function settle(page, kind, value, { index = 0, reject = false } = {}) {
+  await page.waitForFunction(({ kind, index }) =>
+    window.requests.filter(request => request.kind === kind && !request.settled)[index], { kind, index });
   await page.evaluate(async ({ kind, value, index, reject }) => {
     const request = window.requests.filter(r => r.kind === kind && !r.settled)[index];
     if (!request) throw new Error('대기 중인 Mock 요청 없음: ' + kind);
     request.settled = true;
     if (reject) request.reject(new Error(value));
+    else if (kind === 'image') {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext('2d');
+      context.fillStyle = value % 2 ? '#059669' : '#2563eb';
+      context.fillRect(0, 0, 1, 1);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      blob.fixtureDiagnosisId = value;
+      request.resolve(blob);
+    }
     else request.resolve(value);
     await new Promise(requestAnimationFrame);
     await new Promise(requestAnimationFrame);
@@ -285,4 +310,124 @@ test('다른 Pet의 생성 응답도 부모 결과로 전달하지 않는다', a
   await settle(page, 'analyze', record(103, 2));
   assert.deepEqual(await resultIds(page), []);
   assert.equal(await page.getByRole('alertdialog').getByText('선택한 반려동물의 진단 결과가 아닙니다.', { exact: true }).count(), 1);
+});
+
+const withImage = (id, imageUrl = `/api/v1/diagnosis/${id}/image`) => ({ ...record(id), imageUrl });
+const resultImage = page => page.getByRole('img', { name: '테스트 Pet 1의 진단 환부', exact: true });
+const imageEntries = page => page.evaluate(() => window.objectUrls.filter(item => item.diagnosisId !== null));
+
+test('R04: 분석 중 사진을 변경해도 조회 대기/실패 결과에 입력 Preview를 쓰지 않는다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await runAnalysis(page);
+  await page.locator('#diagnosis-image').setInputFiles({
+    name: 'changed.png', mimeType: 'image/png', buffer: Buffer.from('changed fixture')
+  });
+  await settle(page, 'analyze', withImage(103));
+  await settle(page, 'history', history([103]));
+  assert.equal(await page.getByRole('img', { name: '선택한 환부', exact: true }).count(), 1);
+  assert.equal(await resultImage(page).count(), 0, '결과 조회 대기에 새 입력 사진을 대신 표시하지 않는다');
+  await settle(page, 'image', '사진 조회 실패', { reject: true });
+  assert.equal(await resultImage(page).count(), 0);
+  assert.equal(await page.getByText('사진 조회 실패', { exact: true }).count(), 1);
+});
+
+test('R04: 저장 사진이 없는 생성 결과에도 입력 Preview를 대신 표시하지 않는다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await runAnalysis(page);
+  await settle(page, 'analyze', record(103));
+  await settle(page, 'history', history([103]));
+  assert.equal(await resultImage(page).count(), 0);
+  assert.equal(await page.evaluate(() => window.requests.filter(item => item.kind === 'image').length), 0);
+});
+
+test('R04: 새 이력 사진 대기/실패 동안 이전 결과 사진을 표시하지 않는다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await detailButton(page, 101).click();
+  await settle(page, 'detail', withImage(101));
+  await settle(page, 'image', 101);
+  await resultImage(page).evaluate(image => image.decode());
+  await detailButton(page, 102).click();
+  await settle(page, 'detail', withImage(102));
+  assert.equal(await resultImage(page).count(), 0);
+  assert.ok((await imageEntries(page))[0].revoked);
+  await settle(page, 'image', '새 이력 사진 조회 실패', { reject: true });
+  assert.equal(await resultImage(page).count(), 0);
+});
+
+test('R04: 같은 진단 ID라도 Image Reference가 바뀌면 이전 사진을 표시하지 않는다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await detailButton(page, 101).click();
+  await settle(page, 'detail', withImage(101, 'image-reference-a'));
+  await settle(page, 'image', 101);
+  await detailButton(page, 101).click();
+  await settle(page, 'detail', withImage(101, 'image-reference-b'));
+  assert.equal(await resultImage(page).count(), 0);
+  await settle(page, 'image', 101);
+  assert.equal(await resultImage(page).getAttribute('src'), (await imageEntries(page))[1].url);
+});
+
+test('R04: 저장 사진은 입력 제거와 분리하고 결과 전환/Unmount 때 해제한다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await runAnalysis(page);
+  await settle(page, 'analyze', withImage(103));
+  await settle(page, 'history', history());
+  await settle(page, 'image', 103);
+  const saved = (await imageEntries(page))[0];
+  await page.getByRole('button', { name: '선택한 Image 제거', exact: true }).click();
+  assert.equal(await resultImage(page).getAttribute('src'), saved.url);
+  assert.equal((await imageEntries(page))[0].revoked, false);
+  await detailButton(page, 102).click();
+  await settle(page, 'detail', withImage(102));
+  await settle(page, 'image', 102);
+  assert.equal((await imageEntries(page))[0].revoked, true);
+  assert.equal(await resultImage(page).getAttribute('src'), (await imageEntries(page))[1].url);
+  await page.evaluate(() => window.unmountFixture());
+  assert.ok((await imageEntries(page)).every(item => item.revoked));
+});
+
+test('R04: 이전 사진이 늦게 도착해도 현재 사진을 바꾸거나 URL을 만들지 않는다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await detailButton(page, 101).click();
+  await settle(page, 'detail', withImage(101));
+  await detailButton(page, 102).click();
+  await settle(page, 'detail', withImage(102));
+  await settle(page, 'image', 102, { index: 1 });
+  await settle(page, 'image', 101);
+  const entries = await imageEntries(page);
+  assert.deepEqual(entries.map(item => item.diagnosisId), [102]);
+  assert.equal(await resultImage(page).getAttribute('src'), entries[0].url);
+});
+
+test('R04: 사진 조회 중 화면이 종료되면 늦은 Blob의 URL을 만들지 않는다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await detailButton(page, 101).click();
+  await settle(page, 'detail', withImage(101));
+  await page.evaluate(() => window.unmountFixture());
+  await settle(page, 'image', 101);
+  assert.deepEqual(await imageEntries(page), []);
+});
+
+test('R04: A→B→A 이력 이동에서 이미 해제한 A 사진 URL을 재사용하지 않는다', async t => {
+  const page = await openFixture(t);
+  await settle(page, 'history', history());
+  await detailButton(page, 101).click();
+  await settle(page, 'detail', withImage(101));
+  await settle(page, 'image', 101);
+  await detailButton(page, 102).click();
+  await settle(page, 'detail', withImage(102));
+  await detailButton(page, 101).click();
+  await settle(page, 'detail', withImage(101));
+  assert.equal((await imageEntries(page))[0].revoked, true);
+  assert.equal(await resultImage(page).count(), 0);
+  await settle(page, 'image', 101, { index: 1 });
+  await settle(page, 'image', 102);
+  assert.deepEqual((await imageEntries(page)).map(item => item.diagnosisId), [101, 101]);
+  assert.equal(await resultImage(page).getAttribute('src'), (await imageEntries(page))[1].url);
 });

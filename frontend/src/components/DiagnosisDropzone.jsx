@@ -83,9 +83,7 @@ export default function DiagnosisDropzone({
   const [historyPage, setHistoryPage] = useState(0);
   const [historyMeta, setHistoryMeta] = useState({ totalElements: 0, totalPages: 0 });
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [previewDiagnosisId, setPreviewDiagnosisId] = useState(null);
-  const [storedImagePreview, setStoredImagePreview] = useState('');
-  const [storedImageError, setStoredImageError] = useState('');
+  const [storedImage, setStoredImage] = useState(null);
   const fileInputRef = useRef(null);
   // 생성·상세는 같은 결과 영역을, 목록은 별도 영역을 갱신하므로 순번을 나눠 관리한다.
   const resultRequestRef = useRef(0);
@@ -117,25 +115,27 @@ export default function DiagnosisDropzone({
   }, [imagePreview]);
 
   useEffect(() => {
-    if (!analysisResult?.diagnosisId || !analysisResult?.imageUrl) {
-      setStoredImagePreview('');
-      setStoredImageError('');
+    const diagnosisId = analysisResult?.diagnosisId;
+    const imageUrl = analysisResult?.imageUrl;
+    setStoredImage(null);
+    if (!diagnosisId || !imageUrl) {
       return undefined;
     }
 
     let active = true;
     let objectUrl = '';
-    diagnosisApi.getDiagnosisImage(analysisResult.diagnosisId)
+    diagnosisApi.getDiagnosisImage(diagnosisId)
       .then((blob) => {
         if (!active) return;
         objectUrl = URL.createObjectURL(blob);
-        setStoredImagePreview(objectUrl);
-        setStoredImageError('');
+        setStoredImage({ diagnosisId, imageUrl, objectUrl, error: '' });
       })
       .catch((error) => {
         if (!active) return;
-        setStoredImagePreview('');
-        setStoredImageError(error?.message || '저장된 진단 Image를 불러오지 못했습니다.');
+        setStoredImage({
+          diagnosisId, imageUrl, objectUrl: '',
+          error: error?.message || '저장된 진단 Image를 불러오지 못했습니다.'
+        });
       });
 
     return () => {
@@ -228,7 +228,6 @@ export default function DiagnosisDropzone({
     setAnalysisResult(null);
     setAnalysisError('');
     setAnalysisFailure(null);
-    setPreviewDiagnosisId(null);
 
     try {
       const result = await diagnosisApi.analyze({
@@ -245,7 +244,6 @@ export default function DiagnosisDropzone({
       if (requestId !== resultRequestRef.current) return;
       if (result.petId !== selectedPet.id) throw new Error('선택한 반려동물의 진단 결과가 아닙니다.');
       setAnalysisResult(result);
-      setPreviewDiagnosisId(result.diagnosisId);
       onDiagnosisResult?.(result);
       await loadHistory(0);
       if (requestId !== resultRequestRef.current) return;
@@ -285,7 +283,6 @@ export default function DiagnosisDropzone({
       setAnalysisResult(result);
       setAnalysisError('');
       setAnalysisFailure(null);
-      setPreviewDiagnosisId(null);
       onDiagnosisResult?.(result);
     } catch (error) {
       if (requestId !== resultRequestRef.current) return;
@@ -303,8 +300,12 @@ export default function DiagnosisDropzone({
   const findings = analysisResult?.visionTopDiseases || [];
   const ragSources = analysisResult?.ragSources || [];
   const isRagPrototype = analysisResult?.analysisMode === 'GEMINI_RAG_PROTOTYPE';
-  const resultImageUrl = storedImagePreview
-    || (analysisResult?.diagnosisId === previewDiagnosisId ? imagePreview : '');
+  // 입력 Preview는 바뀔 수 있으므로 결과에는 현재 진단에 결속된 저장 사진만 표시한다.
+  const resultImage = storedImage?.diagnosisId === analysisResult?.diagnosisId
+    && storedImage?.imageUrl === analysisResult?.imageUrl ? storedImage : null;
+  const resultImageUrl = resultImage?.objectUrl || '';
+  const storedImageError = resultImage ? resultImage.error
+    : analysisResult?.imageUrl ? '저장된 환부 Image를 불러오는 중입니다.' : '';
 
   const printDiagnosisReport = () => {
     window.print();
