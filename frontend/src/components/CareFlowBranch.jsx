@@ -57,6 +57,8 @@ export default function CareFlowBranch({ diagnosisResult, onNavigateTimeline, lo
   const [hospitalError, setHospitalError] = useState('');
   const modalRef = useRef(null);
   const primaryActionRef = useRef(null);
+  // Mount 전에 남은 번호는 과거 클릭이다. 현재 화면에서 새로 바뀐 요청만 한 번 처리한다.
+  const handledLookupRequestRef = useRef(lookupRequestId);
 
   useEffect(() => {
     setIsEmergencyModalOpen(isEmergency);
@@ -65,6 +67,8 @@ export default function CareFlowBranch({ diagnosisResult, onNavigateTimeline, lo
   }, [diagnosisResult?.diagnosisId, isEmergency]);
 
   useEffect(() => {
+    if (lookupRequestId === handledLookupRequestRef.current) return;
+    handledLookupRequestRef.current = lookupRequestId;
     if (lookupRequestId > 0 && diagnosisResult) {
       setIsEmergencyModalOpen(true);
     }

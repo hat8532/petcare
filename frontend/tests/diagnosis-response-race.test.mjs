@@ -17,6 +17,7 @@ let baseUrl;
 before(async () => {
   const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
   let apiMocked = false;
+  let hospitalApiMocked = false;
   const bundle = await build({
     configFile: false, root, logLevel: 'silent',
     define: { 'process.env.NODE_ENV': JSON.stringify('development') },
@@ -29,14 +30,26 @@ before(async () => {
           apiMocked = true;
           return '\0diagnosis-mock';
         }
+        if (importer?.endsWith('/CareFlowBranch.jsx') && source === '../api/hospitalApi') {
+          hospitalApiMocked = true;
+          return '\0hospital-mock';
+        }
       },
       load(id) {
         if (id === '\0diagnosis-mock') return 'export const diagnosisApi = new Proxy({}, { get: (_, key) => (...args) => window.testApi[key](...args) });';
+        if (id === '\0hospital-mock') return 'export const hospitalApi = { getNearbyHospitals: async () => { throw new Error("이 Test에서는 병원 조회를 실행하지 않습니다."); } };';
         if (id !== entry) return;
         return `
           import React, { useState } from 'react';
           import { createRoot } from 'react-dom/client';
           import DiagnosisDropzone from '../src/components/DiagnosisDropzone.jsx';
+          import CareFlowBranch from '../src/components/CareFlowBranch.jsx';
+          const params = new URLSearchParams(location.search);
+          const withCareFlow = params.has('care');
+          window.geolocationCalls = 0;
+          Object.defineProperty(navigator, 'geolocation', { value: {
+            getCurrentPosition: () => { window.geolocationCalls++; throw new Error('실제 위치 조회 금지'); }
+          }});
           window.requests = [];
           window.results = [];
           window.objectUrls = [];
@@ -66,16 +79,24 @@ before(async () => {
                         { id: 2, name: '테스트 Pet 2', species: 'CAT' }];
           function Fixture() {
             const [pet, setPet] = useState(pets[0]);
+            const [care, setCare] = useState({ result: null, requestId: 0, visible: true });
+            window.updateCare = patch => setCare(current => ({ ...current, ...patch }));
             window.switchPet = id => setPet(pets.find(p => p.id === id));
-            return React.createElement(DiagnosisDropzone, {
+            return React.createElement(React.Fragment, null, React.createElement(DiagnosisDropzone, {
               key: pet.id, selectedPet: pet, pets, isAuthenticated: true,
-              onSelectPet: setPet, onDiagnosisResult: result => window.results.push(result)
-            });
+              onSelectPet: setPet, onDiagnosisResult: result => {
+                window.results.push(result);
+                if (withCareFlow) setCare(current => ({ ...current, result }));
+              },
+              onOpenCareFlow: result => setCare(current => ({ ...current, result, requestId: current.requestId + 1 }))
+            }), withCareFlow && care.visible && React.createElement(CareFlowBranch, {
+              diagnosisResult: care.result, lookupRequestId: care.requestId
+            }));
           }
           const app = createRoot(document.getElementById('root'));
           window.unmountFixture = () => app.unmount();
           app.render(React.createElement(
-            location.search ? React.StrictMode : React.Fragment, null, React.createElement(Fixture)
+            params.has('strict') ? React.StrictMode : React.Fragment, null, React.createElement(Fixture)
           ));
         `;
       }
@@ -83,6 +104,7 @@ before(async () => {
     build: { write: false, minify: false, lib: { entry, formats: ['iife'], name: 'DiagnosisRaceFixture' } }
   });
   assert.equal(apiMocked, true, '실제 API 대신 Mock이 연결돼야 한다');
+  assert.equal(hospitalApiMocked, true, '실제 병원 API 대신 Mock이 연결돼야 한다');
   const outputs = (Array.isArray(bundle) ? bundle : [bundle]).flatMap(item => item.output);
   const script = outputs.find(item => item.type === 'chunk').code;
   server = createServer((request, response) => {
@@ -113,7 +135,7 @@ const history = (ids = [101, 102], page = 0) => ({
   content: ids.map(id => record(id)), page, totalElements: 10, totalPages: 2
 });
 
-async function openFixture(t, strict = false) {
+async function openFixture(t, strict = false, care = false) {
   const page = await browser.newPage();
   page.setDefaultTimeout(3000);
   t.after(() => page.close());
@@ -126,7 +148,10 @@ async function openFixture(t, strict = false) {
     errors.push('허용되지 않은 외부 요청');
     return route.abort();
   });
-  await page.goto(`${baseUrl}/${strict ? '?strict' : ''}`);
+  const query = new URLSearchParams();
+  if (strict) query.set('strict', '');
+  if (care) query.set('care', '');
+  await page.goto(`${baseUrl}/?${query}`);
   await page.waitForFunction(() => window.requests?.some(r => r.kind === 'history'));
   return page;
 }
@@ -506,4 +531,99 @@ test('R05: 유효한 진단 ID가 없는 분석 응답도 저장 완료로 안�
   const dialog = page.getByRole('alertdialog');
   assert.equal(await dialog.getByText(/저장했습니다|저장되었습니다/).count(), 0);
   assert.ok((await dialog.textContent()).includes(unknownSaveNotice));
+});
+
+async function updateCare(page, patch) {
+  await page.evaluate(async patch => {
+    window.updateCare(patch);
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+  }, patch);
+  assert.equal(await page.evaluate(() => window.geolocationCalls), 0, 'Modal 개방만으로 위치를 조회하지 않는다');
+}
+
+const hospitalDialog = page => page.getByRole('dialog');
+const closeHospital = page => hospitalDialog(page).getByRole('button', { name: '결과 계속 확인', exact: true }).click();
+
+for (const strict of [false, true]) {
+  test(`R06: ${strict ? 'StrictMode' : '일반'}에서 이전 요청은 결과 교체/재조회로 재실행하지 않고 새 클릭만 처리한다`, async t => {
+    const page = await openFixture(t, strict, true);
+    await updateCare(page, { result: record(101) });
+    assert.equal(await hospitalDialog(page).count(), 0);
+    await updateCare(page, { requestId: 1 });
+    assert.equal(await hospitalDialog(page).count(), 1);
+    await closeHospital(page);
+    await updateCare(page, { result: record(102) });
+    assert.equal(await hospitalDialog(page).count(), 0);
+    await updateCare(page, { requestId: 2 });
+    await closeHospital(page);
+    await updateCare(page, { result: record(102) });
+    assert.equal(await hospitalDialog(page).count(), 0, '같은 ID의 새 응답 객체도 과거 요청이 아니다');
+    await updateCare(page, { requestId: 3, result: record(103) });
+    assert.equal(await hospitalDialog(page).count(), 1, '새 결과와 새 클릭이 함께 와도 처리한다');
+  });
+}
+
+test('R06: 결과가 없을 때 들어온 요청을 나중에 다른 Pet 결과에 재생하지 않는다', async t => {
+  const page = await openFixture(t, false, true);
+  await updateCare(page, { requestId: 1 });
+  assert.equal(await hospitalDialog(page).count(), 0);
+  await updateCare(page, { result: record(201, 2) });
+  assert.equal(await hospitalDialog(page).count(), 0);
+  await updateCare(page, { requestId: 2 });
+  assert.equal(await hospitalDialog(page).count(), 1);
+  await updateCare(page, { result: null });
+  assert.equal(await hospitalDialog(page).count(), 0);
+});
+
+test('R06: 진단 탭 재Mount는 과거 클릭을 재생하지 않고 새 클릭은 열 수 있다', async t => {
+  const page = await openFixture(t, true, true);
+  await updateCare(page, { result: record(101), requestId: 1 });
+  await closeHospital(page);
+  await updateCare(page, { visible: false });
+  await updateCare(page, { visible: true });
+  assert.equal(await hospitalDialog(page).count(), 0);
+  await updateCare(page, { requestId: 2 });
+  assert.equal(await hospitalDialog(page).count(), 1);
+});
+
+test('R06: 새 응급 결과의 자동 경고·수동 재개방은 유지한다', async t => {
+  const page = await openFixture(t, true, true);
+  const emergency = id => ({ ...record(id), riskLevel: 'EMERGENCY', riskLabel: '응급' });
+  await updateCare(page, { result: emergency(101) });
+  assert.equal(await hospitalDialog(page).getByText('응급 위험 신호가 입력되었습니다.', { exact: true }).count(), 1);
+  await closeHospital(page);
+  await updateCare(page, { result: emergency(101) });
+  assert.equal(await hospitalDialog(page).count(), 0);
+  await page.getByRole('button', { name: '현재 위치로 응급 병원 조회', exact: true }).click();
+  await closeHospital(page);
+  await updateCare(page, { result: emergency(102) });
+  assert.equal(await hospitalDialog(page).count(), 1);
+  await page.keyboard.press('Escape');
+  await updateCare(page, { result: record(103) });
+  assert.equal(await hospitalDialog(page).count(), 0);
+  assert.equal(await page.locator('#root').getAttribute('inert'), null);
+});
+
+test('R06: 이전 병원 클릭 뒤 새 분석 실패는 실패 Dialog만 열고 응급은 응급 Dialog만 연다', async t => {
+  const page = await openFixture(t, false, true);
+  await settle(page, 'history', history());
+  await detailButton(page, 101).click();
+  await settle(page, 'detail', record(101));
+  await page.locator('#diagnosis-section').getByRole('button', { name: /현재 위치로 검증 병원 조회/ }).click();
+  await closeHospital(page);
+  await runAnalysis(page);
+  await settle(page, 'analyze', record(103, 1, 'INFERENCE_TIMEOUT'));
+  await settle(page, 'history', history([103]));
+  assert.equal(await hospitalDialog(page).count(), 0);
+  assert.equal(await page.getByRole('alertdialog').count(), 1);
+  assert.equal(await page.locator('#root').getAttribute('inert'), '');
+  await page.getByRole('alertdialog').getByRole('button', { name: '결과 화면 확인', exact: true }).click();
+  assert.equal(await page.locator('#root').getAttribute('inert'), null);
+  await page.getByRole('button', { name: /AI 질병 진단 실행하기/ }).click();
+  await settle(page, 'analyze', { ...record(104, 1, 'INFERENCE_TIMEOUT'), riskLevel: 'EMERGENCY', riskLabel: '응급' });
+  await settle(page, 'history', history([104]));
+  assert.equal(await hospitalDialog(page).count(), 1);
+  assert.equal(await page.getByRole('alertdialog').count(), 0);
+  assert.equal(await page.evaluate(() => window.geolocationCalls), 0);
 });
