@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { authApi } from '../api/authApi';
+import { sessionStorage } from '../api/common/httpClient';
 
 export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedPage = false }) {
   // 모드 상태: 'login' | 'register' | 'forgot'
@@ -14,6 +15,12 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
   const [message, setMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const loginRequestRef = useRef(0);
+  useLayoutEffect(() => {
+    const requests = loginRequestRef;
+    setLoading(false);
+    return () => { requests.current++; };
+  }, [isOpen, isEmbeddedPage, viewMode]);
 
   // 실시간 중복 및 유효성 피드백
   const [emailStatus, setEmailStatus] = useState(null); // { available, message }
@@ -44,6 +51,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
   }, [isOpen]);
 
   const handleClose = () => {
+    loginRequestRef.current++;
     setViewMode('login');
     setMessage('');
     setSuccessMessage('');
@@ -161,6 +169,9 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
       }
     }
 
+    const requestId = ++loginRequestRef.current;
+    const session = sessionStorage.capture();
+    const isActive = () => requestId === loginRequestRef.current && sessionStorage.isCurrent(session);
     try {
       setLoading(true);
 
@@ -172,13 +183,10 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
           nickname: nickname.trim(),
           phone: phone.trim()
         });
+        if (!isActive()) return;
 
         if (response && response.accessToken) {
-          localStorage.setItem('petcare_token', response.accessToken);
-          if (response.refreshToken) {
-            localStorage.setItem('petcare_refresh_token', response.refreshToken);
-          }
-          localStorage.setItem('petcare_user', JSON.stringify(response.user));
+          sessionStorage.save(response);
 
           if (onLoginSuccess) {
             onLoginSuccess(response.user);
@@ -193,13 +201,10 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
           email: email.trim(),
           password: password.trim()
         });
+        if (!isActive()) return;
 
         if (response && response.accessToken) {
-          localStorage.setItem('petcare_token', response.accessToken);
-          if (response.refreshToken) {
-            localStorage.setItem('petcare_refresh_token', response.refreshToken);
-          }
-          localStorage.setItem('petcare_user', JSON.stringify(response.user));
+          sessionStorage.save(response);
 
           if (onLoginSuccess) {
             onLoginSuccess(response.user);
@@ -210,9 +215,9 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
         }
       }
     } catch (err) {
-      setMessage(err.message || '인증 처리에 실패했습니다. 다시 시도해 주세요.');
+      if (isActive()) setMessage(err.message || '인증 처리에 실패했습니다. 다시 시도해 주세요.');
     } finally {
-      setLoading(false);
+      if (requestId === loginRequestRef.current) setLoading(false);
     }
   };
 

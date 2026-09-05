@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { sessionStorage } from '../api/common/httpClient';
 
 export default function OAuth2CallbackPage({ onLoginSuccess }) {
   const [statusText, setStatusText] = useState('소셜 로그인 인증 처리 중입니다...');
   const [errorText, setErrorText] = useState('');
 
   useEffect(() => {
+    let timer;
     try {
       const params = new URLSearchParams(window.location.search);
       const accessToken = params.get('accessToken');
@@ -19,12 +21,6 @@ export default function OAuth2CallbackPage({ onLoginSuccess }) {
         return;
       }
 
-      // 토큰 및 사용자 정보 저장
-      localStorage.setItem('petcare_token', accessToken);
-      if (refreshToken) {
-        localStorage.setItem('petcare_refresh_token', refreshToken);
-      }
-
       const userPayload = {
         id: id ? Number(id) : 1,
         email: email || '',
@@ -32,11 +28,13 @@ export default function OAuth2CallbackPage({ onLoginSuccess }) {
         role: role || 'ROLE_USER'
       };
 
-      localStorage.setItem('petcare_user', JSON.stringify(userPayload));
+      sessionStorage.save({ accessToken, refreshToken, user: userPayload });
+      const session = sessionStorage.capture();
       setStatusText('로그인 완료! 메인 화면으로 이동합니다...');
 
       // 상태 업데이트 및 메인 화면으로 부드럽게 전환 (SPA 방식)
-      setTimeout(() => {
+      timer = setTimeout(() => {
+        if (!sessionStorage.isCurrent(session)) return;
         window.history.replaceState({}, document.title, '/');
         if (onLoginSuccess) {
           onLoginSuccess(userPayload);
@@ -47,6 +45,7 @@ export default function OAuth2CallbackPage({ onLoginSuccess }) {
       console.error('OAuth2 Callback 처리 에러:', e);
       setErrorText('로그인 정보 처리 중 오류가 발생했습니다.');
     }
+    return () => clearTimeout(timer);
   }, [onLoginSuccess]);
 
   return (

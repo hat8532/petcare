@@ -48,12 +48,12 @@ public class SecurityConfig {
                 .authenticationEntryPoint((request, response, authException) -> {
                     response.setContentType("application/json;charset=UTF-8");
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write("{\"status\":\"FAIL\",\"message\":\"인증이 필요합니다.\"}");
+                    response.getWriter().write("{\"code\":401,\"message\":\"인증이 필요합니다.\",\"data\":null}");
                 })
                 .accessDeniedHandler((request, response, accessDeniedException) -> {
                     response.setContentType("application/json;charset=UTF-8");
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.getWriter().write("{\"status\":\"FAIL\",\"message\":\"접근 권한이 없습니다.\"}");
+                    response.getWriter().write("{\"code\":403,\"message\":\"접근 권한이 없습니다.\",\"data\":null}");
                 })
             )
             .authorizeHttpRequests(auth -> auth

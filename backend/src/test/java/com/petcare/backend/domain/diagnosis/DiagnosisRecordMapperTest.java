@@ -60,6 +60,8 @@ class DiagnosisRecordMapperTest {
                 .build();
 
         mapper.insert(record);
+        assertThat(record.getId()).isNotNull();
+        assertThat(record.getCreatedAt()).isNotNull();
         DiagnosisRecordDTO saved = mapper.findByIdAndOwner(
                 record.getId(), "diagnosis-mapper@petcare.test");
 
@@ -72,6 +74,7 @@ class DiagnosisRecordMapperTest {
         assertThat(saved.getDiseasesJson()).isEqualTo(record.getDiseasesJson());
         assertThat(saved.getReportContent()).isEqualTo(record.getReportContent());
         assertThat(saved.getCreatedAt()).isNotNull();
+        assertThat(saved.getCreatedAt()).isEqualTo(record.getCreatedAt());
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT diseases_json IS NULL AND report_content IS NULL FROM diagnosis_records WHERE id = ?",

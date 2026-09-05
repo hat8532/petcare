@@ -7,6 +7,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +18,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -47,17 +49,21 @@ class DiagnosisServiceTest {
         doAnswer(invocation -> {
             DiagnosisRecordDTO record = invocation.getArgument(0);
             record.setId(108L);
+            record.setCreatedAt(LocalDateTime.of(2026, 9, 5, 12, 0));
             return null;
         }).when(mapper).insert(any());
-        when(mapper.findByIdAndOwner(108L, "owner@example.com")).thenReturn(null);
+        when(mapper.findByIdAndOwner(108L, "owner@example.com"))
+                .thenThrow(new IllegalStateException("read unavailable after committed insert"));
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
-                "붉은 부위를 계속 긁습니다.", Map.of()), pngImage(), "owner@example.com");
+                "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
 
         ArgumentCaptor<DiagnosisRecordDTO> captor = ArgumentCaptor.forClass(DiagnosisRecordDTO.class);
         verify(mapper).insert(captor.capture());
         assertThat(response.diagnosisId()).isEqualTo(108L);
+        assertThat(response.createdAt()).isEqualTo(LocalDateTime.of(2026, 9, 5, 12, 0));
+        verify(mapper, never()).findByIdAndOwner(anyLong(), anyString());
         assertThat(captor.getValue().getSymptomsJson()).isEqualTo("[\"가려움/긁음\"]");
         assertThat(captor.getValue().getUserId()).isEqualTo(7L);
         assertThat(captor.getValue().getDiseasesJson())
@@ -84,11 +90,10 @@ class DiagnosisServiceTest {
             record.setId(109L);
             return null;
         }).when(mapper).insert(any());
-        when(mapper.findByIdAndOwner(109L, "owner@example.com")).thenReturn(null);
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "CAT", "SKIN", null, List.of("가려움/긁음"),
-                "구조 검증용 피부 증상 설명입니다.", Map.of()), pngImage(), "owner@example.com");
+                "구조 검증용 피부 증상 설명입니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
 
         ArgumentCaptor<DiagnosisAnalyzeRequest> trustedRequest = ArgumentCaptor.forClass(DiagnosisAnalyzeRequest.class);
         verify(visionInferenceClient).infer(trustedRequest.capture(), any(), any());
@@ -131,11 +136,10 @@ class DiagnosisServiceTest {
             record.setId(111L);
             return null;
         }).when(mapper).insert(any());
-        when(mapper.findByIdAndOwner(111L, "owner@example.com")).thenReturn(null);
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
-                "붉은 부위를 계속 긁습니다.", Map.of()), pngImage(), "owner@example.com");
+                "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
 
         assertThat(response.analysisMode()).isEqualTo("GEMINI_RAG_PROTOTYPE");
         assertThat(response.ragReport())
@@ -159,11 +163,10 @@ class DiagnosisServiceTest {
             record.setId(110L);
             return null;
         }).when(mapper).insert(any());
-        when(mapper.findByIdAndOwner(110L, "owner@example.com")).thenReturn(null);
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("통증/예민"),
-                "상처에서 피가 납니다.", Map.of()), pngImage(), "owner@example.com");
+                "상처에서 피가 납니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
 
         assertThat(response.riskLevel()).isEqualTo("EMERGENCY");
     }
@@ -184,11 +187,10 @@ class DiagnosisServiceTest {
             record.setId(112L);
             return null;
         }).when(mapper).insert(any());
-        when(mapper.findByIdAndOwner(112L, "owner@example.com")).thenReturn(null);
 
         DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("통증/예민"),
-                "호흡 곤란과 청색증이 있습니다.", Map.of()), pngImage(), "owner@example.com");
+                "호흡 곤란과 청색증이 있습니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
 
         assertThat(response.riskLevel()).isEqualTo("EMERGENCY");
         assertThat(response.riskReasons()).contains("RED_FLAG_REPORTED");
@@ -217,11 +219,26 @@ class DiagnosisServiceTest {
 
         assertThatThrownBy(() -> service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
                 1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
-                "붉은 부위를 계속 긁습니다.", Map.of()), pngImage(), "other@example.com"))
+                "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "other@example.com"))
                 .isInstanceOf(DiagnosisAccessException.class);
 
         verify(visionInferenceClient, never()).infer(any(), any(), any());
         verify(imageStorage, never()).save(any(), any());
+    }
+
+    @Test
+    void insertFailureStillCompensatesTheJustSavedImage() {
+        when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
+                VisionInferenceResult.unavailable("MODEL_UNAVAILABLE", invocation.getArgument(2)));
+        doThrow(new IllegalStateException("insert failed")).when(mapper).insert(any());
+
+        assertThatThrownBy(() -> service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
+                1L, "초코", "DOG", "SKIN", null, List.of("가려움/긁음"),
+                "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com"))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(imageStorage).deleteQuietly("user-1/00000000-0000-0000-0000-000000000001.png");
+        verify(mapper, never()).findByIdAndOwner(anyLong(), anyString());
     }
 
     private MockMultipartFile pngImage() {

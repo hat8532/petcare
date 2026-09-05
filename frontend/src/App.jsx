@@ -58,8 +58,11 @@ export default function App() {
       setSelectedPet(null);
       return;
     }
+    let active = true;
     async function loadPets() {
       const data = await petApi.getPetsByUser(user.id);
+      // 로그아웃·계정 변경으로 끝난 조회의 응답은 현재 Pet 상태에 적용하지 않는다.
+      if (!active) return;
       setPets(data || []);
       if (data && data.length > 0) {
         setSelectedPet(data[0]);
@@ -68,6 +71,7 @@ export default function App() {
       }
     }
     loadPets();
+    return () => { active = false; };
   }, [user, isOAuth2Callback]);
 
   useEffect(() => {
@@ -288,7 +292,7 @@ export default function App() {
             pets={pets}
             onUserUpdated={(updatedUser) => setUser(updatedUser)}
             onLogout={async () => {
-              await authApi.logout();
+              if (!await authApi.logout()) return;
               setUser(null);
               setActiveTab('home');
             }}

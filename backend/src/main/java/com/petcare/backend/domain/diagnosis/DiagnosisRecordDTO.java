@@ -13,6 +13,8 @@ public class DiagnosisRecordDTO {
     private Long id;
     private Long userId;
     private Long petId;
+    private String idempotencyKey;
+    private String requestHash;
     private String affectedArea;
     private String symptomsJson;
     private String imageUrl;
