@@ -149,7 +149,7 @@ export default function PetRegisterModal({ isOpen, onClose, onPetCreated }) {
             새 반려동물 등록
           </h2>
           <p style={{ fontSize: '13px', color: '#64748b', fontWeight: '500', marginTop: '4px', margin: 0 }}>
-            아이의 프로필을 등록하고 AI 스마트 맞춤 케어를 시작하세요.
+            반려동물의 프로필을 등록하고 AI 스마트 맞춤 케어를 시작하세요.
           </p>
         </div>
 

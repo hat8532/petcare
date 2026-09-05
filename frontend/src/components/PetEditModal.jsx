@@ -110,36 +110,39 @@ export default function PetEditModal({ isOpen, onClose, pet, onPetUpdated, onPet
       position: 'fixed',
       inset: 0,
       zIndex: 999,
-      background: 'rgba(15, 23, 42, 0.55)',
-      backdropFilter: 'blur(6px)',
+      background: 'rgba(11, 15, 25, 0.45)',
+      backdropFilter: 'blur(16px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(16px) saturate(180%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '20px'
     }}>
-      <div className="glass-card fade-in" style={{
+      <div className="fade-in" style={{
         width: '100%',
         maxWidth: '520px',
         background: '#ffffff',
-        borderRadius: '24px',
-        padding: '32px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        borderRadius: '28px',
+        padding: '34px 30px',
+        boxShadow: '0 25px 60px -15px rgba(11, 15, 25, 0.25)',
+        border: '1px solid rgba(226, 232, 240, 0.9)',
         maxHeight: '90vh',
         overflowY: 'auto'
       }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '26px' }}>✏️</span>
             <div>
-              <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0 }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0b0f19', margin: 0, letterSpacing: '-0.3px' }}>
                 반려동물 정보 수정
               </h3>
-              <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+              <p style={{ fontSize: '12.5px', color: '#64748b', margin: '2px 0 0 0', fontWeight: '500' }}>
                 {pet.name}의 이름, 종, 품종, 체중 정보 및 프로필 사진을 수정하세요.
               </p>
             </div>
           </div>
+
           <button
             onClick={onClose}
             style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}
@@ -293,25 +296,48 @@ export default function PetEditModal({ isOpen, onClose, pet, onPetUpdated, onPet
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button
               type="button"
               onClick={handleDelete}
               disabled={isSubmitting}
-              className="btn btn-danger"
-              style={{ padding: '13px 18px', fontSize: '13px' }}
+              style={{
+                padding: '13px 18px',
+                fontSize: '13px',
+                borderRadius: '14px',
+                background: '#fff1f2',
+                color: '#e11d48',
+                border: '1px solid #fecdd3',
+                fontWeight: '800',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s'
+              }}
             >
               🗑️ 프로필 삭제
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn btn-primary"
-              style={{ flex: 1, padding: '13px 20px', fontSize: '14px' }}
+              className="card-hover-lift"
+              style={{
+                flex: 1,
+                padding: '13px 20px',
+                fontSize: '14px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: '800',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.28)',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.7 : 1,
+                transition: 'all 0.2s'
+              }}
             >
               {isSubmitting ? '수정 중...' : '💾 반려동물 정보 수정 완료'}
             </button>
           </div>
+
         </form>
       </div>
     </div>

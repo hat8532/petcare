@@ -167,51 +167,74 @@ export default function DailyCareChatbot({ selectedPet }) {
   };
 
   return (
-    <section id="daily-ai-section" style={{ padding: '60px 0 90px 0', background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)' }}>
-      <div className="container">
+    <section id="daily-ai-section" style={{ padding: '36px 0 80px 0', background: 'var(--bg-main)' }}>
+      <div className="container" style={{ maxWidth: '1240px' }}>
         
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#eef2ff', border: '1px solid #c7d2fe', padding: '6px 18px', borderRadius: '9999px', marginBottom: '12px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '38px' }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'rgba(238, 242, 255, 0.8)',
+            border: '1px solid #c7d2fe',
+            padding: '5px 16px',
+            borderRadius: '9999px',
+            marginBottom: '12px',
+            backdropFilter: 'blur(10px)'
+          }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4f46e5', boxShadow: '0 0 10px #4f46e5' }}></span>
-            <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#4f46e5', letterSpacing: '0.5px' }}>
-              GOOGLE GEMINI 2.0 / FLASH REAL-TIME AI
+            <span style={{ fontSize: '12px', fontWeight: '800', color: '#4f46e5', letterSpacing: '0.6px' }}>
+              GOOGLE GEMINI 2.0 REAL-TIME VET AI
             </span>
           </div>
           
-          <h2 style={{ fontSize: '34px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }}>
-            일상 펫 케어 AI 어시스턴트
+          <h2 style={{ fontSize: '32px', fontWeight: '900', color: '#0b0f19', letterSpacing: '-0.8px', margin: '0 0 10px 0' }}>
+            일상 펫 케어 & 맞춤 AI 어시스턴트
           </h2>
-          <p style={{ fontSize: '15px', color: '#64748b', marginTop: '8px', maxWidth: '600px', marginInLine: 'auto' }}>
-            사료 칼로리 계산부터 관절 영양, 행동 해석까지 Google Gemini AI가 100% 맞춤형 실시간 수의학 답변을 드립니다.
+          <p style={{ fontSize: '15px', color: '#64748b', maxWidth: '620px', margin: '0 auto', fontWeight: '500', lineHeight: '1.6' }}>
+            사료 칼로리 계산부터 관절 영양, 행동 해석까지 Google Gemini AI가 100% 맞춤형 실시간 수의학 솔루션을 제공합니다.
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '30px', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '26px', alignItems: 'start' }}>
           
           {/* Left: Kibble Calorie Calculator */}
-          <div className="glass-card" style={{
-            padding: '34px',
-            background: '#ffffff',
-            borderRadius: '24px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 20px 40px -15px rgba(0,0,0,0.05)'
+          <div className="card-hover-lift" style={{
+            padding: '34px 28px',
+            background: 'rgba(255, 255, 255, 0.88)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderRadius: '26px',
+            border: '1px solid rgba(226, 232, 240, 0.85)',
+            boxShadow: '0 10px 30px -10px rgba(15, 23, 42, 0.05)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-              <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
+              <div style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                border: '1px solid #a7f3d0',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
+              }}>
                 🥣
               </div>
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#0b0f19', margin: 0, letterSpacing: '-0.3px' }}>
                   일일 사료 급여량 & 칼로리 계산기
                 </h3>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>체중과 활동 단계 기반 RER/MER 정밀 산출</span>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>체중과 활동 단계 기반 RER/MER 정밀 산출</span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '22px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', marginBottom: '24px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '700', color: '#334155', marginBottom: '7px' }}>
                   반려동물 체중 (kg)
                 </label>
                 <input
@@ -220,18 +243,18 @@ export default function DailyCareChatbot({ selectedPet }) {
                   value={weightInput}
                   onChange={(e) => setWeightInput(e.target.value)}
                   placeholder="예: 3.8"
-                  style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1.5px solid #cbd5e1', fontSize: '14px', outline: 'none', background: '#f8fafc' }}
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #cbd5e1', fontSize: '14.5px', outline: 'none', background: '#f8fafc', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '700', color: '#334155', marginBottom: '7px' }}>
                   하루 활동량 단계
                 </label>
                 <select
                   value={activityLevel}
                   onChange={(e) => setActivityLevel(e.target.value)}
-                  style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1.5px solid #cbd5e1', fontSize: '14px', outline: 'none', background: '#f8fafc', cursor: 'pointer' }}
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', background: '#f8fafc', cursor: 'pointer', boxSizing: 'border-box' }}
                 >
                   <option value="LIGHT">🏠 실내 위주 (활동량 적음)</option>
                   <option value="NORMAL">🐕 보통 (일반 산책 1회)</option>
@@ -241,15 +264,16 @@ export default function DailyCareChatbot({ selectedPet }) {
 
               <button
                 onClick={handleCalculateFeed}
-                className="btn btn-primary"
+                className="card-hover-lift"
                 style={{
                   padding: '14px',
                   borderRadius: '14px',
                   fontSize: '14.5px',
                   fontWeight: '800',
-                  background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff',
                   border: 'none',
-                  boxShadow: '0 8px 20px rgba(5, 150, 105, 0.25)',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.28)',
                   cursor: 'pointer',
                   marginTop: '4px'
                 }}
@@ -257,6 +281,7 @@ export default function DailyCareChatbot({ selectedPet }) {
                 ⚡ 일일 권장 사료량 계산하기
               </button>
             </div>
+
 
             {calcResult && (
               <div style={{
@@ -290,49 +315,51 @@ export default function DailyCareChatbot({ selectedPet }) {
             )}
           </div>
 
-          {/* Right: Modern AI Live Chatbot Container */}
-          <div className="glass-card" style={{
-            padding: '26px',
-            background: '#ffffff',
-            borderRadius: '24px',
-            border: '1px solid #cbd5e1',
-            boxShadow: '0 20px 40px -15px rgba(0,0,0,0.07)',
+          {/* Right: Real-time 1:1 Vet AI Chatbot */}
+          <div className="card-hover-lift" style={{
+            padding: '28px',
+            background: 'rgba(255, 255, 255, 0.88)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderRadius: '26px',
+            border: '1px solid rgba(226, 232, 240, 0.85)',
+            boxShadow: '0 10px 30px -10px rgba(15, 23, 42, 0.05)',
             display: 'flex',
             flexDirection: 'column',
-            height: '560px'
+            height: '580px'
           }}>
             
             {/* Chat Bar Header */}
             <div style={{
-              borderBottom: '1px solid #f1f5f9',
-              paddingBottom: '14px',
-              marginBottom: '14px',
+              borderBottom: '1px solid rgba(226, 232, 240, 0.7)',
+              paddingBottom: '16px',
+              marginBottom: '16px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '50%',
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '14px',
                   background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                   color: '#ffffff',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '18px',
-                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+                  fontSize: '20px',
+                  boxShadow: '0 4px 14px rgba(99, 102, 241, 0.28)'
                 }}>
                   🤖
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+                  <h3 style={{ fontSize: '17.5px', fontWeight: '900', color: '#0b0f19', margin: 0, letterSpacing: '-0.3px' }}>
                     Gemini 실시간 수의학 Q&A
                   </h3>
-                  <span style={{ fontSize: '11.5px', color: '#10b981', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span>
-                    Google AI Live Active
+                  <span style={{ fontSize: '12px', color: '#10b981', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></span>
+                    Google Vet AI Active
                   </span>
                 </div>
               </div>
@@ -343,12 +370,12 @@ export default function DailyCareChatbot({ selectedPet }) {
                   fontSize: '12px',
                   fontWeight: '700',
                   color: '#64748b',
-                  background: '#f8fafc',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '10px',
-                  padding: '5px 12px',
+                  background: 'rgba(241, 245, 249, 0.8)',
+                  border: '1px solid rgba(226, 232, 240, 0.9)',
+                  borderRadius: '9999px',
+                  padding: '6px 14px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 🧹 대화 초기화
@@ -359,26 +386,26 @@ export default function DailyCareChatbot({ selectedPet }) {
             <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '10px' }}>
               <button
                 onClick={() => handleQuickQuestion('강아지 무릎 관절에 좋은 사료와 영양 성분 추천해줘')}
-                style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', padding: '5px 12px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', padding: '6px 14px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
-                🦴 무릎/관절 영양 사료
+                🦴 관절 영양 사료
               </button>
               <button
                 onClick={() => handleQuickQuestion('강아지가 밤에 한숨을 쉬는 진짜 이유가 뭐야?')}
-                style={{ background: '#eef2ff', color: '#3730a3', border: '1px solid #c7d2fe', padding: '5px 12px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                style={{ background: '#eef2ff', color: '#3730a3', border: '1px solid #c7d2fe', padding: '6px 14px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
-                🐶 강아지 한숨 의미
+                🐶 한숨의 의미
               </button>
               <button
                 onClick={() => handleQuickQuestion('고양이 음수량 늘리는 꿀팁 추천해줘')}
-                style={{ background: '#fff1f2', color: '#9f1239', border: '1px solid #fecdd3', padding: '5px 12px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                style={{ background: '#fff1f2', color: '#9f1239', border: '1px solid #fecdd3', padding: '6px 14px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
-                🐱 고양이 음수량 관리
+                🐱 음수량 꿀팁
               </button>
             </div>
 
             {/* Chat Messages List */}
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px', paddingRight: '4px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '4px' }}>
               {messages.map((m, idx) => (
                 <div
                   key={idx}
@@ -390,17 +417,18 @@ export default function DailyCareChatbot({ selectedPet }) {
                   }}
                 >
                   <div style={{
-                    width: '32px',
-                    height: '32px',
+                    width: '34px',
+                    height: '34px',
                     borderRadius: '50%',
-                    background: m.sender === 'user' ? '#059669' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                    background: m.sender === 'user' ? '#0b0f19' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                     color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '14px',
+                    fontSize: '15px',
                     fontWeight: 'bold',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    boxShadow: '0 3px 10px rgba(0,0,0,0.1)'
                   }}>
                     {m.sender === 'user' ? '👤' : '🤖'}
                   </div>
@@ -408,13 +436,14 @@ export default function DailyCareChatbot({ selectedPet }) {
                   <div style={{
                     maxWidth: '84%',
                     padding: '14px 18px',
-                    borderRadius: m.sender === 'user' ? '20px 4px 20px 20px' : '4px 20px 20px 20px',
-                    background: m.sender === 'user' ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)' : '#ffffff',
-                    color: m.sender === 'user' ? '#ffffff' : '#0f172a',
-                    border: m.sender === 'user' ? 'none' : '1px solid #e2e8f0',
-                    boxShadow: m.sender === 'user' ? '0 4px 14px rgba(5,150,105,0.2)' : '0 4px 14px rgba(0,0,0,0.04)',
+                    borderRadius: m.sender === 'user' ? '22px 6px 22px 22px' : '6px 22px 22px 22px',
+                    background: m.sender === 'user' ? 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)' : '#ffffff',
+                    color: m.sender === 'user' ? '#ffffff' : '#0b0f19',
+                    border: m.sender === 'user' ? 'none' : '1px solid rgba(226, 232, 240, 0.9)',
+                    boxShadow: m.sender === 'user' ? '0 6px 18px rgba(16, 185, 129, 0.25)' : '0 4px 16px rgba(15, 23, 42, 0.04)',
                     fontSize: '13.5px',
-                    lineHeight: '1.68'
+                    lineHeight: '1.68',
+                    fontWeight: '500'
                   }}>
                     {m.sender === 'user' ? m.text : renderFormattedText(m.text)}
                   </div>
@@ -425,15 +454,15 @@ export default function DailyCareChatbot({ selectedPet }) {
               {isAiThinking && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', animation: 'fadeIn 0.3s ease' }}>
                   <div style={{
-                    width: '32px',
-                    height: '32px',
+                    width: '34px',
+                    height: '34px',
                     borderRadius: '50%',
                     background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                     color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '14px'
+                    fontSize: '15px'
                   }}>
                     🤖
                   </div>
@@ -441,7 +470,7 @@ export default function DailyCareChatbot({ selectedPet }) {
                     background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
                     border: '1px solid #c7d2fe',
                     padding: '13px 18px',
-                    borderRadius: '4px 20px 20px 20px',
+                    borderRadius: '6px 22px 22px 22px',
                     fontSize: '13px',
                     color: '#3730a3',
                     fontWeight: '700',
@@ -450,7 +479,7 @@ export default function DailyCareChatbot({ selectedPet }) {
                     gap: '8px',
                     boxShadow: '0 4px 12px rgba(99, 102, 241, 0.12)'
                   }}>
-                    <span>✨ Gemini AI가 답변을 작성 중입니다. 잠시만 기다려 주세요...</span>
+                    <span>✨ Gemini AI가 맞춤 답변을 분석 중입니다...</span>
                     <span style={{ display: 'inline-block', animation: 'spin 1.5s linear infinite' }}>⏳</span>
                   </div>
                 </div>
@@ -463,16 +492,17 @@ export default function DailyCareChatbot({ selectedPet }) {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="✨ Gemini AI에게 무엇이든 물어보세요..."
+                placeholder="✨ Gemini AI에게 건강/행동/영양을 자유롭게 물어보세요..."
                 style={{
                   flex: 1,
                   padding: '13px 20px',
                   borderRadius: '9999px',
-                  border: '1.5px solid #cbd5e1',
+                  border: '1px solid rgba(226, 232, 240, 0.9)',
                   fontSize: '13.5px',
                   outline: 'none',
                   background: '#f8fafc',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  boxSizing: 'border-box'
                 }}
               />
               <button
@@ -484,15 +514,15 @@ export default function DailyCareChatbot({ selectedPet }) {
                   fontSize: '13.5px',
                   fontWeight: '800',
                   color: '#ffffff',
-                  background: isAiThinking ? '#94a3b8' : 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                  background: isAiThinking ? '#94a3b8' : '#0b0f19',
                   border: 'none',
-                  boxShadow: isAiThinking ? 'none' : '0 4px 14px rgba(79, 70, 229, 0.3)',
+                  boxShadow: isAiThinking ? 'none' : '0 6px 18px rgba(11, 15, 25, 0.25)',
                   cursor: isAiThinking ? 'wait' : 'pointer',
                   whiteSpace: 'nowrap',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
-                {isAiThinking ? '답변 생성 중...' : '전송 🚀'}
+                {isAiThinking ? '분석 중...' : '전송 🚀'}
               </button>
             </form>
 

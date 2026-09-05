@@ -5,10 +5,15 @@ const ACCESS_TOKEN_KEY = 'petcare_token';
 const REFRESH_TOKEN_KEY = 'petcare_refresh_token';
 const USER_KEY = 'petcare_user';
 
+export const AUTH_EXPIRED_EVENT = 'petcare:auth-expired';
+
 const clearSession = () => {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+  }
 };
 
 const createHeaders = (additionalHeaders = {}, useAuth = true) => {
