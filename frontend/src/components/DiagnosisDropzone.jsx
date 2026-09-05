@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { diagnosisApi } from '../api/diagnosisApi';
 import AiBenchmarkModal from './AiBenchmarkModal';
 import DiagnosisFailureDialog from './DiagnosisFailureDialog';
@@ -87,7 +87,16 @@ export default function DiagnosisDropzone({
   const [storedImagePreview, setStoredImagePreview] = useState('');
   const [storedImageError, setStoredImageError] = useState('');
   const fileInputRef = useRef(null);
+  // 생성·상세는 같은 결과 영역을, 목록은 별도 영역을 갱신하므로 순번을 나눠 관리한다.
+  const resultRequestRef = useRef(0);
+  const historyRequestRef = useRef(0);
   const closeAnalysisFailure = useCallback(() => setAnalysisFailure(null), []);
+
+  useLayoutEffect(() => () => {
+    // App의 Pet key 변경·화면 종료 시 이전 응답의 부모 Callback까지 무효화한다.
+    resultRequestRef.current += 1;
+    historyRequestRef.current += 1;
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -136,6 +145,7 @@ export default function DiagnosisDropzone({
   }, [analysisResult?.diagnosisId, analysisResult?.imageUrl]);
 
   const loadHistory = useCallback(async (page = 0) => {
+    const requestId = ++historyRequestRef.current;
     if (!selectedPet?.id) {
       setHistory([]);
       setHistoryError('');
@@ -146,6 +156,7 @@ export default function DiagnosisDropzone({
     setIsHistoryLoading(true);
     try {
       const resultPage = await diagnosisApi.getHistoryByPet(selectedPet.id, page, HISTORY_PAGE_SIZE);
+      if (requestId !== historyRequestRef.current) return;
       setHistory(resultPage.content);
       setHistoryPage(resultPage.page);
       setHistoryMeta({
@@ -154,10 +165,11 @@ export default function DiagnosisDropzone({
       });
       setHistoryError('');
     } catch (error) {
+      if (requestId !== historyRequestRef.current) return;
       setHistory([]);
       setHistoryError(error?.message || '과거 진단 이력을 불러오지 못했습니다.');
     } finally {
-      setIsHistoryLoading(false);
+      if (requestId === historyRequestRef.current) setIsHistoryLoading(false);
     }
   }, [selectedPet?.id]);
 
@@ -211,6 +223,7 @@ export default function DiagnosisDropzone({
       return;
     }
 
+    const requestId = ++resultRequestRef.current;
     setIsAnalyzing(true);
     setAnalysisResult(null);
     setAnalysisError('');
@@ -229,10 +242,13 @@ export default function DiagnosisDropzone({
         healthProfile: selectedPet.healthProfile
       }, imageFile);
 
+      if (requestId !== resultRequestRef.current) return;
+      if (result.petId !== selectedPet.id) throw new Error('선택한 반려동물의 진단 결과가 아닙니다.');
       setAnalysisResult(result);
       setPreviewDiagnosisId(result.diagnosisId);
       onDiagnosisResult?.(result);
       await loadHistory(0);
+      if (requestId !== resultRequestRef.current) return;
       // 응급 분기에서는 Emergency modal을 우선해 두 개의 focus trap이 동시에 열리지 않게 한다.
       if (result.riskLevel !== 'EMERGENCY' && result.failureCode) {
         setAnalysisFailure({
@@ -242,6 +258,7 @@ export default function DiagnosisDropzone({
         });
       }
     } catch (error) {
+      if (requestId !== resultRequestRef.current) return;
       const message = error?.message || '진단 API 요청에 실패했습니다.';
       setAnalysisError(message);
       setAnalysisFailure({
@@ -250,19 +267,28 @@ export default function DiagnosisDropzone({
         canRetry: !error?.status || error.status >= 500
       });
     } finally {
-      setIsAnalyzing(false);
+      if (requestId === resultRequestRef.current) setIsAnalyzing(false);
     }
   };
 
   const showStoredDiagnosis = async (diagnosisId) => {
+    const requestId = ++resultRequestRef.current;
+    setIsAnalyzing(false);
+    setAnalysisError('');
+    setAnalysisFailure(null);
     try {
       const result = await diagnosisApi.getDiagnosis(diagnosisId);
+      if (requestId !== resultRequestRef.current) return;
+      if (result.petId !== selectedPet?.id || result.diagnosisId !== diagnosisId) {
+        throw new Error('선택한 진단 이력과 응답이 일치하지 않습니다.');
+      }
       setAnalysisResult(result);
       setAnalysisError('');
       setAnalysisFailure(null);
       setPreviewDiagnosisId(null);
       onDiagnosisResult?.(result);
     } catch (error) {
+      if (requestId !== resultRequestRef.current) return;
       setAnalysisError(error?.message || '저장된 진단 결과를 불러오지 못했습니다.');
     }
   };
