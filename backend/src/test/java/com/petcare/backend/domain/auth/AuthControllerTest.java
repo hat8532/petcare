@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.BeanPropertyBindingResult;
 
@@ -48,7 +49,8 @@ class AuthControllerTest {
                 .build();
 
         BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(signupRequest, "signupRequest");
-        ResponseEntity<?> response = authController.signup(signupRequest, bindingResult);
+        MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+        ResponseEntity<?> response = authController.signup(signupRequest, bindingResult, servletResponse);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isInstanceOf(AuthDTO.AuthResponse.class);
@@ -56,7 +58,10 @@ class AuthControllerTest {
         AuthDTO.AuthResponse authResponse = (AuthDTO.AuthResponse) response.getBody();
         assertThat(authResponse.getStatus()).isEqualTo("SUCCESS");
         assertThat(authResponse.getAccessToken()).isNotBlank();
-        assertThat(authResponse.getRefreshToken()).isNotBlank();
+        assertThat(authResponse.getRefreshToken()).isNull();
+        assertThat(servletResponse.getHeader("Set-Cookie"))
+                .contains(RefreshTokenCookieService.COOKIE_NAME + "=")
+                .contains("HttpOnly");
         assertThat(authResponse.getUser().getEmail()).isEqualTo(testEmail);
         assertThat(authResponse.getUser().getNickname()).isEqualTo(testNickname);
 
@@ -67,7 +72,7 @@ class AuthControllerTest {
         assertThat(passwordEncoder.matches(testPassword, savedUser.getPassword())).isTrue();
 
         // JWT 토큰 검증
-        assertThat(jwtUtil.validateToken(authResponse.getAccessToken())).isTrue();
+        assertThat(jwtUtil.validateAccessToken(authResponse.getAccessToken())).isTrue();
         assertThat(jwtUtil.getClaimsFromToken(authResponse.getAccessToken()).getSubject()).isEqualTo(testEmail);
     }
 
@@ -81,7 +86,7 @@ class AuthControllerTest {
                 .nickname(testNickname)
                 .build();
         BeanPropertyBindingResult firstBinding = new BeanPropertyBindingResult(firstSignup, "firstSignup");
-        authController.signup(firstSignup, firstBinding);
+        authController.signup(firstSignup, firstBinding, new MockHttpServletResponse());
 
         // 동일 이메일 재가입 시도
         AuthDTO.SignupRequest secondSignup = AuthDTO.SignupRequest.builder()
@@ -90,7 +95,8 @@ class AuthControllerTest {
                 .nickname("다른닉네임")
                 .build();
         BeanPropertyBindingResult secondBinding = new BeanPropertyBindingResult(secondSignup, "secondSignup");
-        ResponseEntity<?> duplicateResponse = authController.signup(secondSignup, secondBinding);
+        ResponseEntity<?> duplicateResponse = authController.signup(
+                secondSignup, secondBinding, new MockHttpServletResponse());
 
         assertThat(duplicateResponse.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(duplicateResponse.getBody()).isInstanceOf(Map.class);
@@ -109,7 +115,7 @@ class AuthControllerTest {
                 .nickname(testNickname)
                 .build();
         BeanPropertyBindingResult signupBinding = new BeanPropertyBindingResult(signupRequest, "signupRequest");
-        authController.signup(signupRequest, signupBinding);
+        authController.signup(signupRequest, signupBinding, new MockHttpServletResponse());
 
         // 로그인 요청
         AuthDTO.LoginRequest loginRequest = AuthDTO.LoginRequest.builder()
@@ -117,7 +123,8 @@ class AuthControllerTest {
                 .password(testPassword)
                 .build();
         BeanPropertyBindingResult loginBinding = new BeanPropertyBindingResult(loginRequest, "loginRequest");
-        ResponseEntity<?> response = authController.login(loginRequest, loginBinding);
+        MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+        ResponseEntity<?> response = authController.login(loginRequest, loginBinding, servletResponse);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isInstanceOf(AuthDTO.AuthResponse.class);
@@ -125,11 +132,14 @@ class AuthControllerTest {
         AuthDTO.AuthResponse authResponse = (AuthDTO.AuthResponse) response.getBody();
         assertThat(authResponse.getStatus()).isEqualTo("SUCCESS");
         assertThat(authResponse.getAccessToken()).isNotBlank();
-        assertThat(authResponse.getRefreshToken()).isNotBlank();
+        assertThat(authResponse.getRefreshToken()).isNull();
+        assertThat(servletResponse.getHeader("Set-Cookie"))
+                .contains(RefreshTokenCookieService.COOKIE_NAME + "=")
+                .contains("HttpOnly");
         assertThat(authResponse.getUser().getEmail()).isEqualTo(testEmail);
 
         // 토큰 유효성 검증
-        assertThat(jwtUtil.validateToken(authResponse.getAccessToken())).isTrue();
+        assertThat(jwtUtil.validateAccessToken(authResponse.getAccessToken())).isTrue();
         assertThat(jwtUtil.getClaimsFromToken(authResponse.getAccessToken()).getSubject()).isEqualTo(testEmail);
     }
 
@@ -143,7 +153,7 @@ class AuthControllerTest {
                 .nickname(testNickname)
                 .build();
         BeanPropertyBindingResult signupBinding = new BeanPropertyBindingResult(signupRequest, "signupRequest");
-        authController.signup(signupRequest, signupBinding);
+        authController.signup(signupRequest, signupBinding, new MockHttpServletResponse());
 
         // 틀린 비밀번호로 로그인 시도
         AuthDTO.LoginRequest loginRequest = AuthDTO.LoginRequest.builder()
@@ -151,7 +161,8 @@ class AuthControllerTest {
                 .password("wrongPassword999!")
                 .build();
         BeanPropertyBindingResult loginBinding = new BeanPropertyBindingResult(loginRequest, "loginRequest");
-        ResponseEntity<?> response = authController.login(loginRequest, loginBinding);
+        ResponseEntity<?> response = authController.login(
+                loginRequest, loginBinding, new MockHttpServletResponse());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(response.getBody()).isInstanceOf(Map.class);
@@ -168,7 +179,8 @@ class AuthControllerTest {
                 .password(testPassword)
                 .build();
         BeanPropertyBindingResult loginBinding = new BeanPropertyBindingResult(loginRequest, "loginRequest");
-        ResponseEntity<?> response = authController.login(loginRequest, loginBinding);
+        ResponseEntity<?> response = authController.login(
+                loginRequest, loginBinding, new MockHttpServletResponse());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }

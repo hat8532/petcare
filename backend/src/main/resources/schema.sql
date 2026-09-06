@@ -361,3 +361,5 @@ CREATE INDEX IF NOT EXISTS idx_hospitals_location ON hospitals(latitude, longitu
 CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
 CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);
 CREATE INDEX IF NOT EXISTS idx_user_social_provider ON user_social_accounts(provider, provider_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_social_provider_id
+    ON user_social_accounts(provider, provider_id);

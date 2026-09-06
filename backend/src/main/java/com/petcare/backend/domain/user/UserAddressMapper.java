@@ -11,6 +11,6 @@ public interface UserAddressMapper {
     UserAddressDTO findDefaultByUserId(@Param("userId") Long userId);
     void insert(UserAddressDTO address);
     void update(UserAddressDTO address);
-    void deleteById(@Param("id") Long id);
+    int deleteByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
     void resetDefaultByUserId(@Param("userId") Long userId);
 }

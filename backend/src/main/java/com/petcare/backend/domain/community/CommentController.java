@@ -16,7 +16,6 @@ import java.util.Map;
 //   DELETE /api/v1/community/{postId}/comments/{commentId}
 @RestController
 @RequestMapping("/api/v1/community/{postId}/comments")
-@CrossOrigin(origins = "*")
 public class CommentController {
 
     private final CommentMapper commentMapper;

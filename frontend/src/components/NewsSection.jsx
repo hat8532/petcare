@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { newsApi } from '../api/newsApi';
 
+const DEFAULT_NEWS_URL = 'https://news.naver.com';
+
+function safeNewsUrl(rawUrl) {
+  if (!rawUrl) return DEFAULT_NEWS_URL;
+
+  try {
+    const parsed = new URL(rawUrl);
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : DEFAULT_NEWS_URL;
+  } catch {
+    return DEFAULT_NEWS_URL;
+  }
+}
+
 export default function NewsSection() {
   const [newsList, setNewsList] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -456,9 +469,9 @@ export default function NewsSection() {
                 </span>
 
                 <a
-                  href={featuredNews.url || featuredNews.newsUrl || 'https://news.naver.com'}
+                  href={safeNewsUrl(featuredNews.url || featuredNews.newsUrl)}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   style={{
                     padding: '10px 22px',
                     borderRadius: '14px',
@@ -585,9 +598,9 @@ export default function NewsSection() {
                     </span>
 
                     <a
-                      href={news.url || news.newsUrl || 'https://news.naver.com'}
+                      href={safeNewsUrl(news.url || news.newsUrl)}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       style={{
                         fontSize: '13px',
                         fontWeight: '800',

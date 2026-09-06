@@ -120,8 +120,8 @@ export default function MyPage({ user, pets = [], onUserUpdated, onLogout, onWit
       return;
     }
 
-    if (newPassword.length < 8) {
-      setPasswordMessage({ type: 'error', text: '새 비밀번호는 8자 이상이어야 합니다.' });
+    if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/.test(newPassword)) {
+      setPasswordMessage({ type: 'error', text: '영문, 숫자, 특수문자를 포함해 8자 이상 입력해 주세요.' });
       return;
     }
 

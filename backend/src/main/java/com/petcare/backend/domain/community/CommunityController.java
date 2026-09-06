@@ -15,7 +15,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/community")
-@CrossOrigin(origins = "*")
 public class CommunityController {
 
     // 인증 정보를 찾지 못했을 때 사용할 기본 작성자/반려동물 (씨앗 데이터의 초코마미·초코).

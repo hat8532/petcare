@@ -14,6 +14,19 @@
         ORDER BY id DESC
     </select>
 
+    <select id="findByPetIdAndUserId" resultType="com.petcare.backend.domain.timeline.TimelineCompareDTO">
+        SELECT tc.id, tc.pet_id AS petId, tc.before_diagnosis_id AS beforeDiagnosisId,
+               tc.before_image_url AS beforeImageUrl, tc.before_date AS beforeDate,
+               tc.after_image_url AS afterImageUrl, tc.after_date AS afterDate,
+               tc.progress_status AS progressStatus, tc.gemini_analysis AS geminiAnalysis,
+               tc.created_at AS createdAt
+        FROM timeline_compares tc
+        INNER JOIN pets p ON p.id = tc.pet_id
+        WHERE tc.pet_id = #{petId}
+          AND p.user_id = #{userId}
+        ORDER BY tc.id DESC
+    </select>
+
     <select id="countAll" resultType="int">
         SELECT COUNT(*) FROM timeline_compares
     </select>

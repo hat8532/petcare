@@ -13,12 +13,14 @@ import com.petcare.backend.domain.timeline.TimelineCompareMapper;
 import com.petcare.backend.domain.user.UserDTO;
 import com.petcare.backend.domain.user.UserMapper;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
 @Component
+@ConditionalOnProperty(name = "petcare.demo-data.enabled", havingValue = "true")
 public class DataInitializer implements CommandLineRunner {
 
     private final UserMapper userMapper;

@@ -82,9 +82,10 @@ before(async () => {
             if (path === '/api/v1/fixture-unauthorized') return json({ message: 'fixture denied' }, 401);
             throw new Error('예상하지 않은 Fetch: ' + path);
           };
-          localStorage.setItem('petcare_user', JSON.stringify({ id: 1, name: 'Fixture User A' }));
-          localStorage.setItem('petcare_token', 'fixture-access-token');
-          localStorage.setItem('petcare_refresh_token', 'fixture-refresh-token');
+          sessionStorage.save({
+            accessToken: 'fixture-access-token',
+            user: { id: 1, name: 'Fixture User A' }
+          });
           window.triggerUnauthorized = async () => {
             try { await httpClient.get('/fixture-unauthorized'); }
             catch (error) { return error.status; }
@@ -196,7 +197,8 @@ test('실제 LoginPage: 종료된 A 로그인 응답은 재진입한 B 세션을
   await settleHttp(page, 1, { accessToken: 'b-token', user: { id: 2 } });
   await settleHttp(page, 0, { accessToken: 'a-token', user: { id: 1 } });
   assert.deepEqual(await page.evaluate(() => window.loginResults), [2]);
-  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), 'b-token');
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), null);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('petcare_user')).id), 2);
 });
 
 test('실제 LoginPage: 화면 종료 후 로그인 성공은 저장과 부모 Callback을 실행하지 않는다', async t => {
@@ -207,7 +209,8 @@ test('실제 LoginPage: 화면 종료 후 로그인 성공은 저장과 부모 C
   await page.evaluate(() => window.hideLogin());
   await settleHttp(page, 0, { accessToken: 'stale-token', user: { id: 2 } });
   assert.deepEqual(await page.evaluate(() => window.loginResults), []);
-  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), 'fixture-access-token');
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), null);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('petcare_user')).id), 1);
 });
 
 for (const [label, body, status, reject] of [
@@ -242,7 +245,8 @@ test('새 로그인 이후 도착한 최초 401은 새 Refresh를 사용하지 �
   await settleHttp(page, 0, {}, 401);
   assert.equal((await httpResult(page)).status, 401);
   assert.equal(await page.evaluate(() => window.fetchCalls.filter(p => p.endsWith('/refresh')).length), 0);
-  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), 'new-token');
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), null);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('petcare_user')).id), 2);
 });
 
 test('같은 사용자 재로그인도 이전 Refresh를 무효화하고 없는 Refresh Token을 제거한다', async t => {
@@ -254,7 +258,7 @@ test('같은 사용자 재로그인도 이전 Refresh를 무효화하고 없는 
   }));
   await settleHttp(page, 1, { accessToken: 'stale-token', refreshToken: 'stale-refresh' });
   assert.equal((await httpResult(page)).status, 401);
-  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), 'new-token');
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), null);
   assert.equal(await page.evaluate(() => localStorage.getItem('petcare_refresh_token')), null);
 });
 
@@ -267,7 +271,8 @@ test('늦은 Logout 완료는 새 세션을 지우지 않고 UI 종료 여부를
   await settleHttp(page, 0, {});
   await page.waitForFunction(() => window.logoutEnded !== undefined);
   assert.equal(await page.evaluate(() => window.logoutEnded), false);
-  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), 'new-token');
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), null);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('petcare_user')).id), 2);
 });
 
 test('갱신 실패: 기존 Pet·진단·저장된 세션을 정리한다', async t => {
@@ -279,10 +284,9 @@ test('갱신 실패: 기존 Pet·진단·저장된 세션을 정리한다', asyn
   await expire(page);
   assert.deepEqual(await state(page), { userId: null, pets: [], selectedPetId: null, authenticated: false, diagnosis: null, storageCleared: true, expiredEvents: 1 });
 });
-test('Refresh Token 없음: 만료 이벤트로 App 상태를 정리한다', async t => {
+test('HttpOnly Refresh Cookie 갱신 실패: 만료 이벤트로 App 상태를 정리한다', async t => {
   const page = await open(t);
   await settle(page, 0, [pet(101)]);
-  await page.evaluate(() => localStorage.removeItem('petcare_refresh_token'));
   await expire(page);
   assert.equal((await state(page)).storageCleared, true);
   assert.equal((await state(page)).selectedPetId, null);
@@ -395,14 +399,12 @@ test('재요청의 늦은 401이 다른 Login Token을 지우지 않는다', asy
   await settleHttp(page, 0, {}, 401);
   await page.waitForFunction(() => window.pendingHttp.length === 2);
   await page.evaluate(() => {
-    localStorage.setItem('petcare_token', 'fixture-user-b-token');
-    localStorage.setItem('petcare_refresh_token', 'fixture-user-b-refresh');
-    localStorage.setItem('petcare_user', JSON.stringify({ id: 2 }));
+    window.fixtureSession.save({ accessToken: 'fixture-user-b-token', user: { id: 2 } });
     window.observed.Navbar.onUserChange({ id: 2 });
   });
   await settleHttp(page, 1, {}, 401);
   assert.equal((await httpResult(page)).status, 401);
   assert.equal((await state(page)).userId, 2);
   assert.equal((await state(page)).expiredEvents, 0);
-  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token') === 'fixture-user-b-token'), true);
+  assert.equal(await page.evaluate(() => localStorage.getItem('petcare_token')), null);
 });

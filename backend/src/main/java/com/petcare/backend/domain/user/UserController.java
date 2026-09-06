@@ -1,5 +1,9 @@
 package com.petcare.backend.domain.user;
 
+import com.petcare.backend.domain.auth.RefreshTokenCookieService;
+import com.petcare.backend.domain.auth.RefreshTokenService;
+import com.petcare.backend.global.security.JwtUtil;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -12,15 +16,23 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/users")
-@CrossOrigin(origins = "*")
 public class UserController {
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
+    private final RefreshTokenCookieService refreshTokenCookieService;
+    private final JwtUtil jwtUtil;
 
-    public UserController(UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    public UserController(UserMapper userMapper, PasswordEncoder passwordEncoder,
+                          RefreshTokenService refreshTokenService,
+                          RefreshTokenCookieService refreshTokenCookieService,
+                          JwtUtil jwtUtil) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenService = refreshTokenService;
+        this.refreshTokenCookieService = refreshTokenCookieService;
+        this.jwtUtil = jwtUtil;
     }
 
     private UserDTO getAuthenticatedUser() {
@@ -102,7 +114,8 @@ public class UserController {
      * PUT /api/v1/users/me/password
      */
     @PutMapping("/me/password")
-    public ResponseEntity<?> updatePassword(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> updatePassword(@RequestBody Map<String, String> request,
+                                            HttpServletResponse servletResponse) {
         UserDTO user = getAuthenticatedUser();
         if (user == null || "DELETED".equalsIgnoreCase(user.getStatus())) {
             Map<String, Object> error = new HashMap<>();
@@ -138,17 +151,24 @@ public class UserController {
             return ResponseEntity.badRequest().body(error);
         }
 
-        // 새 비밀번호 유효성 검사 (8자 이상)
-        if (newPassword.trim().length() < 8) {
+        // 회원가입과 같은 강도: 영문, 숫자, 특수문자를 모두 포함한 8자 이상.
+        if (!newPassword.trim().matches(
+                "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[@$!%*#?&])[A-Za-z\\d@$!%*#?&]{8,}$")) {
             Map<String, Object> error = new HashMap<>();
             error.put("status", "FAIL");
-            error.put("message", "새 비밀번호는 8자 이상이어야 합니다.");
+            error.put("message", "새 비밀번호는 영문, 숫자, 특수문자를 포함하여 8자 이상이어야 합니다.");
             return ResponseEntity.badRequest().body(error);
         }
 
         // 비밀번호 암호화 후 업데이트
         String encodedNewPassword = passwordEncoder.encode(newPassword.trim());
         userMapper.updatePassword(user.getId(), encodedNewPassword);
+
+        // 다른 Browser의 탈취·잔존 Refresh Token은 모두 폐기하고 현재 Session만 이어 간다.
+        refreshTokenService.revokeAll(user.getId());
+        String replacementRefreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getEmail());
+        refreshTokenService.store(user.getId(), replacementRefreshToken);
+        refreshTokenCookieService.write(servletResponse, replacementRefreshToken);
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", "SUCCESS");

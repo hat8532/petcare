@@ -1,28 +1,49 @@
 // 모든 Domain API가 공유하는 Backend 기본 주소다.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const OAUTH_PROVIDERS = new Set(['google', 'naver', 'kakao']);
 
-const ACCESS_TOKEN_KEY = 'petcare_token';
-const REFRESH_TOKEN_KEY = 'petcare_refresh_token';
+const LEGACY_ACCESS_TOKEN_KEY = 'petcare_token';
+const LEGACY_REFRESH_TOKEN_KEY = 'petcare_refresh_token';
 const USER_KEY = 'petcare_user';
 
 export const AUTH_EXPIRED_EVENT = 'petcare:auth-expired';
 
+export function buildOAuthAuthorizationUrl(provider) {
+  if (!OAUTH_PROVIDERS.has(provider)) {
+    throw new Error('지원하지 않는 소셜 로그인 공급자입니다.');
+  }
+  const browserOrigin = typeof window !== 'undefined'
+    ? window.location.origin : 'http://localhost';
+  const backendOrigin = new URL(API_BASE_URL, browserOrigin).origin;
+  return new URL(`/oauth2/authorization/${provider}`, backendOrigin).toString();
+}
+
 let sessionVersion = 0;
+let accessToken = null;
+let refreshOperation = null;
+
+// 과거 Version의 JavaScript 접근 가능 Token을 시작 즉시 제거한다.
+localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
+localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
+
 const captureSession = () => ({ version: sessionVersion, user: localStorage.getItem(USER_KEY) });
 const isCurrentSession = (session) => session.version === sessionVersion
   && session.user === localStorage.getItem(USER_KEY);
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
-    if (event.key === null || [ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY].includes(event.key)) {
+    if (event.key === null || [LEGACY_ACCESS_TOKEN_KEY, LEGACY_REFRESH_TOKEN_KEY, USER_KEY].includes(event.key)) {
       sessionVersion++;
+      accessToken = null;
+      refreshOperation = null;
     }
   });
 }
 
 const clearSession = () => {
   sessionVersion++;
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  accessToken = null;
+  localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
+  localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
@@ -31,7 +52,6 @@ const clearSession = () => {
 
 const createHeaders = (additionalHeaders = {}, useAuth = true) => {
   const headers = { Accept: 'application/json', ...additionalHeaders };
-  const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
 
   if (useAuth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
   return headers;
@@ -54,38 +74,39 @@ export class HttpClientError extends Error {
   }
 }
 
-let refreshOperation = null;
-
 const refreshAccessToken = async (session) => {
-  if (!isCurrentSession(session)) return null;
-  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!refreshToken) {
+  if (!isCurrentSession(session) || !session.user) {
     clearSession();
     return null;
   }
 
-  if (!refreshOperation || !isCurrentSession(refreshOperation.session)
-      || refreshOperation.refreshToken !== refreshToken) {
-    const operation = { session, refreshToken };
+  if (!refreshOperation || !isCurrentSession(refreshOperation.session)) {
+    const operation = { session };
     refreshOperation = operation;
-    const stillCurrent = () => isCurrentSession(session)
-      && localStorage.getItem(REFRESH_TOKEN_KEY) === refreshToken;
-    operation.promise = fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken })
-    })
-      .then(async (response) => {
-        const body = await readResponseBody(response);
-        if (!stillCurrent()) return null;
-        if (!response.ok || !body?.accessToken) {
-          clearSession();
-          return null;
-        }
-        localStorage.setItem(ACCESS_TOKEN_KEY, body.accessToken);
-        if (body.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, body.refreshToken);
-        return body.accessToken;
-      })
+    const stillCurrent = () => isCurrentSession(session);
+
+    const executeRefresh = async () => {
+      if (!stillCurrent()) return null;
+
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json' }
+      });
+      const body = await readResponseBody(response);
+      if (!stillCurrent()) return null;
+      if (!response.ok || !body?.accessToken) {
+        clearSession();
+        return null;
+      }
+      accessToken = body.accessToken;
+      return body.accessToken;
+    };
+
+    const lockManager = typeof navigator !== 'undefined' ? navigator.locks : null;
+    operation.promise = (lockManager
+      ? lockManager.request('petcare-auth-refresh', executeRefresh)
+      : executeRefresh())
       .catch(() => {
         if (stillCurrent()) clearSession();
         return null;
@@ -107,9 +128,10 @@ const request = async (endpoint, options = {}) => {
     ...fetchOptions
   } = options;
   const session = captureSession();
-  const requestAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const requestAccessToken = accessToken;
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...fetchOptions,
+    credentials: 'include',
     headers: createHeaders(additionalHeaders, auth)
   });
 
@@ -118,7 +140,7 @@ const request = async (endpoint, options = {}) => {
   }
   if (response.status === 401 && auth && retryOnUnauthorized) {
     // 같은 세션의 다른 요청이 이미 갱신했다면 다시 Refresh하지 않는다.
-    const currentToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const currentToken = accessToken;
     const newAccessToken = currentToken && currentToken !== requestAccessToken
       ? currentToken : await refreshAccessToken(session);
     if (newAccessToken && isCurrentSession(session)) {
@@ -128,7 +150,7 @@ const request = async (endpoint, options = {}) => {
 
   // 갱신 후에도 거절된 세션만 종료한다. 늦은 401로 새 Login/갱신 Token을 지우지 않는다.
   if (response.status === 401 && auth && !retryOnUnauthorized
-      && isCurrentSession(session) && requestAccessToken === localStorage.getItem(ACCESS_TOKEN_KEY)) {
+      && isCurrentSession(session) && requestAccessToken === accessToken) {
     clearSession();
   }
 
@@ -174,11 +196,11 @@ export const sessionStorage = Object.freeze({
   clear: clearSession,
   capture: captureSession,
   isCurrent: isCurrentSession,
-  save: ({ accessToken, refreshToken, user }) => {
+  save: ({ accessToken: newAccessToken, user }) => {
     sessionVersion++;
-    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    else localStorage.removeItem(REFRESH_TOKEN_KEY);
+    accessToken = newAccessToken;
+    localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
+    localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   }
 });

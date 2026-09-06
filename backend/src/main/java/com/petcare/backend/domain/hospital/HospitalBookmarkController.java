@@ -21,7 +21,6 @@ import java.util.Map;
 // DB에 없는 병원은 hospitalId 자리에 0을 보낸다.
 @RestController
 @RequestMapping("/api/v1/hospitals")
-@CrossOrigin(origins = "*")
 public class HospitalBookmarkController {
 
     private final HospitalBookmarkMapper hospitalBookmarkMapper;

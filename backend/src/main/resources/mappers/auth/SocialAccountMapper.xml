@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.petcare.backend.domain.auth.SocialAccountMapper">
+
+    <select id="findUserByProviderAndProviderId"
+            resultType="com.petcare.backend.domain.user.UserDTO">
+        SELECT u.id, u.email, u.password, u.nickname, u.phone,
+               u.profile_image_url AS profileImageUrl,
+               u.provider, u.role, u.status,
+               u.created_at AS createdAt, u.updated_at AS updatedAt
+        FROM user_social_accounts usa
+        INNER JOIN users u ON u.id = usa.user_id
+        WHERE usa.provider = #{provider}
+          AND usa.provider_id = #{providerId}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO user_social_accounts (user_id, provider, provider_id)
+        VALUES (#{userId}, #{provider}, #{providerId})
+    </insert>
+
+</mapper>

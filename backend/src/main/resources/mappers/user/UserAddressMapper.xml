@@ -32,8 +32,9 @@
         WHERE user_id = #{userId}
     </update>
 
-    <delete id="deleteById">
-        DELETE FROM user_addresses WHERE id = #{id}
+    <delete id="deleteByIdAndUserId">
+        DELETE FROM user_addresses
+        WHERE id = #{id} AND user_id = #{userId}
     </delete>
 
 </mapper>
