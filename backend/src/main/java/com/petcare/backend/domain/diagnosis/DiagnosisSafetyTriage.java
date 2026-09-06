@@ -10,8 +10,12 @@ import java.util.regex.Pattern;
 @Component
 public class DiagnosisSafetyTriage {
 
+    // 명시적으로 끝난 부정문만 제거한다. "없지 않다", "없는 것 같다"는 지우지 않는다.
+    private static final String CONFIRMED_ABSENCE =
+            "(?:이|가|은|는)?\\s*(?:없(?:습니다|어요|음|다)|아님|아닙니다|아니에요)(?=\\s*(?:$|[.,!;]))";
+
     private static final List<Pattern> EMERGENCY_PATTERNS = List.of(
-            Pattern.compile("호흡\\s*(곤란|불가|가쁨)|숨을\\s*(못|쉬지\\s*않)|청색증|혀가\\s*파"),
+            Pattern.compile("호흡\\s*(곤란|불가|가쁨)|(?:호흡|숨)(?:이|은)?\\s*없|숨을\\s*(못|쉬지\\s*않)|청색증|혀가\\s*파"),
             Pattern.compile("의식(이)?\\s*(없|잃)|반응(이)?\\s*없|쓰러(짐|졌)|경련|발작"),
             Pattern.compile("혈변|피똥|토혈|다량(의)?\\s*출혈|출혈(이)?\\s*멈추지|피가\\s*(계속|납니다|나요|났|남|흐르)"),
             Pattern.compile("소변(을)?\\s*(못|안\\s*봄|보지\\s*못)|요도\\s*폐색"),
@@ -23,7 +27,7 @@ public class DiagnosisSafetyTriage {
             Pattern.compile("계속\\s*긁|심한\\s*가려움|행동\\s*이상|무기력"));
 
     public TriageResult evaluate(DiagnosisAnalyzeRequest request) {
-        String input = normalize(String.join(" ", request.symptoms()) + " " + request.description());
+        String input = normalize(String.join(" / ", request.symptoms())) + " / " + normalize(request.description());
         List<String> reasons = new ArrayList<>();
 
         if (matchesAny(input, EMERGENCY_PATTERNS)) {
@@ -76,7 +80,8 @@ public class DiagnosisSafetyTriage {
         return input.toLowerCase(Locale.ROOT)
                 .replaceAll("피(가|는)?\\s*(나지|보이지)\\s*않(습니다|아요|음)?", "")
                 .replaceAll("출혈(이|은|는)?\\s*(없(습니다|어요|음)?|아님)", "")
-                .replaceAll("호흡\\s*(곤란|가쁨)?(이|은|는)?\\s*(없(습니다|어요|음)?|아님)", "")
+                .replaceAll("호흡\\s*(곤란|가쁨)" + CONFIRMED_ABSENCE, "")
+                .replaceAll("(?:경련|발작)" + CONFIRMED_ABSENCE, "")
                 .replaceAll("의식(은|이)?\\s*(정상|있(습니다|어요|음)?)", "")
                 .replaceAll("\\s+", " ")
                 .trim();

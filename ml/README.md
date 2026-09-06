@@ -45,6 +45,8 @@ PETCARE_RAG_CORPUS=/absolute/path/to/corpus.json
 - 실제 사용자 Image 전송과 운영 활성화는 별도 Privacy·비용·Secret Gate를 통과한 뒤 진행한다.
 - 응답은 제한된 관찰·한계 Code와 검색된 Source ID만 허용하는 Structured JSON Validator를 통과해야 하며, `confidence`는 임상 확률이나 검증된 정확도가 아니다.
 - Provider 인증·Rate limit·Timeout·Model 부재·Contract 불일치는 안정된 Failure Code로 축소한다.
+- Gemini 각 HTTP 요청의 대기 설정은 15초이며 사진 Gate와 본 분석을 합친 Adapter 실행은 30초로 제한한다. 초과하면 대기 중 요청을 취소하고 `INFERENCE_TIMEOUT`으로 변환한다. Spring read timeout은 35초, Frontend 분석 Abort는 45초로 두어 상위 계층에 응답·저장 여유를 둔다.
+- 브라우저 Abort는 이미 전송된 Provider 요청이나 DB 저장의 취소·중복 방지를 보장하지 않는다. 재시도 Idempotency는 별도 Contract가 필요하다.
 - Gemini 호출 전 `DOG·CAT + SKIN` 범위의 Source를 TF-IDF 방식으로 최대 3건 검색한다.
 - 사용자 입력과 RAG 문맥을 보내기 전에 별도 Gemini Image Gate를 호출하며, 실제 반려동물 피부 환부가 선명한 사진이 아니면 `PROVIDER_REJECTED`로 실패 처리하고 본 분석을 호출하지 않는다.
 - Gemini는 자유 형식 Report를 작성하지 않는다. 검색 결과에서 관련 Source ID만 선택하고, 사용자에게 보이는 Report는 선택된 로컬 한국어 요약을 그대로 조합한다.

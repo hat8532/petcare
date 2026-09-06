@@ -3,12 +3,18 @@ package com.petcare.backend.domain.diagnosis;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HexFormat;
+import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 @Service
 public class DiagnosisService {
@@ -62,6 +68,12 @@ public class DiagnosisService {
             String ownerEmail) {
         DiagnosisPetContext petContext = requireOwnedPet(request.petId(), ownerEmail);
         ValidatedDiagnosisImage validatedImage = diagnosisImageValidator.validate(image);
+        String key = UUID.fromString(request.idempotencyKey()).toString();
+        String hash = sha256(writeJson(List.of("diagnosis-request@1", request.petId(),
+                request.affectedArea(), request.customAreaText(), request.symptoms(),
+                request.description(), sha256(validatedImage.bytes()))).getBytes(StandardCharsets.UTF_8));
+        DiagnosisRecordDTO existing = diagnosisRecordMapper.findByIdempotencyKey(petContext.userId(), key);
+        if (existing != null) return replay(existing, hash);
 
         DiagnosisAnalyzeRequest trustedRequest = trustedRequest(request, petContext);
         DiagnosisSafetyTriage.TriageResult triageResult = safetyTriage.evaluate(trustedRequest);
@@ -73,6 +85,8 @@ public class DiagnosisService {
         DiagnosisRecordDTO record = DiagnosisRecordDTO.builder()
                 .userId(petContext.userId())
                 .petId(petContext.petId())
+                .idempotencyKey(key)
+                .requestHash(hash)
                 .affectedArea(trustedRequest.affectedArea())
                 .symptomsJson(writeJson(trustedRequest.symptoms()))
                 .imageUrl(imageKey)
@@ -85,12 +99,31 @@ public class DiagnosisService {
 
         try {
             diagnosisRecordMapper.insert(record);
+        } catch (DuplicateKeyException exception) {
+            // 동시 INSERT의 패자가 만든 파일만 정리한다. 기존 승자 기록/파일은 보존한다.
+            diagnosisImageStorage.deleteQuietly(imageKey);
+            DiagnosisRecordDTO winner = diagnosisRecordMapper.findByIdempotencyKey(petContext.userId(), key);
+            if (winner == null) throw exception;
+            return replay(winner, hash);
         } catch (RuntimeException exception) {
             diagnosisImageStorage.deleteQuietly(imageKey);
             throw exception;
         }
-        DiagnosisRecordDTO savedRecord = diagnosisRecordMapper.findByIdAndOwner(record.getId(), ownerEmail);
-        return DiagnosisResultResponse.from(savedRecord == null ? record : savedRecord, objectMapper);
+        // INSERT에서 DB가 만든 ID·시각을 함께 받으므로 저장 성공 뒤 SELECT 실패가 생기지 않는다.
+        return DiagnosisResultResponse.from(record, objectMapper);
+    }
+
+    private DiagnosisResultResponse replay(DiagnosisRecordDTO record, String hash) {
+        if (!hash.equals(record.getRequestHash())) throw new DiagnosisConflictException();
+        return DiagnosisResultResponse.from(record, objectMapper);
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256을 사용할 수 없습니다.", exception);
+        }
     }
 
     public DiagnosisImageResource getDiagnosisImage(Long diagnosisId, String ownerEmail) {
@@ -152,7 +185,7 @@ public class DiagnosisService {
                 request.customAreaText(),
                 request.symptoms(),
                 request.description(),
-                Map.of());
+                Map.of(), request.idempotencyKey());
     }
 
     private String buildSafeReport(

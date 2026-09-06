@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { diagnosisApi } from '../api/diagnosisApi';
 import AiBenchmarkModal from './AiBenchmarkModal';
 import DiagnosisFailureDialog from './DiagnosisFailureDialog';
@@ -31,7 +31,7 @@ const FAILURE_GUIDANCE = Object.freeze({
 });
 
 const failureGuidance = (failureCode) => FAILURE_GUIDANCE[failureCode]
-  || '외부 Image 분석 Provider 응답을 검증하지 못해 입력 기반 Safety Triage만 저장했습니다.';
+  || '외부 Image 분석 Provider 응답을 검증하지 못해 AI 소견을 제공하지 못했습니다.';
 
 const ACTION_TITLES = Object.freeze({
   MONITOR_AND_RECORD: '집에서 경과 기록',
@@ -83,11 +83,19 @@ export default function DiagnosisDropzone({
   const [historyPage, setHistoryPage] = useState(0);
   const [historyMeta, setHistoryMeta] = useState({ totalElements: 0, totalPages: 0 });
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [previewDiagnosisId, setPreviewDiagnosisId] = useState(null);
-  const [storedImagePreview, setStoredImagePreview] = useState('');
-  const [storedImageError, setStoredImageError] = useState('');
+  const [storedImage, setStoredImage] = useState(null);
   const fileInputRef = useRef(null);
+  // 생성·상세는 같은 결과 영역을, 목록은 별도 영역을 갱신하므로 순번을 나눠 관리한다.
+  const resultRequestRef = useRef(0);
+  const historyRequestRef = useRef(0);
+  const submissionRef = useRef(null);
   const closeAnalysisFailure = useCallback(() => setAnalysisFailure(null), []);
+
+  useLayoutEffect(() => () => {
+    // App의 Pet key 변경·화면 종료 시 이전 응답의 부모 Callback까지 무효화한다.
+    resultRequestRef.current += 1;
+    historyRequestRef.current += 1;
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -108,25 +116,27 @@ export default function DiagnosisDropzone({
   }, [imagePreview]);
 
   useEffect(() => {
-    if (!analysisResult?.diagnosisId || !analysisResult?.imageUrl) {
-      setStoredImagePreview('');
-      setStoredImageError('');
+    const diagnosisId = analysisResult?.diagnosisId;
+    const imageUrl = analysisResult?.imageUrl;
+    setStoredImage(null);
+    if (!diagnosisId || !imageUrl) {
       return undefined;
     }
 
     let active = true;
     let objectUrl = '';
-    diagnosisApi.getDiagnosisImage(analysisResult.diagnosisId)
+    diagnosisApi.getDiagnosisImage(diagnosisId)
       .then((blob) => {
         if (!active) return;
         objectUrl = URL.createObjectURL(blob);
-        setStoredImagePreview(objectUrl);
-        setStoredImageError('');
+        setStoredImage({ diagnosisId, imageUrl, objectUrl, error: '' });
       })
       .catch((error) => {
         if (!active) return;
-        setStoredImagePreview('');
-        setStoredImageError(error?.message || '저장된 진단 Image를 불러오지 못했습니다.');
+        setStoredImage({
+          diagnosisId, imageUrl, objectUrl: '',
+          error: error?.message || '저장된 진단 Image를 불러오지 못했습니다.'
+        });
       });
 
     return () => {
@@ -136,6 +146,7 @@ export default function DiagnosisDropzone({
   }, [analysisResult?.diagnosisId, analysisResult?.imageUrl]);
 
   const loadHistory = useCallback(async (page = 0) => {
+    const requestId = ++historyRequestRef.current;
     if (!selectedPet?.id) {
       setHistory([]);
       setHistoryError('');
@@ -146,6 +157,7 @@ export default function DiagnosisDropzone({
     setIsHistoryLoading(true);
     try {
       const resultPage = await diagnosisApi.getHistoryByPet(selectedPet.id, page, HISTORY_PAGE_SIZE);
+      if (requestId !== historyRequestRef.current) return;
       setHistory(resultPage.content);
       setHistoryPage(resultPage.page);
       setHistoryMeta({
@@ -154,10 +166,11 @@ export default function DiagnosisDropzone({
       });
       setHistoryError('');
     } catch (error) {
+      if (requestId !== historyRequestRef.current) return;
       setHistory([]);
       setHistoryError(error?.message || '과거 진단 이력을 불러오지 못했습니다.');
     } finally {
-      setIsHistoryLoading(false);
+      if (requestId === historyRequestRef.current) setIsHistoryLoading(false);
     }
   }, [selectedPet?.id]);
 
@@ -211,37 +224,47 @@ export default function DiagnosisDropzone({
       return;
     }
 
+    const payload = {
+      petId: selectedPet.id,
+      petName: selectedPet.name || '반려동물',
+      petSpecies: selectedPet.species || 'UNKNOWN',
+      affectedArea, customAreaText, symptoms: selectedSymptoms,
+      description: description.trim(), healthProfile: selectedPet.healthProfile
+    };
+    const fingerprint = JSON.stringify(payload);
+    // 응답 유실/Timeout은 같은 제출을 재전송한다. 입력 변경·완료 뒤 새 분석은 새 Key다.
+    if (!submissionRef.current || submissionRef.current.fingerprint !== fingerprint
+        || submissionRef.current.image !== imageFile) {
+      submissionRef.current = { fingerprint, image: imageFile, key: crypto.randomUUID() };
+    }
+    const submission = submissionRef.current;
+    const requestId = ++resultRequestRef.current;
     setIsAnalyzing(true);
     setAnalysisResult(null);
     setAnalysisError('');
     setAnalysisFailure(null);
-    setPreviewDiagnosisId(null);
 
     try {
-      const result = await diagnosisApi.analyze({
-        petId: selectedPet.id,
-        petName: selectedPet.name || '반려동물',
-        petSpecies: selectedPet.species || 'UNKNOWN',
-        affectedArea,
-        customAreaText,
-        symptoms: selectedSymptoms,
-        description: description.trim(),
-        healthProfile: selectedPet.healthProfile
-      }, imageFile);
+      const result = await diagnosisApi.analyze({ ...payload, idempotencyKey: submission.key }, imageFile);
 
+      if (requestId !== resultRequestRef.current) return;
+      if (result.petId !== selectedPet.id) throw new Error('선택한 반려동물의 진단 결과가 아닙니다.');
+      if (submissionRef.current === submission) submissionRef.current = null;
       setAnalysisResult(result);
-      setPreviewDiagnosisId(result.diagnosisId);
       onDiagnosisResult?.(result);
       await loadHistory(0);
+      if (requestId !== resultRequestRef.current) return;
       // 응급 분기에서는 Emergency modal을 우선해 두 개의 focus trap이 동시에 열리지 않게 한다.
       if (result.riskLevel !== 'EMERGENCY' && result.failureCode) {
         setAnalysisFailure({
           code: result.failureCode,
+          diagnosisId: result.diagnosisId,
           message: failureGuidance(result.failureCode),
           canRetry: RETRYABLE_FAILURE_CODES.has(result.failureCode)
         });
       }
     } catch (error) {
+      if (requestId !== resultRequestRef.current) return;
       const message = error?.message || '진단 API 요청에 실패했습니다.';
       setAnalysisError(message);
       setAnalysisFailure({
@@ -250,19 +273,27 @@ export default function DiagnosisDropzone({
         canRetry: !error?.status || error.status >= 500
       });
     } finally {
-      setIsAnalyzing(false);
+      if (requestId === resultRequestRef.current) setIsAnalyzing(false);
     }
   };
 
   const showStoredDiagnosis = async (diagnosisId) => {
+    const requestId = ++resultRequestRef.current;
+    setIsAnalyzing(false);
+    setAnalysisError('');
+    setAnalysisFailure(null);
     try {
       const result = await diagnosisApi.getDiagnosis(diagnosisId);
+      if (requestId !== resultRequestRef.current) return;
+      if (result.petId !== selectedPet?.id || result.diagnosisId !== diagnosisId) {
+        throw new Error('선택한 진단 이력과 응답이 일치하지 않습니다.');
+      }
       setAnalysisResult(result);
       setAnalysisError('');
       setAnalysisFailure(null);
-      setPreviewDiagnosisId(null);
       onDiagnosisResult?.(result);
     } catch (error) {
+      if (requestId !== resultRequestRef.current) return;
       setAnalysisError(error?.message || '저장된 진단 결과를 불러오지 못했습니다.');
     }
   };
@@ -277,8 +308,12 @@ export default function DiagnosisDropzone({
   const findings = analysisResult?.visionTopDiseases || [];
   const ragSources = analysisResult?.ragSources || [];
   const isRagPrototype = analysisResult?.analysisMode === 'GEMINI_RAG_PROTOTYPE';
-  const resultImageUrl = storedImagePreview
-    || (analysisResult?.diagnosisId === previewDiagnosisId ? imagePreview : '');
+  // 입력 Preview는 바뀔 수 있으므로 결과에는 현재 진단에 결속된 저장 사진만 표시한다.
+  const resultImage = storedImage?.diagnosisId === analysisResult?.diagnosisId
+    && storedImage?.imageUrl === analysisResult?.imageUrl ? storedImage : null;
+  const resultImageUrl = resultImage?.objectUrl || '';
+  const storedImageError = resultImage ? resultImage.error
+    : analysisResult?.imageUrl ? '저장된 환부 Image를 불러오는 중입니다.' : '';
 
   const printDiagnosisReport = () => {
     window.print();
@@ -295,11 +330,20 @@ export default function DiagnosisDropzone({
       <AiBenchmarkModal isOpen={isBenchmarkOpen} onClose={() => setIsBenchmarkOpen(false)} />
       <style>{`
         @media print {
-          body * { visibility: hidden !important; }
-          #diagnosis-print-report, #diagnosis-print-report * { visibility: visible !important; }
+          body { margin: 0 !important; min-height: 0 !important; background: white !important; }
+          body *:not(:has(#diagnosis-print-report)):not(#diagnosis-print-report):not(#diagnosis-print-report *) {
+            display: none !important;
+          }
+          body *:has(#diagnosis-print-report) {
+            display: block !important; position: static !important;
+            height: auto !important; min-height: 0 !important;
+            margin: 0 !important; padding: 0 !important;
+          }
+          #diagnosis-print-report, #diagnosis-print-report * { animation: none !important; transform: none !important; }
           #diagnosis-print-report {
-            position: absolute !important;
-            inset: 0 auto auto 0 !important;
+            display: block !important;
+            position: static !important;
+            min-height: 0 !important;
             width: 100% !important;
             box-shadow: none !important;
             border: 0 !important;
@@ -637,9 +681,9 @@ export default function DiagnosisDropzone({
                   <span className={`badge ${riskBadgeClass(analysisResult.riskLevel)}`} style={{ fontSize: '14px', padding: '6px 14px' }}>
                     위험도: {analysisResult.riskLabel}
                   </span>
-                  <div className="diagnosis-no-print" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <span style={{ color: '#64748b', fontSize: '12px' }}>{formatDate(analysisResult.createdAt)}</span>
-                    <button type="button" onClick={printDiagnosisReport} className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '12px' }}>
+                    <button type="button" onClick={printDiagnosisReport} className="btn btn-secondary diagnosis-no-print" style={{ padding: '7px 12px', fontSize: '12px' }}>
                       PDF 저장·인쇄
                     </button>
                   </div>
@@ -650,6 +694,12 @@ export default function DiagnosisDropzone({
                     ? 'AI Image 의심 소견 안내'
                     : '진단 분석 결과 리포트'}
                 </h3>
+
+                <p style={{ marginBottom: '12px', color: '#64748b', fontSize: '12px', overflowWrap: 'anywhere' }}>
+                  진단 #{analysisResult.diagnosisId} · 반려동물 #{analysisResult.petId}
+                  {analysisResult.petId === selectedPet?.id && selectedPet.name ? ` (${selectedPet.name})` : ''}
+                  {' · 환부: '}{AREA_OPTIONS.find(area => area.id === analysisResult.affectedArea)?.label || analysisResult.affectedArea}
+                </p>
 
                 <div style={{ marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '10px', fontSize: '12px', color: '#475569' }}>
                   <strong>분석 Mode:</strong> {analysisResult.analysisMode || 'UNKNOWN'}
@@ -667,6 +717,7 @@ export default function DiagnosisDropzone({
                           type="button"
                           onClick={() => setAnalysisFailure({
                             code: analysisResult.failureCode,
+                            diagnosisId: analysisResult.diagnosisId,
                             message: failureGuidance(analysisResult.failureCode),
                             canRetry: Boolean(imageFile)
                               && RETRYABLE_FAILURE_CODES.has(analysisResult.failureCode)

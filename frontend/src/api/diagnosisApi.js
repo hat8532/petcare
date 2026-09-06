@@ -39,6 +39,7 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  *
  * @typedef {Object} DiagnosisAnalyzeRequest
  * @property {number} petId
+ * @property {string} idempotencyKey 동일 제출 재전송에 재사용하는 UUID
  * @property {string} petName
  * @property {string} petSpecies
  * @property {string} affectedArea
@@ -84,7 +85,8 @@ export const DIAGNOSIS_ENDPOINTS = Object.freeze({
  * @property {number} totalPages
  */
 
-const ANALYSIS_TIMEOUT_MS = 20_000;
+// Gemini 전체 30초를 기다리는 Spring read 35초에 연결·저장·응답 여유를 둔다.
+const ANALYSIS_TIMEOUT_MS = 45_000;
 
 /* ====================================================
    3. 진단 입력·응답 검증

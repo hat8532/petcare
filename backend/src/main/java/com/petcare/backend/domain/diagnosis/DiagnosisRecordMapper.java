@@ -25,5 +25,9 @@ public interface DiagnosisRecordMapper {
             @Param("id") Long id,
             @Param("email") String email);
 
+    DiagnosisRecordDTO findByIdempotencyKey(
+            @Param("userId") Long userId,
+            @Param("key") String key);
+
     void insert(DiagnosisRecordDTO record);
 }

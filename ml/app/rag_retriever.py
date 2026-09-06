@@ -165,6 +165,8 @@ def _cosine_similarity(left: dict[str, float], right: dict[str, float]) -> float
 def _load_corpus(path_value: str) -> _Corpus:
     try:
         raw = json.loads(Path(path_value).read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError("corpus must be an object")
         if raw.get("schemaVersion") != "petcare-rag-corpus@1":
             raise ValueError("unsupported schema")
         corpus_id = _required_text(raw, "corpusId", 100)

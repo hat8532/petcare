@@ -36,7 +36,8 @@ public class VisionInferenceClient {
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(3_000);
-        requestFactory.setReadTimeout(10_000);
+        // Gemini 두 단계의 합산 제한 30초보다 길고, 화면의 45초 제한보다 짧게 둔다.
+        requestFactory.setReadTimeout(35_000);
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)

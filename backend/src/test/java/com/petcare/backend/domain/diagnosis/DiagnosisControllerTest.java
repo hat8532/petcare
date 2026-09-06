@@ -35,6 +35,7 @@ class DiagnosisControllerTest {
                         .file(new MockMultipartFile("request", "", "application/json", """
                                 {
                                   "petId": 1,
+                                  "idempotencyKey": "00000000-0000-0000-0000-000000000001",
                                   "petName": "초코",
                                   "petSpecies": "DOG",
                                   "affectedArea": "SKIN",
@@ -71,6 +72,7 @@ class DiagnosisControllerTest {
                         .file(new MockMultipartFile("request", "", "application/json", """
                 {
                                   "petId": 1,
+                                  "idempotencyKey": "00000000-0000-0000-0000-000000000001",
                                   "petSpecies": "DOG",
                                   "affectedArea": "SKIN",
                                   "symptoms": ["가려움/긁음"],
