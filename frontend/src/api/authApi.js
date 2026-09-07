@@ -5,6 +5,7 @@ const publicRequest = Object.freeze({ auth: false });
 export const authApi = Object.freeze({
   signup: (payload) => httpClient.post('/auth/signup', payload, publicRequest),
   login: (payload) => httpClient.post('/auth/login', payload, publicRequest),
+  exchangeOAuthCode: (code) => httpClient.post('/auth/oauth2/exchange', { code }, publicRequest),
 
   checkEmail: async (email) => {
     try {
@@ -28,7 +29,8 @@ export const authApi = Object.freeze({
     const session = sessionStorage.capture();
     let ended = false;
     try {
-      await httpClient.post('/auth/logout', undefined, { retryOnUnauthorized: false });
+      await httpClient.post('/auth/logout', undefined,
+        { auth: false, retryOnUnauthorized: false });
     } catch (error) {
       console.warn('Logout request warning:', error);
     } finally {

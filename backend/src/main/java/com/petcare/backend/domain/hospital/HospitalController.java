@@ -1,9 +1,13 @@
 package com.petcare.backend.domain.hospital;
 
 import com.petcare.backend.global.hospital.NaverLocalSearchService;
+import com.petcare.backend.global.security.RequestRateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Comparator;
 import java.util.List;
@@ -11,16 +15,18 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/hospitals")
-@CrossOrigin(origins = "*")
 public class HospitalController {
 
     private final HospitalMapper hospitalMapper;
     private final NaverLocalSearchService naverLocalSearchService;
+    private final RequestRateLimiter requestRateLimiter;
 
     public HospitalController(HospitalMapper hospitalMapper,
-                              NaverLocalSearchService naverLocalSearchService) {
+                              NaverLocalSearchService naverLocalSearchService,
+                              RequestRateLimiter requestRateLimiter) {
         this.hospitalMapper = hospitalMapper;
         this.naverLocalSearchService = naverLocalSearchService;
+        this.requestRateLimiter = requestRateLimiter;
     }
 
     @GetMapping("/nearby")
@@ -28,13 +34,30 @@ public class HospitalController {
             @RequestParam(name = "lat", defaultValue = "37.5507") double lat,
             @RequestParam(name = "lng", defaultValue = "126.9408") double lng,
             @RequestParam(name = "isEmergency24h", required = false) Boolean isEmergency24h,
-            @RequestParam(name = "region", required = false) String region) {
+            @RequestParam(name = "region", required = false) String region,
+            HttpServletRequest servletRequest) {
+
+        if (!Double.isFinite(lat) || lat < -90 || lat > 90
+                || !Double.isFinite(lng) || lng < -180 || lng > 180) {
+            return badRequest("위도와 경도 범위가 올바르지 않습니다.");
+        }
+
+        String normalizedRegion = region == null ? "" : region.trim();
+        if (normalizedRegion.length() > 50) {
+            return badRequest("지역명은 50자 이하로 입력해 주세요.");
+        }
+
+        RequestRateLimiter.Decision limit = requestRateLimiter.tryAcquire(
+                "hospital:" + servletRequest.getRemoteAddr(), 60, Duration.ofMinutes(1));
+        if (!limit.allowed()) {
+            return rateLimited(limit.retryAfterSeconds());
+        }
 
         // 병원 정보는 네이버 지역검색(검증된 출처)에서만 가져온다.
         // DB fallback을 두지 않는 이유: 과거 seed 데이터가 실존하지 않는 병원이었고
         // (네이버 검색 0건 또는 주소 불일치), 평점·영업시간·전화번호도 임의값이었다.
         // 응급 상황에 쓰이는 정보라 검증되지 않은 출처는 표시하지 않는다.
-        List<HospitalDTO> hospitals = naverLocalSearchService.searchEmergencyVetHospitals(region, 5);
+        List<HospitalDTO> hospitals = naverLocalSearchService.searchEmergencyVetHospitals(normalizedRegion, 5);
 
         // 각 병원까지의 직선 거리를 계산해 담고, 가까운 순으로 정렬한다.
         hospitals.forEach(h -> h.setDistance(distanceInKm(lat, lng, h.getLatitude(), h.getLongitude())));
@@ -50,6 +73,22 @@ public class HospitalController {
         response.put("data", hospitals);
 
         return ResponseEntity.ok(response);
+    }
+
+    private ResponseEntity<Map<String, Object>> badRequest(String message) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "FAIL");
+        response.put("message", message);
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    private ResponseEntity<Map<String, Object>> rateLimited(long retryAfterSeconds) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "FAIL");
+        response.put("message", "병원 검색 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.");
+        return ResponseEntity.status(429)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds))
+                .body(response);
     }
 
     @GetMapping("/{id}")

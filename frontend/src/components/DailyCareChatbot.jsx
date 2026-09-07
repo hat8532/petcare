@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { httpClient } from '../api/common/httpClient';
 
 export default function DailyCareChatbot({ selectedPet }) {
   const [messages, setMessages] = useState(() => {
@@ -6,7 +7,7 @@ export default function DailyCareChatbot({ selectedPet }) {
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) {}
+      } catch {}
     }
     return [
       {
@@ -106,62 +107,34 @@ export default function DailyCareChatbot({ selectedPet }) {
     setInput('');
     setIsAiThinking(true);
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-
-    // 1. Try Spring Boot Backend Gemini Service First
+    // Gemini Key는 Browser Bundle에 넣지 않고 인증된 Backend를 통해서만 사용한다.
     try {
-      const res = await fetch('http://localhost:8080/api/v1/chat/daily', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMsg,
-          petName: selectedPet?.name || '반려동물',
-          petSpecies: selectedPet?.species || '반려동물'
-        })
+      const data = await httpClient.post('/chat/daily', {
+        message: userMsg,
+        petName: selectedPet?.name || '반려동물',
+        petSpecies: selectedPet?.species || '반려동물'
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.status === 'SUCCESS' && data.aiReply) {
-          setMessages(prev => [...prev, { sender: 'ai', text: data.aiReply }]);
-          setIsAiThinking(false);
-          return;
-        }
+      if (data?.status === 'SUCCESS' && data.aiReply) {
+        setMessages(prev => [...prev, { sender: 'ai', text: data.aiReply }]);
+        setIsAiThinking(false);
+        return;
       }
     } catch (err) {
-      console.warn('Backend chat endpoint offline, proceeding with direct Gemini REST API...', err);
+      console.warn('Backend chat request failed:', err);
+      setMessages(prev => [...prev, {
+        sender: 'ai',
+        text: err?.status === 401
+          ? '🔐 AI 상담은 로그인 후 사용할 수 있습니다.'
+          : '🤖 현재 AI 상담 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.'
+      }]);
+      setIsAiThinking(false);
+      return;
     }
 
-    // 2. Direct Google Gemini Flash REST API Call (Guarantees Real Gemini AI Response!)
-    try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
-      const promptText = `당신은 전문 수의사 및 반려동물 헬스케어 AI 어시스턴트입니다.\n반려동물 이름: ${selectedPet?.name || '반려동물'} (종류: ${selectedPet?.species || '반려동물'})\n보호자 질문: "${userMsg}"\n\n친절하고 신뢰할 수 있는 수의사 어조로 이모지를 적절히 활용하여 정확한 수의학/사료/관절/영양/행동 조언을 한국어로 명확하게 작성해 주세요.`;
-
-      const aiRes = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }]
-        })
-      });
-
-      if (aiRes.ok) {
-        const aiData = await aiRes.json();
-        const realText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (realText) {
-          setMessages(prev => [...prev, { sender: 'ai', text: realText }]);
-          setIsAiThinking(false);
-          return;
-        }
-      }
-    } catch (e) {
-      console.error('Direct Gemini API call failed:', e);
-    }
-
-    // Fallback if network fails
     setMessages(prev => [...prev, {
       sender: 'ai',
-      text: `🤖 [Gemini AI 실시간 수의학 응답]\n"${userMsg}" 질문에 대한 수의학 조언입니다.\n관절/무릎 보호를 위해 글루코사민, 콘드로이친, MSM이 함유된 관절 전용 처방 사료와 함께 바닥 미끄럼 방지 매트 시공을 강력 추천합니다!`
+      text: '🤖 현재 AI 응답을 만들 수 없습니다. 잠시 후 다시 시도해 주세요.'
     }]);
     setIsAiThinking(false);
   };

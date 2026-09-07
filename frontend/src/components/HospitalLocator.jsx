@@ -1,6 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { hospitalApi } from '../api/hospitalApi';
 
+const HTML_ESCAPE_MAP = Object.freeze({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+});
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => HTML_ESCAPE_MAP[character]);
+}
+
+function safeNaverMapUrl(rawUrl, hospitalName) {
+  const fallback = `https://map.naver.com/v5/search/${encodeURIComponent(hospitalName || '')}`;
+  if (!rawUrl) return fallback;
+
+  try {
+    const parsed = new URL(rawUrl);
+    return parsed.protocol === 'https:' && parsed.hostname === 'map.naver.com'
+      ? parsed.toString()
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 // 같은 병원인지 판단하는 열쇠. 네이버에서 온 병원은 id가 없어서 이름+주소로 맞춘다.
 // 서버의 findByNameAndAddress 와 같은 기준이라야 화면과 DB가 어긋나지 않는다.
 function hospitalKey(h) {
@@ -328,7 +354,7 @@ export default function HospitalLocator({ user, onOpenLogin }) {
         });
         userMarkerRef.current = window.L.marker([userGps.lat, userGps.lng], { icon: userIcon })
           .addTo(map)
-          .bindPopup(`<b>📍 내 실제 GPS 위치 (고정)</b><br/>${userGps.name}`);
+          .bindPopup(`<b>📍 내 실제 GPS 위치 (고정)</b><br/>${escapeHtml(userGps.name)}`);
       }
 
       // 2. Render Hospital Markers for current viewport
@@ -337,10 +363,13 @@ export default function HospitalLocator({ user, onOpenLogin }) {
 
       hospitals.forEach(h => {
         const isEmergency = h.isEmergency24h;
+        const safeName = escapeHtml(h.name);
+        const safeAddress = escapeHtml(h.address);
+        const safePlaceUrl = escapeHtml(safeNaverMapUrl(h.naverPlaceUrl, h.name));
         const hospitalIcon = window.L.divIcon({
           className: 'hospital-marker',
           html: `<div style="background:${isEmergency ? '#e11d48' : '#0284c7'}; color:#fff; padding:5px 10px; border-radius:14px; font-size:11px; font-weight:bold; white-space:nowrap; box-shadow:0 4px 10px rgba(0,0,0,0.25); border:1px solid #fff;">
-                  ${isEmergency ? '🚨' : '🏥'} ${h.name} (${h.distance.toFixed(1)}km)
+                  ${isEmergency ? '🚨' : '🏥'} ${safeName} (${h.distance.toFixed(1)}km)
                 </div>`,
           iconSize: [120, 30],
           iconAnchor: [60, 30]
@@ -350,12 +379,12 @@ export default function HospitalLocator({ user, onOpenLogin }) {
         
         const popupContent = `
           <div style="font-family:sans-serif; padding:4px;">
-            <strong style="font-size:14px; color:#0f172a;">${h.name}</strong>
+            <strong style="font-size:14px; color:#0f172a;">${safeName}</strong>
             ${h.isEmergency24h ? '<span style="color:#e11d48; font-weight:bold; font-size:11px; margin-left:6px;">🚨 24시 응급</span>' : ''}
-            <div style="font-size:12px; color:#64748b; margin-top:4px;">${h.address}</div>
+            <div style="font-size:12px; color:#64748b; margin-top:4px;">${safeAddress}</div>
             <div style="font-size:12px; color:#059669; font-weight:bold; margin-top:4px;">📍 거리: ${h.distance.toFixed(1)} km</div>
             <div style="margin-top:8px;">
-              <a href="${h.naverPlaceUrl || 'https://map.naver.com/v5/search/' + encodeURIComponent(h.name)}" target="_blank" style="background:#03c75a; color:#fff; padding:6px 12px; border-radius:8px; font-size:12px; text-decoration:none; display:inline-block; font-weight:bold;">
+              <a href="${safePlaceUrl}" target="_blank" rel="noopener noreferrer" style="background:#03c75a; color:#fff; padding:6px 12px; border-radius:8px; font-size:12px; text-decoration:none; display:inline-block; font-weight:bold;">
                 🗺️ 네이버 길안내
               </a>
             </div>
@@ -549,9 +578,9 @@ export default function HospitalLocator({ user, onOpenLogin }) {
                 </div>
 
                 <a
-                  href={selectedHospital.naverPlaceUrl || `https://map.naver.com/v5/search/${encodeURIComponent(selectedHospital.name)}`}
+                  href={safeNaverMapUrl(selectedHospital.naverPlaceUrl, selectedHospital.name)}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="btn btn-primary"
                   style={{ padding: '8px 16px', fontSize: '13px', whiteSpace: 'nowrap', background: '#03c75a', border: 'none' }}
                 >
@@ -640,9 +669,9 @@ export default function HospitalLocator({ user, onOpenLogin }) {
                           📞 전화
                         </a>
                         <a
-                          href={h.naverPlaceUrl || `https://map.naver.com/v5/search/${encodeURIComponent(h.name)}`}
+                          href={safeNaverMapUrl(h.naverPlaceUrl, h.name)}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           className="btn btn-primary"
                           style={{ padding: '6px 12px', fontSize: '12px', background: '#03c75a', border: 'none' }}

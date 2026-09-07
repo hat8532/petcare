@@ -10,7 +10,7 @@ public interface PetMapper {
     List<PetDTO> findByUserId(@Param("userId") Long userId);
     PetDTO findById(@Param("id") Long id);
     void insert(PetDTO pet);
-    void update(PetDTO pet);
-    void deleteById(@Param("id") Long id);
+    int update(PetDTO pet);
+    int deleteByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
     int countAll();
 }

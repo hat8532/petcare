@@ -13,7 +13,19 @@ class JwtUtilTest {
 
         String firstToken = firstProcess.generateAccessToken(1L, "owner@example.com", "ROLE_USER");
 
-        assertThat(firstProcess.validateToken(firstToken)).isTrue();
-        assertThat(secondProcess.validateToken(firstToken)).isFalse();
+        assertThat(firstProcess.validateAccessToken(firstToken)).isTrue();
+        assertThat(secondProcess.validateAccessToken(firstToken)).isFalse();
+    }
+
+    @Test
+    void accessAndRefreshTokensCannotBeUsedInterchangeably() {
+        JwtUtil jwtUtil = new JwtUtil("");
+        String accessToken = jwtUtil.generateAccessToken(1L, "owner@example.com", "ROLE_USER");
+        String refreshToken = jwtUtil.generateRefreshToken(1L, "owner@example.com");
+
+        assertThat(jwtUtil.validateAccessToken(accessToken)).isTrue();
+        assertThat(jwtUtil.validateRefreshToken(accessToken)).isFalse();
+        assertThat(jwtUtil.validateRefreshToken(refreshToken)).isTrue();
+        assertThat(jwtUtil.validateAccessToken(refreshToken)).isFalse();
     }
 }

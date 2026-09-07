@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -37,6 +39,9 @@ class AuthExtendedControllerTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private RefreshTokenService refreshTokenService;
+
     private final String email = "extended_test_user@petcare.com";
     private final String password = "ComplexPassword123!";
     private final String nickname = "해피집사";
@@ -55,32 +60,34 @@ class AuthExtendedControllerTest {
                 .build();
         userMapper.insert(user);
 
-        String refreshToken = jwtUtil.generateRefreshToken(email);
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), email);
+        refreshTokenService.store(user.getId(), refreshToken);
 
-        AuthDTO.RefreshTokenRequest refreshRequest = AuthDTO.RefreshTokenRequest.builder()
-                .refreshToken(refreshToken)
-                .build();
-
-        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(refreshRequest, "refreshRequest");
-        ResponseEntity<?> response = authController.refreshAccessToken(refreshRequest, bindingResult);
+        MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+        ResponseEntity<?> response = authController.refreshAccessToken(
+                refreshToken, new MockHttpServletRequest(), servletResponse);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isInstanceOf(AuthDTO.AuthResponse.class);
 
         AuthDTO.AuthResponse authResponse = (AuthDTO.AuthResponse) response.getBody();
         assertThat(authResponse.getAccessToken()).isNotBlank();
-        assertThat(jwtUtil.validateToken(authResponse.getAccessToken())).isTrue();
+        assertThat(jwtUtil.validateAccessToken(authResponse.getAccessToken())).isTrue();
+        assertThat(authResponse.getRefreshToken()).isNull();
+        assertThat(servletResponse.getHeader("Set-Cookie"))
+                .contains(RefreshTokenCookieService.COOKIE_NAME + "=")
+                .contains("HttpOnly");
+
+        ResponseEntity<?> replayResponse = authController.refreshAccessToken(
+                refreshToken, new MockHttpServletRequest(), new MockHttpServletResponse());
+        assertThat(replayResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
     @DisplayName("④ Refresh Token 갱신 실패 - 위조된 토큰에 대해 401 반환 검증")
     void testRefreshTokenInvalid() {
-        AuthDTO.RefreshTokenRequest refreshRequest = AuthDTO.RefreshTokenRequest.builder()
-                .refreshToken("forged.fake.refresh.token")
-                .build();
-
-        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(refreshRequest, "refreshRequest");
-        ResponseEntity<?> response = authController.refreshAccessToken(refreshRequest, bindingResult);
+        ResponseEntity<?> response = authController.refreshAccessToken(
+                "forged.fake.refresh.token", new MockHttpServletRequest(), new MockHttpServletResponse());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
@@ -132,7 +139,7 @@ class AuthExtendedControllerTest {
         );
 
         // 탈퇴 요청
-        ResponseEntity<?> withdrawResponse = authController.withdraw();
+        ResponseEntity<?> withdrawResponse = authController.withdraw(new MockHttpServletResponse());
         assertThat(withdrawResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         // DB 확인: status가 DELETED로 Soft Delete 되었는지 검증
@@ -145,14 +152,15 @@ class AuthExtendedControllerTest {
                 .password(password)
                 .build();
         BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(loginRequest, "loginRequest");
-        ResponseEntity<?> loginResponse = authController.login(loginRequest, bindingResult);
+        ResponseEntity<?> loginResponse = authController.login(
+                loginRequest, bindingResult, new MockHttpServletResponse());
 
         assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
-    @DisplayName("⑧ 비밀번호 찾기 - 임시 비밀번호 발급 및 해당 임시 비밀번호로 로그인 성공 검증")
-    void testForgotPassword() {
+    @DisplayName("⑧ 비밀번호 찾기 - 이메일 검증 도입 전에는 비밀번호를 변경하지 않고 503 반환")
+    void testForgotPasswordIsDisabledUntilEmailVerificationExists() {
         // 사용자 등록
         UserDTO user = UserDTO.builder()
                 .email(email)
@@ -171,18 +179,16 @@ class AuthExtendedControllerTest {
         BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(forgotRequest, "forgotRequest");
         ResponseEntity<?> forgotResponse = authController.forgotPassword(forgotRequest, bindingResult);
 
-        assertThat(forgotResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        Map<?, ?> responseMap = (Map<?, ?>) forgotResponse.getBody();
-        String tempPassword = (String) responseMap.get("tempPassword");
-        assertThat(tempPassword).isNotBlank();
+        assertThat(forgotResponse.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
 
-        // 발급받은 임시 비밀번호로 로그인 시도 -> 성공(200) 검증
+        // 기존 비밀번호가 바뀌지 않아야 한다.
         AuthDTO.LoginRequest loginRequest = AuthDTO.LoginRequest.builder()
                 .email(email)
-                .password(tempPassword)
+                .password(password)
                 .build();
         BeanPropertyBindingResult loginBinding = new BeanPropertyBindingResult(loginRequest, "loginRequest");
-        ResponseEntity<?> loginResponse = authController.login(loginRequest, loginBinding);
+        ResponseEntity<?> loginResponse = authController.login(
+                loginRequest, loginBinding, new MockHttpServletResponse());
 
         assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
     }

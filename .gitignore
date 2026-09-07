@@ -72,3 +72,4 @@ lerna-debug.log*
 /backend/**/application-local.properties
 /backend/**/application-dev.properties
 /backend/**/application-*.properties
+!/backend/src/main/resources/application-demo.properties

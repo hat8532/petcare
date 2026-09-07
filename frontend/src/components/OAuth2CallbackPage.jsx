@@ -1,51 +1,68 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { authApi } from '../api/authApi';
 import { sessionStorage } from '../api/common/httpClient';
 
 export default function OAuth2CallbackPage({ onLoginSuccess }) {
   const [statusText, setStatusText] = useState('소셜 로그인 인증 처리 중입니다...');
   const [errorText, setErrorText] = useState('');
+  const oauthCodeRef = useRef(new URLSearchParams(window.location.search).get('code'));
+  const exchangePromiseRef = useRef(null);
+  const handledRef = useRef(false);
+  const mountedRef = useRef(false);
+  const timerRef = useRef(null);
 
   useEffect(() => {
-    let timer;
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const accessToken = params.get('accessToken');
-      const refreshToken = params.get('refreshToken');
-      const email = params.get('email');
-      const nickname = params.get('nickname');
-      const role = params.get('role');
-      const id = params.get('id');
+    mountedRef.current = true;
+    const loginCode = oauthCodeRef.current;
 
-      if (!accessToken) {
-        setErrorText('인증 토큰을 불러올 수 없습니다. 다시 로그인해 주세요.');
-        return;
-      }
+    // 교환 전에 주소창에서 Code를 지워 Referrer/브라우저 기록 노출 시간을 줄인다.
+    window.history.replaceState({}, document.title, '/oauth2/callback');
 
-      const userPayload = {
-        id: id ? Number(id) : 1,
-        email: email || '',
-        nickname: nickname ? decodeURIComponent(nickname) : '소셜회원',
-        role: role || 'ROLE_USER'
+    if (!loginCode) {
+      setErrorText('인증 코드를 불러올 수 없습니다. 다시 로그인해 주세요.');
+      return () => {
+        mountedRef.current = false;
       };
-
-      sessionStorage.save({ accessToken, refreshToken, user: userPayload });
-      const session = sessionStorage.capture();
-      setStatusText('로그인 완료! 메인 화면으로 이동합니다...');
-
-      // 상태 업데이트 및 메인 화면으로 부드럽게 전환 (SPA 방식)
-      timer = setTimeout(() => {
-        if (!sessionStorage.isCurrent(session)) return;
-        window.history.replaceState({}, document.title, '/');
-        if (onLoginSuccess) {
-          onLoginSuccess(userPayload);
-        }
-      }, 500);
-
-    } catch (e) {
-      console.error('OAuth2 Callback 처리 에러:', e);
-      setErrorText('로그인 정보 처리 중 오류가 발생했습니다.');
     }
-    return () => clearTimeout(timer);
+
+    if (!exchangePromiseRef.current) {
+      exchangePromiseRef.current = authApi.exchangeOAuthCode(loginCode);
+    }
+
+    exchangePromiseRef.current
+      .then((data) => {
+        if (!mountedRef.current || handledRef.current) return;
+
+        if (!data?.accessToken || !data?.user) {
+          throw new Error('OAuth 로그인 응답이 올바르지 않습니다.');
+        }
+
+        handledRef.current = true;
+
+        sessionStorage.save({
+          accessToken: data.accessToken,
+          user: data.user
+        });
+        const session = sessionStorage.capture();
+        setStatusText('로그인 완료! 메인 화면으로 이동합니다...');
+
+        timerRef.current = setTimeout(() => {
+          if (!sessionStorage.isCurrent(session)) return;
+          window.history.replaceState({}, document.title, '/');
+          onLoginSuccess?.(data.user);
+        }, 500);
+      })
+      .catch((error) => {
+        if (!mountedRef.current || handledRef.current) return;
+        handledRef.current = true;
+        console.error('OAuth2 Callback 처리 에러:', error);
+        setErrorText(error?.message || '로그인 정보 처리 중 오류가 발생했습니다.');
+      });
+
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(timerRef.current);
+    };
   }, [onLoginSuccess]);
 
   return (

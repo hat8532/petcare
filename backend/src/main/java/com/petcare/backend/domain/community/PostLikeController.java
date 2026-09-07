@@ -14,7 +14,6 @@ import java.util.Map;
 //   POST /api/v1/community/{postId}/likes   토글 (누름 <-> 취소)
 @RestController
 @RequestMapping("/api/v1/community/{postId}/likes")
-@CrossOrigin(origins = "*")
 public class PostLikeController {
 
     private final PostLikeMapper postLikeMapper;

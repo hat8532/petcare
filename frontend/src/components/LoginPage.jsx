@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { authApi } from '../api/authApi';
-import { sessionStorage } from '../api/common/httpClient';
+import { buildOAuthAuthorizationUrl, sessionStorage } from '../api/common/httpClient';
 
 export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedPage = false }) {
   // 모드 상태: 'login' | 'register' | 'forgot'
@@ -133,7 +133,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
       try {
         setLoading(true);
         const res = await authApi.forgotPassword(email.trim());
-        setSuccessMessage(res.message || '임시 비밀번호가 발급되었습니다.');
+        setSuccessMessage(res.message || '비밀번호 재설정 안내를 확인해 주세요.');
         if (res.tempPassword) {
           setTempPasswordResult(res.tempPassword);
         }
@@ -222,8 +222,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
   };
 
   const handleSocialLogin = (provider) => {
-    const backendOAuthUrl = `http://localhost:8080/oauth2/authorization/${provider}`;
-    window.location.href = backendOAuthUrl;
+    window.location.href = buildOAuthAuthorizationUrl(provider);
   };
 
   const formCardContent = (
@@ -282,7 +281,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
           {viewMode === 'register' ? 'PetCare 회원가입' : (viewMode === 'forgot' ? '비밀번호 찾기' : 'PetCare 로그인')}
         </h2>
         <p style={{ fontSize: '13px', color: '#64748b', fontWeight: '500', marginTop: '4px', margin: 0 }}>
-          {viewMode === 'forgot' ? '등록된 이메일로 안전한 임시 비밀번호를 발급해 드립니다.' : 'AI 기반 반려동물 스마트 헬스케어 플랫폼'}
+          {viewMode === 'forgot' ? '이메일 본인 확인 기반 재설정 기능을 준비 중입니다.' : 'AI 기반 반려동물 스마트 헬스케어 플랫폼'}
         </p>
       </div>
 
@@ -488,7 +487,7 @@ export default function LoginPage({ isOpen, onClose, onLoginSuccess, isEmbeddedP
         >
           {loading ? '처리 중...' : (
             viewMode === 'register' ? '회원가입 완료' : (
-              viewMode === 'forgot' ? '임시 비밀번호 발급' : '이메일 로그인'
+              viewMode === 'forgot' ? '비밀번호 재설정 요청' : '이메일 로그인'
             )
           )}
         </button>

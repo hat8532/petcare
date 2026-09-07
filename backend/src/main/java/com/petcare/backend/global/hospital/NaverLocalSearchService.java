@@ -6,6 +6,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -34,7 +35,14 @@ public class NaverLocalSearchService {
     @Value("${naver.news.client-secret:}")
     private String clientSecret;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = createRestTemplate();
+
+    private RestTemplate createRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000);
+        factory.setReadTimeout(10_000);
+        return new RestTemplate(factory);
+    }
 
     public boolean isConfigured() {
         return clientId != null && !clientId.isBlank()
@@ -84,7 +92,7 @@ public class NaverLocalSearchService {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Naver Local Search Error: " + e.getMessage());
+            System.err.println("Naver Local Search failed: " + e.getClass().getSimpleName());
         }
 
         return Collections.emptyList();
@@ -183,13 +191,11 @@ public class NaverLocalSearchService {
     }
 
     // 네이버 응답은 <b> 같은 태그와 &amp; 같은 HTML 엔티티를 함께 담아 보낸다.
-    // 태그만 지우면 "힐링동물병원 &amp; 건강검진센터"처럼 엔티티가 화면에 그대로 노출된다.
+    // 태그 제거 뒤 &lt;/&gt;를 다시 꺾쇠로 만들면 HTML 출력 지점에서 태그가 되살아날 수 있다.
     private String stripHtml(String input) {
         String text = input.replaceAll("<[^>]*>", "");
-        // &amp;를 마지막에 풀어야 "&amp;lt;" 같은 이중 인코딩이 &lt;로 잘못 복원되지 않는다.
-        text = text.replace("&lt;", "<")
-                   .replace("&gt;", ">")
-                   .replace("&quot;", "\"")
+        // 꺾쇠 엔티티는 그대로 유지하고, 화면 표시가 필요한 안전한 엔티티만 복원한다.
+        text = text.replace("&quot;", "\"")
                    .replace("&#39;", "'")
                    .replace("&nbsp;", " ")
                    .replace("&amp;", "&");

@@ -10,7 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "petcare.demo-data.enabled=true")
 @AutoConfigureMockMvc
 class JwtAuthenticationFilterTest {
 
@@ -48,7 +48,17 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("4. 공개 API (/api/v1/news, /api/v1/hospitals/nearby) - 토큰 없이도 정상 접근 (200 OK)")
+    @DisplayName("4. Refresh Token은 보호 API의 Bearer 인증으로 사용할 수 없음")
+    void refreshTokenCannotAuthenticateProtectedEndpoint() throws Exception {
+        String refreshToken = jwtUtil.generateRefreshToken(1L, "user@petcare.com");
+
+        mockMvc.perform(get("/api/v1/pets/user/1")
+                        .header("Authorization", "Bearer " + refreshToken))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("5. 공개 API (/api/v1/news, /api/v1/hospitals/nearby) - 토큰 없이도 정상 접근 (200 OK)")
     void testPublicEndpointsWithoutToken() throws Exception {
         mockMvc.perform(get("/api/v1/hospitals/nearby?lat=37.5507&lng=126.9408"))
                 .andExpect(status().isOk());

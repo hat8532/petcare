@@ -5,6 +5,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -22,10 +23,18 @@ public class NaverNewsService {
     @Value("${naver.news.client-secret:}")
     private String newsClientSecret;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = createRestTemplate();
+
+    private RestTemplate createRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000);
+        factory.setReadTimeout(10_000);
+        return new RestTemplate(factory);
+    }
 
     public boolean isConfigured() {
-        return newsClientId != null && !newsClientId.isBlank();
+        return newsClientId != null && !newsClientId.isBlank()
+                && newsClientSecret != null && !newsClientSecret.isBlank();
     }
 
     public List<Map<String, Object>> searchPetNews(String query, int display) {
@@ -72,7 +81,7 @@ public class NaverNewsService {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Naver Developers News Search Error: " + e.getMessage());
+            System.err.println("Naver News Search failed: " + e.getClass().getSimpleName());
         }
 
         return Collections.emptyList();
@@ -127,8 +136,6 @@ public class NaverNewsService {
         return input.replaceAll("<[^>]*>", "")
                 .replaceAll("&quot;", "\"")
                 .replaceAll("&amp;", "&")
-                .replaceAll("&lt;", "<")
-                .replaceAll("&gt;", ">")
                 .replaceAll("&apos;", "'");
     }
 }
