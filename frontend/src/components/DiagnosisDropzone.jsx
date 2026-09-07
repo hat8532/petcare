@@ -384,7 +384,9 @@ export default function DiagnosisDropzone({
             </h3>
 
             <fieldset style={{ border: 0, padding: 0, margin: '0 0 18px' }}>
-              <legend className="sr-only">0. 등록된 반려동물 선택</legend>
+              <legend style={{ display: 'block', width: '100%', fontSize: '13px', color: '#475569', marginBottom: '8px', fontWeight: '700' }}>
+                0. 등록된 반려동물 선택
+              </legend>
               <div style={{
                 background: selectedPet ? '#f8fafc' : '#fffbeb',
                 border: selectedPet ? '1px solid #e2e8f0' : '1px solid #fde68a',
@@ -405,7 +407,9 @@ export default function DiagnosisDropzone({
                     <div style={{ fontSize: '12px', color: '#64748b' }}>
                       {selectedPet
                         ? `${selectedPet.species || '종 미지정'} · ${selectedPet.breed || '품종 미지정'}`
-                        : '로그인 후 진단할 반려동물을 선택하거나 등록하세요.'}
+                        : isAuthenticated
+                          ? '진단할 반려동물을 선택하거나 등록하세요.'
+                          : '로그인하면 등록된 반려동물을 불러올 수 있습니다.'}
                     </div>
                   </div>
                 </div>
@@ -444,14 +448,15 @@ export default function DiagnosisDropzone({
                   })}
                 </div>
               ) : (
-                <div style={{ marginTop: '12px', padding: '14px', borderRadius: '12px', background: '#fff7ed', border: '1px solid #fed7aa' }}>
-                  <p style={{ margin: '0 0 10px', color: '#9a3412' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginTop: '10px', padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <p style={{ flex: '1 1 220px', margin: 0, color: '#64748b', fontSize: '12px', lineHeight: '1.5' }}>
                     {isAuthenticated ? '진단할 반려동물을 먼저 등록해 주세요.' : '로그인 후 등록된 반려동물을 선택할 수 있습니다.'}
                   </p>
                   <button
                     type="button"
                     onClick={isAuthenticated ? onOpenPetManagement : onOpenLogin}
                     className="btn btn-secondary"
+                    style={{ flexShrink: 0, padding: '8px 14px', fontSize: '12px' }}
                   >
                     {isAuthenticated ? '반려동물 등록으로 이동' : '로그인하기'}
                   </button>
