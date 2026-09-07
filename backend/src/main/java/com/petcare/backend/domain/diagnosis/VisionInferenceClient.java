@@ -60,6 +60,8 @@ public class VisionInferenceClient {
             body.add("petId", request.petId().toString());
             body.add("species", request.petSpecies());
             body.add("affectedArea", request.affectedArea());
+            body.add("customAreaText", "CUSTOM".equals(request.affectedArea()) && request.customAreaText() != null
+                    ? request.customAreaText() : "");
             body.add("symptoms", objectMapper.writeValueAsString(request.symptoms()));
             body.add("description", request.description());
             body.add("requestId", requestId);
@@ -71,7 +73,7 @@ public class VisionInferenceClient {
                     .retrieve()
                     .body(VisionInferenceResult.class);
 
-            return resultValidator.validate(result, requestId);
+            return resultValidator.validate(result, requestId, request.petSpecies(), request.affectedArea());
         } catch (RestClientResponseException exception) {
             return VisionInferenceResult.unavailable(readFailureCode(exception), requestId);
         } catch (ResourceAccessException exception) {

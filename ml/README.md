@@ -23,7 +23,19 @@ DIAGNOSIS_VISION_BASE_URL=http://127.0.0.1:8000
 PETCARE_EXPERIMENTAL_DEMO_ENABLED=true
 ```
 
-Demo는 `DOG·CAT + SKIN` 요청만 받고 `EXPERIMENTAL_DEMO` Mode와 예시 후보를 반환한다. Score는 임상 확률이나 Model 성능이 아니며 실제 평가 Evidence로 사용할 수 없다.
+Demo는 아래 동물 6분류·환부 8개 메뉴를 받고 `EXPERIMENTAL_DEMO` Mode와 예시 후보를 반환한다. Score는 임상 확률이나 Model 성능이 아니며 실제 평가 Evidence로 사용할 수 없다. 실제 분석을 확인할 때는 Demo를 끈다.
+
+## 지원 범위 · v0.2.0
+
+- 동물: `DOG`, `CAT`, `RABBIT`, `HAMSTER`(햄스터/소동물), `BIRD`(조류/앵무새), `OTHER`(파충류/기타).
+- 환부: `SKIN`, `EYE`, `EAR`, `MOUTH`, `PAW_LIMB`, `NOSE_RESPIRATORY`, `ABDOMEN`, `CUSTOM`.
+- Gemini는 48개 메뉴 조합의 사진 관찰을 받는다. 이는 개별 종·질환에 대한 임상 성능 검증이나 독립 Vision Model 학습 완료를 뜻하지 않는다.
+- `CUSTOM`은 `customAreaText`(1~100자)를 반드시 보낸다. 일반 환부에서는 이전 CUSTOM 값이 남아 있어도 분석·검색에서 제외한다.
+- 피부 메뉴는 털·깃털·비늘, 구강은 치아·부리, 발·관절은 다리·날개 주변의 **외형**을 포함한다. 호흡 기능·관절 내부·소화기 질환 등은 사진으로 판정하지 않는다.
+- `HAMSTER`·`OTHER`는 특정 종을 확정할 수 없는 넓은 등록 분류다. 현재 해당 분류의 RAG 자료는 없으며 다른 동물 자료로 대체하지 않는다.
+- 개·고양이: SKIN/EYE/EAR/MOUTH/PAW_LIMB/NOSE_RESPIRATORY/ABDOMEN 자료. 토끼: EAR 제외 7개 메뉴의 일반 이상 징후 자료. 조류: NOSE_RESPIRATORY/ABDOMEN/CUSTOM의 일반 이상 징후 자료. 메뉴에 자료가 있어도 입력과 관련성이 없으면 검색 결과는 비어 있다.
+- 적합한 사진에 뚜렷한 소견이 없으면 빈 `predictions`와 **이상이 없다는 뜻은 아니라는 한계**를 반환한다. Provider 실패와 구별하며 질환·확률을 채워 넣지 않는다.
+- 기존 API Endpoint·저장 Schema는 유지한다. Spring과 FastAPI를 함께 갱신해야 새 소견·출처가 일치한다.
 
 ## Gemini + RAG Prototype
 
@@ -46,12 +58,12 @@ PETCARE_RAG_CORPUS=/absolute/path/to/corpus.json
 - 응답은 제한된 관찰·한계 Code와 검색된 Source ID만 허용하는 Structured JSON Validator를 통과해야 하며, `confidence`는 임상 확률이나 검증된 정확도가 아니다.
 - Provider 인증·Rate limit·Timeout·Model 부재·Contract 불일치는 안정된 Failure Code로 축소한다.
 - Gemini 각 HTTP 요청의 대기 설정은 15초이며 사진 Gate와 본 분석을 합친 Adapter 실행은 30초로 제한한다. 초과하면 대기 중 요청을 취소하고 `INFERENCE_TIMEOUT`으로 변환한다. Spring read timeout은 35초, Frontend 분석 Abort는 45초로 두어 상위 계층에 응답·저장 여유를 둔다.
-- 브라우저 Abort는 이미 전송된 Provider 요청이나 DB 저장의 취소·중복 방지를 보장하지 않는다. 재시도 Idempotency는 별도 Contract가 필요하다.
-- Gemini 호출 전 `DOG·CAT + SKIN` 범위의 Source를 TF-IDF 방식으로 최대 3건 검색한다.
-- 사용자 입력과 RAG 문맥을 보내기 전에 별도 Gemini Image Gate를 호출하며, 실제 반려동물 피부 환부가 선명한 사진이 아니면 `PROVIDER_REJECTED`로 실패 처리하고 본 분석을 호출하지 않는다.
+- 브라우저 Abort는 이미 전송된 Provider 요청이나 DB 저장의 취소를 보장하지 않는다. Spring의 기존 Idempotency Key·요청 Hash 기반 중복 저장 방지는 유지한다.
+- Gemini 호출 전 선택한 동물·환부 범위의 Source를 TF-IDF 방식으로 최대 3건 검색한다. Corpus 15건은 기존 경로 `veterinary_skin_prototype.json`을 유지하지만 ID는 `veterinary-multi-scope-prototype-ko`, Version은 `2026-09-07`이다.
+- 사용자 증상과 RAG 문맥을 보내기 전에 별도 Gemini Image Gate가 등록 분류·선택 부위·사진 적합성을 확인한다. 종·부위 불일치 또는 부적합 사진은 `PROVIDER_REJECTED`로 처리하고 본 분석을 호출하지 않는다.
 - Gemini는 자유 형식 Report를 작성하지 않는다. 검색 결과에서 관련 Source ID만 선택하고, 사용자에게 보이는 Report는 선택된 로컬 한국어 요약을 그대로 조합한다.
-- Spring은 허용된 6개 Source의 ID·제목·발행처·URL과 로컬 요약문을 다시 대조해 일치하지 않는 응답을 폐기한다.
-- 분석 성공 시 `GEMINI_RAG_PROTOTYPE` Mode와 Model·Version·Report·Source·Limitations를 보존한다.
+- Spring은 허용된 15개 Source의 ID·제목·발행처·URL·로컬 요약문·동물·환부와 부위별 소견 Label을 다시 대조한다. Corpus/Java 대조 회귀 테스트가 있으며 새로운 자료는 양쪽을 함께 갱신한다.
+- 근거가 선택되면 `GEMINI_RAG_PROTOTYPE`, 맞는 근거가 없으면 `GEMINI_MULTIMODAL`·`ragSources=[]`·`ragReport=null`과 자료 부족 한계를 보존한다. Corpus 파일 손상은 정상적인 검색 결과 없음과 달리 `RAG_CORPUS_UNAVAILABLE`로 실패한다.
 - 이 구현은 작은 실제 검색 Prototype이지 Vector DB·Embedding·FAISS 기반 Production RAG가 아니다. 이미지 Gate도 별도 학습된 독립 검증 Model이 아니라 분리된 Gemini 요청이므로 임상 검증으로 간주하지 않는다.
 - Corpus는 원문을 복제하지 않고 직접 작성한 한국어 요약과 출처 링크만 보관한다. 상용 사용 전에는 출처별 이용 조건을 다시 검토한다.
 

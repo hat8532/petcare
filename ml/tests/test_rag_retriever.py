@@ -93,7 +93,7 @@ def test_default_corpus_has_retrievable_authoritative_sources():
     metadata = retriever.metadata()
     results = retriever.search("DOG", "SKIN", "가려움 긁음 붉은 피부와 탈모")
 
-    assert metadata.corpus_id == "veterinary-skin-prototype-ko"
+    assert metadata.corpus_id == "veterinary-multi-scope-prototype-ko"
     assert metadata.document_count >= 5
     assert results
     assert all(result.source_url.startswith("https://") for result in results)

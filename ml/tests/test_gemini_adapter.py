@@ -63,7 +63,7 @@ def test_total_deadline_covers_both_requests_and_cancels_pending_analysis():
             analysis_cancelled = request_count == 2
             raise
         if request_count == 1:
-            return provider_response({"imageSuitable": True, "reasonCode": "CLEAR_PET_SKIN_LESION"})
+            return provider_response({"imageSuitable": True, "reasonCode": "CLEAR_PET_AREA"})
         return provider_response({
             "findings": [{"findingCode": "REDNESS", "confidence": 72.5}],
             "relevantSourceIds": ["vet-source-1"],
@@ -126,7 +126,7 @@ def test_sends_inline_image_and_validates_structured_response():
             return provider_response(
                 {
                     "imageSuitable": True,
-                    "reasonCode": "CLEAR_PET_SKIN_LESION",
+                    "reasonCode": "CLEAR_PET_AREA",
                 }
             )
         return provider_response(
@@ -159,7 +159,7 @@ def test_sends_inline_image_and_validates_structured_response():
 
     assert result.model == "gemini-test"
     assert result.model_version == "gemini-test-version"
-    assert result.analysis.findings[0].finding == "피부 발적 소견"
+    assert result.analysis.findings[0].finding == "발적 소견"
     assert result.analysis.relevant_source_ids == ["vet-source-1"]
     assert result.analysis.limitations == ["사진 한 장만 분석했습니다."]
     assert len(captured_requests) == 2
@@ -185,12 +185,12 @@ def test_rejects_response_outside_structured_contract():
             return provider_response(
                 {
                     "imageSuitable": True,
-                    "reasonCode": "CLEAR_PET_SKIN_LESION",
+                    "reasonCode": "CLEAR_PET_AREA",
                 }
             )
         return provider_response(
             {
-                "findings": [],
+                "findings": [{"findingCode": "DISEASE_CONFIRMED", "confidence": 80}],
                 "relevantSourceIds": ["vet-source-1"],
                 "limitationCodes": ["SINGLE_IMAGE_ONLY"],
             }
@@ -243,7 +243,7 @@ def test_rejects_source_id_that_was_not_retrieved():
             return provider_response(
                 {
                     "imageSuitable": True,
-                    "reasonCode": "CLEAR_PET_SKIN_LESION",
+                    "reasonCode": "CLEAR_PET_AREA",
                 }
             )
         return provider_response(

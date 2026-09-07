@@ -75,6 +75,29 @@ class DiagnosisServiceTest {
     }
 
     @Test
+    void storesSuccessfulEmptyObservationWithoutCallingItFailureOrNormalHealth() {
+        when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
+                new VisionInferenceResult("GEMINI_MULTIMODAL", "gemini-test", "v2", List.of(),
+                        List.of("사진에서 명확히 구분할 수 있는 외형 소견을 확보하지 못했습니다. 이상이 없다는 뜻은 아닙니다."),
+                        null, invocation.getArgument(2)));
+        doAnswer(invocation -> {
+            ((DiagnosisRecordDTO) invocation.getArgument(0)).setId(110L);
+            return null;
+        }).when(mapper).insert(any());
+        DiagnosisResultResponse response = service.analyzeDiagnosis(new DiagnosisAnalyzeRequest(
+                1L, "초코", "DOG", "CUSTOM", "오른쪽 꼬리 끝", List.of("기타"), "오른쪽 꼬리 끝을 자꾸 핥습니다.",
+                Map.of(), "00000000-0000-0000-0000-000000000001"), pngImage(), "owner@example.com");
+        assertThat(response.failureCode()).isNull();
+        assertThat(response.visionTopDiseases()).isEmpty();
+        assertThat(response.ragReport()).contains("이미지 관찰 결과", "오른쪽 꼬리 끝", "이상이 없다는 뜻은 아닙니다")
+                .doesNotContain("Provider 소견을 받지 못했습니다");
+        ArgumentCaptor<DiagnosisRecordDTO> stored = ArgumentCaptor.forClass(DiagnosisRecordDTO.class);
+        verify(mapper).insert(stored.capture());
+        assertThat(stored.getValue().getDiseasesJson()).contains("GEMINI_MULTIMODAL");
+        assertThat(stored.getValue().getReportContent()).contains("오른쪽 꼬리 끝", "이상이 없다는 뜻은 아닙니다");
+    }
+
+    @Test
     void preservesExperimentalDemoModeAndExamplePredictions() {
         when(visionInferenceClient.infer(any(), any(), any())).thenAnswer(invocation ->
                 new VisionInferenceResult(
