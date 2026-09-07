@@ -523,3 +523,57 @@ body {
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
 }
 
+/* ========================================================
+   Grid & Split Layout Utilities
+   ======================================================== */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 960px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hospital-split-container {
+  display: grid;
+  grid-template-columns: 1fr 460px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1080px) {
+  .hospital-split-container {
+    grid-template-columns: 1fr 410px;
+    gap: 18px;
+  }
+}
+
+@media (max-width: 900px) {
+  .hospital-split-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hospital-list-scroll {
+  max-height: calc(100vh - 240px);
+  min-height: 560px;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.hospital-list-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hospital-list-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+
