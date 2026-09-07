@@ -10,8 +10,9 @@ from app.gemini_adapter import GeminiAdapterError, GeminiMultimodalAdapter
 from app.image_validation import ImageValidationError, read_validated_image
 from app.manifest import ManifestState, inspect_model_manifest
 from app.rag_retriever import RagCorpusError, RagRetriever
+from app.analysis_scope import SPECIES, AREAS, NO_VISIBLE_FINDINGS, INTERNAL_LIMITATION, NO_MATCHED_EVIDENCE
 
-SERVICE_VERSION = "0.1.0"
+SERVICE_VERSION = "0.2.0"
 DEMO_MODEL_NAME = "petcare-contract-demo"
 ALLOWED_PROVIDER_FAILURE_CODES = {
     "INVALID_INPUT",
@@ -139,6 +140,7 @@ async def infer(
     symptoms: Annotated[str, Form(min_length=2, max_length=4000)],
     description: Annotated[str, Form(min_length=1, max_length=2000)],
     request_id: Annotated[str, Form(alias="requestId", min_length=1, max_length=100)],
+    custom_area_text: Annotated[str, Form(alias="customAreaText", max_length=100)] = "",
 ) -> InferenceResponse:
     del pet_id
 
@@ -150,12 +152,13 @@ async def infer(
             detail={"failureCode": exception.failure_code, "requestId": request_id},
         ) from exception
 
+    if species not in SPECIES or affected_area not in AREAS:
+        raise HTTPException(status_code=422, detail={"failureCode": "OUT_OF_SCOPE", "requestId": request_id})
+    if affected_area == "CUSTOM" and not custom_area_text.strip():
+        raise HTTPException(status_code=422, detail={"failureCode": "INVALID_INPUT", "requestId": request_id})
+    custom_area_text = custom_area_text.strip() if affected_area == "CUSTOM" else ""
+
     if experimental_demo_enabled():
-        if species not in {"DOG", "CAT"} or affected_area != "SKIN":
-            raise HTTPException(
-                status_code=422,
-                detail={"failureCode": "OUT_OF_SCOPE", "requestId": request_id},
-            )
         return InferenceResponse(
             mode="EXPERIMENTAL_DEMO",
             model=DEMO_MODEL_NAME,
@@ -176,16 +179,11 @@ async def infer(
 
     gemini = get_gemini_adapter()
     if gemini.is_configured():
-        if species not in {"DOG", "CAT"} or affected_area != "SKIN":
-            raise HTTPException(
-                status_code=422,
-                detail={"failureCode": "OUT_OF_SCOPE", "requestId": request_id},
-            )
         try:
             evidence = get_rag_retriever().search(
                 species=species,
                 affected_area=affected_area,
-                query=f"{symptoms}\n{description}",
+                query=f"{symptoms}\n{description}\n{custom_area_text}",
             )
         except RagCorpusError as exception:
             raise HTTPException(
@@ -195,11 +193,6 @@ async def infer(
                     "requestId": request_id,
                 },
             ) from exception
-        if not evidence:
-            raise HTTPException(
-                status_code=422,
-                detail={"failureCode": "RAG_NO_EVIDENCE", "requestId": request_id},
-            )
         try:
             result = await gemini.analyze(
                 image_bytes=validated_image.content,
@@ -209,6 +202,7 @@ async def infer(
                 symptoms=symptoms,
                 description=description,
                 evidence=evidence,
+                custom_area_text=custom_area_text,
             )
         except GeminiAdapterError as exception:
             failure_code = (
@@ -235,10 +229,18 @@ async def infer(
         rag_report = "\n\n".join(
             f"{item.excerpt} [{item.source_id}]"
             for item in selected_evidence
-        )
+        ) or None
+
+        limitations = [*result.analysis.limitations, INTERNAL_LIMITATION]
+        if not result.analysis.findings:
+            limitations.append(NO_VISIBLE_FINDINGS)
+        if not selected_evidence:
+            limitations.append(NO_MATCHED_EVIDENCE)
+        if species in {"HAMSTER", "OTHER"}:
+            limitations.append("등록된 동물 분류가 넓어 정확한 종은 확인되지 않았습니다. 다른 종의 질환·처치 정보를 적용하지 않았습니다.")
 
         return InferenceResponse(
-            mode="GEMINI_RAG_PROTOTYPE",
+            mode="GEMINI_RAG_PROTOTYPE" if selected_evidence else "GEMINI_MULTIMODAL",
             model=result.model,
             modelVersion=result.model_version,
             predictions=[
@@ -246,7 +248,7 @@ async def infer(
                 for finding in result.analysis.findings
             ],
             limitations=[
-                *result.analysis.limitations,
+                *limitations,
                 "표시 Score는 임상 확률이나 검증된 정확도가 아닌 Model confidence입니다.",
                 "확정 진단과 치료 판단은 수의사의 진료가 필요합니다.",
             ],

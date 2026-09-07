@@ -203,6 +203,10 @@ public class DiagnosisService {
                     .orElse("- 판정 가능한 시각적 소견 없음");
             sections.add("[AI 이미지 의심 소견]\n환부: "
                     + areaLabel(request.affectedArea(), request.customAreaText()) + "\n" + findings);
+        } else if (visionResult.failureCode() == null
+                && ("GEMINI_MULTIMODAL".equals(visionResult.mode()) || "GEMINI_RAG_PROTOTYPE".equals(visionResult.mode()))) {
+            sections.add("[이미지 관찰 결과]\n환부: " + areaLabel(request.affectedArea(), request.customAreaText())
+                    + "\n사진에서 명확히 구분할 수 있는 외형 소견을 확보하지 못했습니다. 이상이 없다는 뜻은 아닙니다.");
         } else {
             sections.add("[이미지 분석 상태]\n검증된 Image Provider 소견을 받지 못했습니다. "
                     + "입력 내용만으로 질환명이나 확률을 생성하지 않습니다.");
@@ -228,12 +232,12 @@ public class DiagnosisService {
         return switch (area) {
             case "EYE" -> "안구/눈";
             case "EAR" -> "귀/귓바퀴";
-            case "MOUTH" -> "구강/치아";
-            case "PAW_LIMB" -> "발/관절";
+            case "MOUTH" -> "구강/치아/부리";
+            case "PAW_LIMB" -> "발/다리/날개와 관절 주변";
             case "NOSE_RESPIRATORY" -> "코/호흡기";
             case "ABDOMEN" -> "배/소화기";
             case "CUSTOM" -> customText == null || customText.isBlank() ? "사용자 지정 부위" : customText;
-            default -> "피부/모피";
+            default -> "피부/털/깃털/비늘";
         };
     }
 

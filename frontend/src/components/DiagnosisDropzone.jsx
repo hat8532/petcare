@@ -25,7 +25,8 @@ const RETRYABLE_FAILURE_CODES = new Set([
 ]);
 
 const FAILURE_GUIDANCE = Object.freeze({
-  PROVIDER_REJECTED: '실제 반려동물의 환부가 선명하게 보이는 근접 사진으로 다시 등록해 주세요.',
+  PROVIDER_REJECTED: '선택한 동물과 부위가 일치하는지 확인하고, 해당 부위가 선명하게 보이는 실제 사진으로 다시 등록해 주세요.',
+  OUT_OF_SCOPE: '등록된 동물과 환부 선택을 다시 확인해 주세요. 계속되면 Backend와 AI 서버의 지원 범위가 같은 버전인지 확인이 필요합니다.',
   RAG_CORPUS_UNAVAILABLE: '수의학 참고 자료를 불러오지 못해 AI 소견을 폐기했습니다. 잠시 후 다시 시도해 주세요.',
   RAG_NO_EVIDENCE: '입력 증상과 연결할 수 있는 검증된 참고 자료가 없어 AI 소견을 생성하지 않았습니다.'
 });
@@ -228,7 +229,7 @@ export default function DiagnosisDropzone({
       petId: selectedPet.id,
       petName: selectedPet.name || '반려동물',
       petSpecies: selectedPet.species || 'UNKNOWN',
-      affectedArea, customAreaText, symptoms: selectedSymptoms,
+      affectedArea, customAreaText: affectedArea === 'CUSTOM' ? customAreaText.trim() : '', symptoms: selectedSymptoms,
       description: description.trim(), healthProfile: selectedPet.healthProfile
     };
     const fingerprint = JSON.stringify(payload);
@@ -501,6 +502,11 @@ export default function DiagnosisDropzone({
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', border: '1px solid #10b981', background: '#ecfdf5', fontSize: '13px', outline: 'none' }}
                 />
               )}
+              <p style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.6, margin: '8px 0 0' }}>
+                등록된 동물 6분류·환부 8개 메뉴의 사진 관찰을 요청할 수 있습니다.
+                조류의 깃털·부리는 피부·구강, 날개는 발·관절 메뉴를 이용해 주세요.
+                사진만으로 내부 질환을 판정하지 않으며, 맞는 참고자료가 없으면 관찰 소견과 한계만 안내합니다.
+              </p>
             </fieldset>
 
             <fieldset style={{ border: 0, padding: 0, margin: '0 0 20px' }}>
@@ -766,7 +772,9 @@ export default function DiagnosisDropzone({
                       );
                     }) : (
                       <div style={{ padding: '14px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', color: '#9a3412', fontSize: '12px', lineHeight: 1.6 }}>
-                        검증된 Image 소견이 없습니다. 질환명이나 확률을 임의 생성하지 않았습니다.
+                        {analysisResult.failureCode
+                          ? '검증된 Image 소견이 없습니다. 질환명이나 확률을 임의 생성하지 않았습니다.'
+                          : '사진에서 명확히 구분할 수 있는 외형 소견을 확보하지 못했습니다. 이상이 없다는 뜻은 아닙니다.'}
                       </div>
                     )}
                   </div>

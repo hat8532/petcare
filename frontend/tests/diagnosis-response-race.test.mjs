@@ -70,14 +70,15 @@ before(async () => {
             window.requests.push({ kind, args, resolve, reject, settled: false });
           });
           window.testApi = {
-            getSymptoms: async () => ({ SKIN: ['가려움/긁음'] }),
+            getSymptoms: async () => Object.fromEntries(['SKIN', 'EYE', 'EAR', 'MOUTH', 'PAW_LIMB', 'NOSE_RESPIRATORY', 'ABDOMEN', 'CUSTOM'].map(area => [area, ['가려움/긁음']])),
             getHistoryByPet: (...args) => pending('history', args),
             getDiagnosis: (...args) => pending('detail', args),
             analyze: (...args) => pending('analyze', args),
             getDiagnosisImage: (...args) => pending('image', args)
           };
           const pets = [{ id: 1, name: '테스트 Pet 1', species: 'DOG' },
-                        { id: 2, name: '테스트 Pet 2', species: 'CAT' }];
+                        { id: 2, name: '테스트 Pet 2', species: 'CAT' },
+                        ...['RABBIT', 'HAMSTER', 'BIRD', 'OTHER'].map((species, i) => ({ id: i + 3, name: '테스트 Pet ' + (i + 3), species }))];
           function Fixture() {
             const [pet, setPet] = useState(pets[0]);
             const [care, setCare] = useState({ result: null, requestId: 0, visible: true });
@@ -195,6 +196,42 @@ async function runAnalysis(page) {
 
 const resultIds = page => page.evaluate(() => window.results.map(result => result.diagnosisId));
 const detailButton = (page, id) => page.getByRole('button', { name: new RegExp('^#' + id + ' ·') });
+
+for (const [petId, species] of ['DOG', 'CAT', 'RABBIT', 'HAMSTER', 'BIRD', 'OTHER'].map((s, i) => [i + 1, s])) {
+  test(`지원 범위: ${species}의 8개 환부가 선택값 그대로 요청된다`, async t => {
+    const page = await openFixture(t);
+    await page.evaluate(id => window.switchPet(id), petId);
+    await page.waitForFunction(id => window.requests.some(r => r.kind === 'history' && Number(r.args[0]) === id), petId);
+    const areas = ['SKIN', 'EYE', 'EAR', 'MOUTH', 'PAW_LIMB', 'NOSE_RESPIRATORY', 'ABDOMEN', 'CUSTOM'];
+    for (const [index, area] of areas.entries()) {
+      await page.locator('.diagnosis-area-grid button').nth(index).click();
+      if (area === 'CUSTOM') await page.getByRole('textbox', { name: '직접 입력한 환부 이름' }).fill('오른쪽 꼬리 끝');
+      await runAnalysis(page);
+      const payload = await page.evaluate(() => window.requests.filter(r => r.kind === 'analyze').at(-1).args[0]);
+      assert.equal(payload.petId, petId);
+      assert.equal(payload.petSpecies, species);
+      assert.equal(payload.affectedArea, area);
+      assert.equal(payload.customAreaText, area === 'CUSTOM' ? '오른쪽 꼬리 끝' : '');
+      await settle(page, 'analyze', { ...record(100 + index, petId), affectedArea: area, analysisMode: 'GEMINI_MULTIMODAL' });
+      // 생성 뒤 목록 갱신까지 응답해야 실제 화면의 분석 중 상태가 해제된다.
+      const pendingHistoryCount = await page.evaluate(() => window.requests.filter(r => r.kind === 'history' && !r.settled).length);
+      await settle(page, 'history', { content: [], page: 0, totalElements: 0, totalPages: 0 }, { index: pendingHistoryCount - 1 });
+      assert.equal(await page.getByText('사진에서 명확히 구분할 수 있는 외형 소견을 확보하지 못했습니다. 이상이 없다는 뜻은 아닙니다.', { exact: true }).count(), 1);
+      assert.equal(await page.getByRole('dialog').count(), 0);
+    }
+  });
+}
+
+test('CUSTOM에서 일반 환부로 바꾸면 숨겨진 이전 부위 설명은 보내지 않는다', async t => {
+  const page = await openFixture(t);
+  await page.locator('.diagnosis-area-grid button').nth(7).click();
+  await page.getByRole('textbox', { name: '직접 입력한 환부 이름' }).fill('이전 숨긴 부위');
+  await page.locator('.diagnosis-area-grid button').nth(1).click();
+  await runAnalysis(page);
+  const payload = await page.evaluate(() => window.requests.find(r => r.kind === 'analyze').args[0]);
+  assert.equal(payload.affectedArea, 'EYE');
+  assert.equal(payload.customAreaText, '');
+});
 
 test('인쇄에도 진단·Pet·환부·생성 시각이 남고 인쇄 버튼은 숨겨진다', async t => {
   const page = await openFixture(t);

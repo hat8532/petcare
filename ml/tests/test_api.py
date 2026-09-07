@@ -38,11 +38,11 @@ def test_health_and_version_expose_service_state():
 
     version = client.get("/version")
     assert version.status_code == 200
-    assert version.json()["serviceVersion"] == "0.1.0"
+    assert version.json()["serviceVersion"] == "0.2.0"
     assert version.json()["modelAvailable"] is False
     assert version.json()["modelStateCode"] == "MODEL_MANIFEST_MISSING"
     assert version.json()["ragAvailable"] is True
-    assert version.json()["ragCorpusId"] == "veterinary-skin-prototype-ko"
+    assert version.json()["ragCorpusId"] == "veterinary-multi-scope-prototype-ko"
 
 
 def test_inference_returns_model_unavailable_without_artifact():
@@ -139,7 +139,7 @@ def test_experimental_demo_rejects_out_of_scope_area(monkeypatch):
         data={
             "petId": "1",
             "species": "DOG",
-            "affectedArea": "EYE",
+            "affectedArea": "UNKNOWN",
             "symptoms": "[]",
             "description": "구조 확인",
             "requestId": "request-out-of-scope",
@@ -203,7 +203,7 @@ def test_gemini_multimodal_result_preserves_mode_and_limitations(monkeypatch):
     assert body["model"] == "gemini-test"
     assert body["modelVersion"] == "test-version"
     assert body["predictions"] == [
-        {"diseaseName": "피부 발적 소견", "probability": 72.5}
+        {"diseaseName": "발적 소견", "probability": 72.5}
     ]
     assert any("임상 확률" in limitation for limitation in body["limitations"])
     assert body["ragReport"] == (
@@ -319,12 +319,21 @@ def test_unknown_provider_failure_is_normalized(monkeypatch):
     assert response.json()["detail"]["failureCode"] == "PROVIDER_UNAVAILABLE"
 
 
-def test_gemini_route_rejects_unrelated_text_without_rag_evidence(monkeypatch):
+def test_gemini_route_returns_observation_only_without_matched_rag_evidence(monkeypatch):
     class ConfiguredGeminiAdapter:
         model = "gemini-test"
 
         def is_configured(self):
             return True
+
+        async def analyze(self, **kwargs):
+            assert kwargs["evidence"] == []
+            return GeminiAdapterResult(
+                model=self.model, model_version="test",
+                analysis=GeminiStructuredAnalysis(
+                    findings=[], relevantSourceIds=[], limitationCodes=["UNCERTAIN_VISUAL_FINDINGS"],
+                ),
+            )
 
     monkeypatch.setattr("app.main.get_gemini_adapter", lambda: ConfiguredGeminiAdapter())
 
@@ -341,11 +350,13 @@ def test_gemini_route_rejects_unrelated_text_without_rag_evidence(monkeypatch):
         },
     )
 
-    assert response.status_code == 422
-    assert response.json()["detail"] == {
-        "failureCode": "RAG_NO_EVIDENCE",
-        "requestId": "request-rag-no-evidence",
-    }
+    assert response.status_code == 200
+    assert response.json()["mode"] == "GEMINI_MULTIMODAL"
+    assert response.json()["failureCode"] is None
+    assert response.json()["predictions"] == []
+    assert response.json()["ragSources"] == []
+    assert response.json()["ragReport"] is None
+    assert any("이상이 없다는 뜻은 아닙니다" in value for value in response.json()["limitations"])
 
 
 def test_gemini_route_fails_closed_when_rag_corpus_is_unavailable(monkeypatch):

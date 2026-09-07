@@ -44,7 +44,7 @@ class VisionInferenceClientTest {
                       "mode":"GEMINI_RAG_PROTOTYPE",
                       "model":"gemini-test",
                       "modelVersion":"v1",
-                      "predictions":[{"diseaseName":"피부 발적 소견","probability":72.5}],
+                      "predictions":[{"diseaseName":"발적 소견","probability":72.5}],
                       "limitations":["사진 한 장만 분석했습니다."],
                       "ragReport":"가려움은 하나의 질병명이 아니라 여러 원인에서 나타나는 증상이다. 개에서는 기생충, 감염, 알레르기 등이 흔한 원인 범주이며, 털 빠짐·각질·냄새·분비물이 동반되면 감염 가능성도 함께 평가해야 한다. [merck-dog-pruritus]",
                       "ragSources":[{
@@ -99,7 +99,7 @@ class VisionInferenceClientTest {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/diagnoses/infer", exchange -> {
             requestContentType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
-            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.ISO_8859_1));
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             byte[] response = """
                     {"detail":{"failureCode":"MODEL_UNAVAILABLE","requestId":"request-001"}}
                     """.getBytes(StandardCharsets.UTF_8);
@@ -116,7 +116,7 @@ class VisionInferenceClientTest {
                     "http://127.0.0.1:" + server.getAddress().getPort(),
                     new ObjectMapper());
             DiagnosisAnalyzeRequest request = new DiagnosisAnalyzeRequest(
-                    1L, "초코", "DOG", "SKIN", "", List.of("가려움/긁음"),
+                    1L, "초코", "BIRD", "CUSTOM", "오른쪽 날개 끝", List.of("가려움/긁음"),
                     "붉은 부위를 계속 긁습니다.", Map.of(), "00000000-0000-0000-0000-000000000001");
             MockMultipartFile image = new MockMultipartFile(
                     "image", "lesion.jpg", "image/jpeg",
@@ -129,7 +129,8 @@ class VisionInferenceClientTest {
             assertThat(result.mode()).isEqualTo("RULE_FALLBACK");
             assertThat(requestContentType.get()).startsWith("multipart/form-data;boundary=");
             assertThat(requestBody.get())
-                    .contains("name=\"image\"", "filename=\"diagnosis-image.jpg\"", "name=\"petId\"", "request-001");
+                    .contains("name=\"image\"", "filename=\"diagnosis-image.jpg\"", "name=\"petId\"", "request-001",
+                            "name=\"customAreaText\"", "오른쪽 날개 끝", "BIRD", "CUSTOM");
         } finally {
             server.stop(0);
         }

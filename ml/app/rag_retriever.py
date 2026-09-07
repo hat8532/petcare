@@ -8,6 +8,7 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
+from app.analysis_scope import SPECIES, AREAS
 
 
 DEFAULT_CORPUS_PATH = (
@@ -16,8 +17,8 @@ DEFAULT_CORPUS_PATH = (
     / "veterinary_skin_prototype.json"
 )
 TOKEN_PATTERN = re.compile(r"[a-z0-9]+|[가-힣]+", re.IGNORECASE)
-ALLOWED_SPECIES = {"DOG", "CAT"}
-ALLOWED_AREAS = {"SKIN"}
+ALLOWED_SPECIES = set(SPECIES)
+ALLOWED_AREAS = set(AREAS)
 
 
 class RagCorpusError(Exception):
@@ -185,8 +186,8 @@ def _load_corpus(path_value: str) -> _Corpus:
                 raise ValueError("duplicate document id")
             source_ids.add(source_id)
 
-            species = _string_list(item, "species", 2, 10)
-            areas = _string_list(item, "areas", 4, 30)
+            species = _string_list(item, "species", 6, 10)
+            areas = _string_list(item, "areas", 8, 30)
             if not set(species).issubset(ALLOWED_SPECIES):
                 raise ValueError("unsupported species")
             if not set(areas).issubset(ALLOWED_AREAS):
