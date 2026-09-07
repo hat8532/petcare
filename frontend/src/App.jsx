@@ -13,6 +13,7 @@ import CommunityPostDetail from './components/CommunityPostDetail';
 import LoginPage from './components/LoginPage';
 import OAuth2CallbackPage from './components/OAuth2CallbackPage';
 import PetEditModal from './components/PetEditModal';
+import PetRegisterModal from './components/PetRegisterModal';
 import MyPage from './components/MyPage';
 import Footer from './components/Footer';
 
@@ -37,6 +38,7 @@ export default function App() {
   const [pets, setPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
   const [editingPet, setEditingPet] = useState(null);
+  const [isRegisterPetOpen, setIsRegisterPetOpen] = useState(false);
   const [latestDiagnosis, setLatestDiagnosis] = useState(null);
   const [careFlowLookupRequest, setCareFlowLookupRequest] = useState(0);
 
@@ -112,6 +114,23 @@ export default function App() {
     });
   };
 
+  const handleOpenRegisterPet = () => {
+    if (!user) {
+      alert('🔒 반려동물 등록은 로그인 후 이용하실 수 있습니다.');
+      setActiveTab('login');
+      return;
+    }
+    setIsRegisterPetOpen(true);
+  };
+
+  const handleOpenEditPet = (petToEdit) => {
+    if (petToEdit) {
+      setEditingPet(petToEdit);
+    } else {
+      handleOpenRegisterPet();
+    }
+  };
+
   const handleOpenDiagnosisCareFlow = (diagnosisResult) => {
     if (diagnosisResult) setLatestDiagnosis(diagnosisResult);
     setCareFlowLookupRequest((current) => current + 1);
@@ -137,7 +156,9 @@ export default function App() {
             pets={pets}
             onOpenLogin={() => setActiveTab('login')}
             onNavigateDiagnosis={() => setActiveTab('diagnosis')}
-            onOpenEditPet={(petToEdit) => setEditingPet(petToEdit)}
+            onOpenEditPet={handleOpenEditPet}
+            onOpenRegisterPet={handleOpenRegisterPet}
+            onPetUpdated={handlePetUpdated}
           />
         );
 
@@ -746,7 +767,8 @@ export default function App() {
         setSelectedPet={setSelectedPet}
         pets={pets}
         onPetAdded={handlePetAdded}
-        onOpenEditPet={(petToEdit) => setEditingPet(petToEdit)}
+        onOpenEditPet={handleOpenEditPet}
+        onOpenRegisterPet={handleOpenRegisterPet}
       />
 
       {/* Main Dynamic Content */}
@@ -754,6 +776,15 @@ export default function App() {
         {renderTabContent()}
       </main>
 
+      {/* Pet Register Modal */}
+      <PetRegisterModal
+        isOpen={isRegisterPetOpen}
+        onClose={() => setIsRegisterPetOpen(false)}
+        onPetCreated={(newPet) => {
+          handlePetAdded(newPet);
+          setIsRegisterPetOpen(false);
+        }}
+      />
 
       {/* Pet Edit Modal */}
       <PetEditModal

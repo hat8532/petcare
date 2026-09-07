@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DailyCareChatbot from './DailyCareChatbot';
 import TimelineSlider from './TimelineSlider';
+import { petApi } from '../api/petApi';
 
 export default function PetHealthDashboard({ 
   user,
@@ -9,7 +10,9 @@ export default function PetHealthDashboard({
   pets = [], 
   onOpenLogin,
   onNavigateDiagnosis, 
-  onOpenEditPet 
+  onOpenEditPet,
+  onOpenRegisterPet,
+  onPetUpdated
 }) {
   const [activeSubTab, setActiveSubTab] = useState('phr');
   
@@ -113,13 +116,29 @@ export default function PetHealthDashboard({
       setReminders([]);
     }
 
-    // 4. Load Vital History
+    // 4. Load Vital History (등록된 기록이 없을 시 반려동물 프로필의 몸무게로 1회차 자동 생성)
     const savedHistory = localStorage.getItem(`petcare_history_${petIdKey}`);
+    let loadedHistory = [];
     if (savedHistory) {
-      try { setVitalHistory(JSON.parse(savedHistory)); } catch (e) { setVitalHistory([]); }
-    } else {
-      setVitalHistory([]);
+      try {
+        const parsed = JSON.parse(savedHistory);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          loadedHistory = parsed;
+        }
+      } catch (e) {}
     }
+
+    // 💡 저장된 기록이 없을 때 반려동물 몸무게가 있으면 자동으로 최초 1건의 기초 측정치로 연동 생성
+    if (loadedHistory.length === 0 && currentPet.weight) {
+      const parsedW = parseFloat(String(currentPet.weight).replace('kg', '')) || 0;
+      if (parsedW > 0) {
+        const today = new Date();
+        const todayStr = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}`;
+        loadedHistory = [{ date: todayStr, weight: parsedW, temp: 38.5 }];
+        localStorage.setItem(`petcare_history_${petIdKey}`, JSON.stringify(loadedHistory));
+      }
+    }
+    setVitalHistory(loadedHistory);
 
     // 5. Load Recent Diagnosis
     const allRecords = localStorage.getItem('petcare_diagnosis_records');
@@ -140,6 +159,30 @@ export default function PetHealthDashboard({
     }
   }, [currentPet, petIdKey]);
 
+  // 💡 대시보드에서 체중이 변경되었을 때 반려동물 프로필 / 수정 모달 / 백엔드 DB와 양방향 동기화
+  const syncPetWeight = (newWeightNum) => {
+    if (!currentPet || !newWeightNum || isNaN(newWeightNum)) return;
+    const formattedWeight = `${newWeightNum}kg`;
+    const updated = {
+      ...currentPet,
+      weight: formattedWeight
+    };
+    if (setSelectedPet) setSelectedPet(updated);
+    if (onPetUpdated) onPetUpdated(updated);
+
+    if (currentPet.id) {
+      petApi.updatePet(currentPet.id, {
+        userId: currentPet.userId || 1,
+        name: currentPet.name,
+        species: currentPet.species,
+        breed: currentPet.breed,
+        age: currentPet.age,
+        weight: formattedWeight,
+        icon: currentPet.icon,
+        profileImageUrl: currentPet.profileImageUrl
+      }).catch(err => console.warn('Pet weight sync to backend failed:', err));
+    }
+  };
 
   const handleVitalChange = (e) => {
     const { name, value } = e.target;
@@ -174,13 +217,15 @@ export default function PetHealthDashboard({
       localStorage.setItem(`petcare_history_${petIdKey}`, JSON.stringify(updatedHistory));
     }
 
-    if (selectedPet && setSelectedPet) {
+    if (w > 0) {
+      syncPetWeight(w);
+    } else if (selectedPet && setSelectedPet) {
       const updated = {
         ...selectedPet,
-        weight: vitals.weight ? `${vitals.weight}kg` : selectedPet.weight,
         healthProfile: vitals
       };
       setSelectedPet(updated);
+      if (onPetUpdated) onPetUpdated(updated);
     }
     setTimeout(() => setIsSaved(false), 2000);
   };
@@ -328,7 +373,10 @@ export default function PetHealthDashboard({
     setVitalHistory(updatedHistory);
     localStorage.setItem(`petcare_history_${petIdKey}`, JSON.stringify(updatedHistory));
     
-    if (w > 0) setVitals(prev => ({ ...prev, weight: String(w) }));
+    if (w > 0) {
+      setVitals(prev => ({ ...prev, weight: String(w) }));
+      syncPetWeight(w);
+    }
     if (t > 0) setVitals(prev => ({ ...prev, bodyTemp: String(t) }));
     
     setNewLog({ weight: '', temp: '', date: '' });
@@ -388,7 +436,10 @@ export default function PetHealthDashboard({
 
     if (validRecords.length > 0) {
       const last = validRecords[validRecords.length - 1];
-      if (last.weight > 0) setVitals(prev => ({ ...prev, weight: String(last.weight) }));
+      if (last.weight > 0) {
+        setVitals(prev => ({ ...prev, weight: String(last.weight) }));
+        syncPetWeight(last.weight);
+      }
       if (last.temp > 0) setVitals(prev => ({ ...prev, bodyTemp: String(last.temp) }));
     }
 
@@ -492,7 +543,13 @@ export default function PetHealthDashboard({
 
             <button
               type="button"
-              onClick={() => onOpenEditPet && onOpenEditPet(null)}
+              onClick={() => {
+                if (onOpenRegisterPet) {
+                  onOpenRegisterPet();
+                } else if (onOpenEditPet) {
+                  onOpenEditPet(null);
+                }
+              }}
               className="card-hover-lift"
               style={{
                 padding: '14px 40px',
@@ -647,7 +704,13 @@ export default function PetHealthDashboard({
 
             <button
               type="button"
-              onClick={() => onOpenEditPet && onOpenEditPet(null)}
+              onClick={() => {
+                if (onOpenRegisterPet) {
+                  onOpenRegisterPet();
+                } else if (onOpenEditPet) {
+                  onOpenEditPet(null);
+                }
+              }}
               className="card-hover-lift"
               style={{
                 padding: '8px 16px',
@@ -1015,7 +1078,7 @@ export default function PetHealthDashboard({
           </div>
 
           {/* Chart or Pure Empty State */}
-          {vitalHistory && vitalHistory.length >= 2 ? (
+          {vitalHistory && vitalHistory.length >= 1 ? (
             <div>
               <div style={{ background: '#fafbfc', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '18px 20px 14px 20px', marginBottom: '16px' }}>
                 
@@ -1054,36 +1117,39 @@ export default function PetHealthDashboard({
                     ))}
                   </div>
 
-                  {/* Legend */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', fontWeight: '700' }}>
+                  {/* Legends */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '11.5px', fontWeight: '700' }}>
                     {(chartMetric === 'all' || chartMetric === 'weight') && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#059669' }}>
-                        <span style={{ width: '12px', height: '3px', background: '#059669', borderRadius: '2px', display: 'inline-block' }}></span> 몸무게 (kg)
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#059669', display: 'inline-block' }}></span>
+                        <span style={{ color: '#047857' }}>체중 (kg)</span>
+                      </div>
                     )}
                     {(chartMetric === 'all' || chartMetric === 'temp') && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f59e0b' }}>
-                        <span style={{ width: '12px', height: '3px', background: '#f59e0b', borderRadius: '2px', display: 'inline-block' }}></span> 체온 (°C)
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }}></span>
+                        <span style={{ color: '#b45309' }}>체온 (°C)</span>
+                      </div>
                     )}
                   </div>
                 </div>
 
-                {/* Dual SVG Line Chart with Gradient Glow */}
-                <svg viewBox="0 0 520 130" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+                {/* SVG Visual Chart */}
+                <svg viewBox="0 0 520 130" style={{ width: '100%', height: '140px', overflow: 'visible' }}>
                   <defs>
                     <linearGradient id="weightAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#059669" stopOpacity="0.22" />
-                      <stop offset="100%" stopColor="#059669" stopOpacity="0.0" />
+                      <stop offset="0%" stopColor="#10b981" stopOpacity="0.32" />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
                     </linearGradient>
                     <linearGradient id="tempAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.18" />
+                      <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.25" />
                       <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
                     </linearGradient>
                   </defs>
 
-                  <line x1="20" y1="20" x2="500" y2="20" stroke="#f1f5f9" strokeDasharray="3 3" />
-                  <line x1="20" y1="58" x2="500" y2="58" stroke="#f1f5f9" strokeDasharray="3 3" />
+                  {/* Grid Lines */}
+                  <line x1="20" y1="24" x2="500" y2="24" stroke="#f1f5f9" strokeDasharray="3 3" />
+                  <line x1="20" y1="60" x2="500" y2="60" stroke="#f1f5f9" strokeDasharray="3 3" />
                   <line x1="20" y1="96" x2="500" y2="96" stroke="#f1f5f9" strokeDasharray="3 3" />
 
                   {(() => {
@@ -1098,7 +1164,7 @@ export default function PetHealthDashboard({
                     const pointsW = vitalHistory.map((item, idx) => {
                       const w = parseFloat(item.weight) || minW;
                       const x = count === 1 ? 260 : 30 + (idx * (460 / (count - 1)));
-                      const y = 90 - ((w - minW) / rangeW) * 65;
+                      const y = count === 1 ? (chartMetric === 'all' ? 50 : 60) : (90 - ((w - minW) / rangeW) * 65);
                       return { x, y, val: item.weight, date: item.date };
                     });
 
@@ -1111,7 +1177,7 @@ export default function PetHealthDashboard({
                     const pointsT = vitalHistory.map((item, idx) => {
                       const t = parseFloat(item.temp) || minT;
                       const x = count === 1 ? 260 : 30 + (idx * (460 / (count - 1)));
-                      const y = 90 - ((t - minT) / rangeT) * 65;
+                      const y = count === 1 ? (chartMetric === 'all' ? 76 : 60) : (90 - ((t - minT) / rangeT) * 65);
                       return { x, y, val: item.temp || '-', date: item.date };
                     });
 
@@ -1123,6 +1189,11 @@ export default function PetHealthDashboard({
 
                     return (
                       <g>
+                        {/* Single Point Vertical Baseline */}
+                        {count === 1 && (
+                          <line x1="260" y1="20" x2="260" y2="105" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="3 3" />
+                        )}
+
                         {/* Weight Area & Line */}
                         {(chartMetric === 'all' || chartMetric === 'weight') && (
                           <g>
@@ -1132,7 +1203,7 @@ export default function PetHealthDashboard({
                             )}
                             {pointsW.map((p, i) => (
                               <g key={`w-${i}`}>
-                                <circle cx={p.x} cy={p.y} r="5" fill="#ffffff" stroke="#059669" strokeWidth="3" />
+                                <circle cx={p.x} cy={p.y} r="5.5" fill="#ffffff" stroke="#059669" strokeWidth="3" />
                                 <text x={p.x} y={p.y - 8} textAnchor="middle" fontSize="10.5" fill="#047857" fontWeight="bold">
                                   {p.val}kg
                                 </text>
@@ -1158,7 +1229,7 @@ export default function PetHealthDashboard({
                             )}
                             {pointsT.map((p, i) => (
                               <g key={`t-${i}`}>
-                                <circle cx={p.x} cy={p.y} r="5" fill="#ffffff" stroke="#f59e0b" strokeWidth="3" />
+                                <circle cx={p.x} cy={p.y} r="5.5" fill="#ffffff" stroke="#f59e0b" strokeWidth="3" />
                                 <text x={p.x} y={p.y + 16} textAnchor="middle" fontSize="10" fill="#b45309" fontWeight="bold">
                                   {p.val}°C
                                 </text>
@@ -1169,7 +1240,7 @@ export default function PetHealthDashboard({
 
                         {/* Date X-Axis Labels */}
                         {pointsW.map((p, i) => (
-                          <text key={`date-${i}`} x={p.x} y={120} textAnchor="middle" fontSize="9.5" fill="#94a3b8" fontWeight="600">
+                          <text key={`date-${i}`} x={p.x} y={125} textAnchor="middle" fontSize="9.5" fill="#94a3b8" fontWeight="600">
                             {p.date}
                           </text>
                         ))}
@@ -1184,6 +1255,11 @@ export default function PetHealthDashboard({
                   <strong style={{ color: '#047857' }}>총 {vitalHistory.length}건 기록됨</strong>
                   <span style={{ margin: '0 8px', color: '#cbd5e1' }}>|</span>
                   <span>최근 측정: {vitalHistory[vitalHistory.length - 1]?.date} (체중 {vitalHistory[vitalHistory.length - 1]?.weight}kg / 체온 {vitalHistory[vitalHistory.length - 1]?.temp || '-'}°C)</span>
+                  {vitalHistory.length === 1 && (
+                    <span style={{ marginLeft: '10px', fontSize: '12px', color: '#2563eb', fontWeight: '700' }}>
+                      (💡 일자를 2건 이상 입력하시면 변화 추이 곡선이 연결됩니다)
+                    </span>
+                  )}
                 </div>
                 <button
                   type="button"

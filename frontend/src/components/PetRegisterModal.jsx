@@ -71,6 +71,28 @@ export default function PetRegisterModal({ isOpen, onClose, onPetCreated }) {
         profileImageUrl: profileImage || null
       });
 
+      if (newPet && newPet.id) {
+        const petIdKey = `pet_${newPet.id}`;
+        const finalWeightStr = weight.trim() ? weight.trim().replace('kg', '') : '3.5';
+        const finalWeightNum = parseFloat(finalWeightStr) || 3.5;
+        const today = new Date();
+        const todayStr = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}`;
+
+        // 1. Initial PHR vitals
+        localStorage.setItem(`petcare_vitals_${petIdKey}`, JSON.stringify({
+          bodyTemp: '38.5',
+          heartRate: '95',
+          weight: String(finalWeightNum),
+          allergies: '',
+          conditions: '',
+          medications: ''
+        }));
+
+        // 2. Initial baseline vital history for trend chart & recent weight
+        const initialHistory = [{ date: todayStr, weight: finalWeightNum, temp: 38.5 }];
+        localStorage.setItem(`petcare_history_${petIdKey}`, JSON.stringify(initialHistory));
+      }
+
       if (onPetCreated) {
         onPetCreated(newPet);
       }
