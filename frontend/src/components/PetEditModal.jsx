@@ -75,6 +75,38 @@ export default function PetEditModal({ isOpen, onClose, pet, onPetUpdated, onPet
 
     try {
       const updatedPet = await petApi.updatePet(pet.id, updatedPayload);
+
+      // 💡 반려동물 정보 수정 시 몸무게를 최근체중 및 바이탈 변화 추이에도 즉시 연동
+      const finalWeightStr = weight.trim() ? weight.trim().replace('kg', '') : '3.5';
+      const finalWeightNum = parseFloat(finalWeightStr) || 3.5;
+      const petIdKey = `pet_${pet.id}`;
+
+      // 1. Vitals 프로필 동기화
+      const savedVitals = localStorage.getItem(`petcare_vitals_${petIdKey}`);
+      let parsedVitals = savedVitals ? JSON.parse(savedVitals) : {};
+      parsedVitals.weight = String(finalWeightNum);
+      localStorage.setItem(`petcare_vitals_${petIdKey}`, JSON.stringify(parsedVitals));
+
+      // 2. Vital History 변화 추이 동기화 (최근 일자 갱신 또는 신규 1회차 생성)
+      const savedHistory = localStorage.getItem(`petcare_history_${petIdKey}`);
+      let historyList = [];
+      try {
+        if (savedHistory) historyList = JSON.parse(savedHistory);
+      } catch (e) {}
+
+      const today = new Date();
+      const todayStr = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}`;
+
+      if (historyList && historyList.length > 0) {
+        historyList[historyList.length - 1] = {
+          ...historyList[historyList.length - 1],
+          weight: finalWeightNum
+        };
+      } else {
+        historyList = [{ date: todayStr, weight: finalWeightNum, temp: 38.5 }];
+      }
+      localStorage.setItem(`petcare_history_${petIdKey}`, JSON.stringify(historyList));
+
       if (onPetUpdated) {
         onPetUpdated({ id: pet.id, ...updatedPayload });
       }

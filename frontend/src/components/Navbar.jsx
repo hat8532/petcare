@@ -13,6 +13,7 @@ export default function Navbar({
   pets,
   onPetAdded,
   onOpenEditPet,
+  onOpenRegisterPet,
   onOpenMyPage
 }) {
   const [showPetDropdown, setShowPetDropdown] = useState(false);
@@ -274,7 +275,11 @@ export default function Navbar({
                   <div
                     onClick={() => {
                       setShowPetDropdown(false);
-                      setShowPetRegisterModal(true);
+                      if (onOpenRegisterPet) {
+                        onOpenRegisterPet();
+                      } else {
+                        setShowPetRegisterModal(true);
+                      }
                     }}
                     style={{
                       borderTop: '1px solid #e2e8f0',
