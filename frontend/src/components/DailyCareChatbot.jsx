@@ -158,7 +158,7 @@ export default function DailyCareChatbot({ selectedPet }) {
           }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4f46e5', boxShadow: '0 0 10px #4f46e5' }}></span>
             <span style={{ fontSize: '12px', fontWeight: '800', color: '#4f46e5', letterSpacing: '0.6px' }}>
-              GOOGLE GEMINI 2.0 REAL-TIME VET AI
+              GOOGLE GEMINI 3.5 FLASH REAL-TIME VET AI
             </span>
           </div>
           
