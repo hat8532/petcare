@@ -1,6 +1,6 @@
 package com.petcare.backend.domain.community;
 
-import com.petcare.backend.domain.diagnosis.DiagnosisRecordMapper;
+import com.petcare.backend.domain.diagnosis.persistence.DiagnosisRecordMapper;
 import com.petcare.backend.domain.pet.PetDTO;
 import com.petcare.backend.domain.pet.PetMapper;
 import com.petcare.backend.domain.user.UserDTO;

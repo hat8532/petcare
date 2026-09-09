@@ -1,4 +1,4 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.exception;
 
 import org.springframework.http.HttpStatus;
 
