@@ -1,7 +1,7 @@
 package com.petcare.backend.domain.diagnosis.api;
 
-import com.petcare.backend.domain.diagnosis.DiagnosisAccessException;
 import com.petcare.backend.domain.diagnosis.DiagnosisService;
+import com.petcare.backend.domain.diagnosis.exception.DiagnosisAccessException;
 import com.petcare.backend.domain.diagnosis.image.DiagnosisImageResource;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;

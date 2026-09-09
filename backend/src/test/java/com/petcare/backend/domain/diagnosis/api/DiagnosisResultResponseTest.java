@@ -1,7 +1,7 @@
 package com.petcare.backend.domain.diagnosis.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.petcare.backend.domain.diagnosis.DiagnosisRecordDTO;
+import com.petcare.backend.domain.diagnosis.persistence.DiagnosisRecordDTO;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

@@ -1,7 +1,7 @@
 package com.petcare.backend.domain.diagnosis.api;
 
-import com.petcare.backend.domain.diagnosis.DiagnosisNotFoundException;
 import com.petcare.backend.domain.diagnosis.DiagnosisService;
+import com.petcare.backend.domain.diagnosis.exception.DiagnosisNotFoundException;
 import com.petcare.backend.domain.diagnosis.image.DiagnosisImageResource;
 import com.petcare.backend.domain.diagnosis.support.DiagnosisTestImages;
 import org.junit.jupiter.api.Test;
