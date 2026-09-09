@@ -1,4 +1,4 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.image;
 
 import jakarta.servlet.MultipartConfigElement;
 import org.springframework.boot.web.servlet.MultipartConfigFactory;

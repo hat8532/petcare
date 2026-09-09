@@ -1,4 +1,4 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.api;
 
 import com.petcare.backend.global.security.JwtUtil;
 import org.junit.jupiter.api.Test;

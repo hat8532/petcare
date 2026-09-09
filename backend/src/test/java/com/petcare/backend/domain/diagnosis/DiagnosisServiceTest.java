@@ -1,6 +1,14 @@
 package com.petcare.backend.domain.diagnosis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.petcare.backend.domain.diagnosis.api.DiagnosisAnalyzeRequest;
+import com.petcare.backend.domain.diagnosis.api.DiagnosisHistoryPage;
+import com.petcare.backend.domain.diagnosis.api.DiagnosisResultResponse;
+import com.petcare.backend.domain.diagnosis.image.DiagnosisImageStorage;
+import com.petcare.backend.domain.diagnosis.image.DiagnosisImageValidator;
+import com.petcare.backend.domain.diagnosis.inference.VisionInferenceClient;
+import com.petcare.backend.domain.diagnosis.inference.VisionInferenceResult;
+import com.petcare.backend.domain.diagnosis.support.DiagnosisTestImages;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

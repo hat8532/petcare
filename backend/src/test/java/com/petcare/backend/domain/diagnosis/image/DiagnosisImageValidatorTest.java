@@ -1,5 +1,6 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.image;
 
+import com.petcare.backend.domain.diagnosis.support.DiagnosisTestImages;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;

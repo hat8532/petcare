@@ -1,4 +1,4 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.inference;
 
 import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.JsonNode;

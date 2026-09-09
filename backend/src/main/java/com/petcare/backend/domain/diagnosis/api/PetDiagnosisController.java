@@ -1,5 +1,7 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.api;
 
+import com.petcare.backend.domain.diagnosis.DiagnosisAccessException;
+import com.petcare.backend.domain.diagnosis.DiagnosisService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;

@@ -1,5 +1,6 @@
 package com.petcare.backend.domain.diagnosis;
 
+import com.petcare.backend.domain.diagnosis.api.DiagnosisAnalyzeRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;

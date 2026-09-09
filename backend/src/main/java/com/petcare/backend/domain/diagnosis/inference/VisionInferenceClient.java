@@ -1,7 +1,9 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.inference;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.petcare.backend.domain.diagnosis.api.DiagnosisAnalyzeRequest;
+import com.petcare.backend.domain.diagnosis.image.ValidatedDiagnosisImage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;

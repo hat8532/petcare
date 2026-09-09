@@ -1,5 +1,10 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.api;
 
+import com.petcare.backend.domain.diagnosis.DiagnosisAccessException;
+import com.petcare.backend.domain.diagnosis.DiagnosisConflictException;
+import com.petcare.backend.domain.diagnosis.DiagnosisNotFoundException;
+import com.petcare.backend.domain.diagnosis.DiagnosisRequestException;
+import com.petcare.backend.domain.diagnosis.image.DiagnosisImageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;

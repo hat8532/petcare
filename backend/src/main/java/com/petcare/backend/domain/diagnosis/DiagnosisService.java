@@ -2,6 +2,15 @@ package com.petcare.backend.domain.diagnosis;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.petcare.backend.domain.diagnosis.api.DiagnosisAnalyzeRequest;
+import com.petcare.backend.domain.diagnosis.api.DiagnosisHistoryPage;
+import com.petcare.backend.domain.diagnosis.api.DiagnosisResultResponse;
+import com.petcare.backend.domain.diagnosis.image.DiagnosisImageResource;
+import com.petcare.backend.domain.diagnosis.image.DiagnosisImageStorage;
+import com.petcare.backend.domain.diagnosis.image.DiagnosisImageValidator;
+import com.petcare.backend.domain.diagnosis.image.ValidatedDiagnosisImage;
+import com.petcare.backend.domain.diagnosis.inference.VisionInferenceClient;
+import com.petcare.backend.domain.diagnosis.inference.VisionInferenceResult;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.multipart.MultipartFile;

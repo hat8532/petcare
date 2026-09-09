@@ -1,4 +1,4 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.image;
 
 public record DiagnosisImageResource(byte[] bytes, String contentType) {
     public DiagnosisImageResource {

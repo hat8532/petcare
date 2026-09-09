@@ -1,4 +1,4 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.api;
 
 public record DiagnosisApiResponse<T>(
         int code,
