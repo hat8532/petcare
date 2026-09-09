@@ -1,4 +1,4 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.support;
 
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -9,12 +9,12 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-final class DiagnosisTestImages {
+public final class DiagnosisTestImages {
 
     private DiagnosisTestImages() {
     }
 
-    static MockMultipartFile pngMultipartFile() {
+    public static MockMultipartFile pngMultipartFile() {
         return new MockMultipartFile(
                 "image",
                 "lesion.png",
@@ -22,7 +22,7 @@ final class DiagnosisTestImages {
                 pngBytes(2, 2));
     }
 
-    static byte[] pngBytes(int width, int height) {
+    public static byte[] pngBytes(int width, int height) {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         image.setRGB(0, 0, Color.RED.getRGB());
         try {
@@ -34,7 +34,7 @@ final class DiagnosisTestImages {
         }
     }
 
-    static byte[] jpegBytes(int width, int height) {
+    public static byte[] jpegBytes(int width, int height) {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         image.setRGB(0, 0, Color.RED.getRGB());
         try {

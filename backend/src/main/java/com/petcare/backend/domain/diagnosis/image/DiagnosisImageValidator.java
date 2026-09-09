@@ -1,4 +1,4 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.image;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;

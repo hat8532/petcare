@@ -1,4 +1,4 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.image;
 
 public record ValidatedDiagnosisImage(
         byte[] bytes,

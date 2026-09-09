@@ -27,11 +27,11 @@ before(async () => {
       enforce: 'pre',
       resolveId(source, importer) {
         if (source === entry) return entry;
-        if (importer?.endsWith('/DiagnosisDropzone.jsx') && source === '../api/diagnosisApi') {
+        if (importer?.endsWith('/diagnosis/DiagnosisStudio.jsx') && source === '../../api/diagnosisApi') {
           apiMocked = true;
           return '\0diagnosis-mock';
         }
-        if (importer?.endsWith('/CareFlowBranch.jsx') && source === '../api/hospitalApi') {
+        if (importer?.endsWith('/diagnosis/CareFlowBranch.jsx') && source === '../../api/hospitalApi') {
           hospitalApiMocked = true;
           return '\0hospital-mock';
         }

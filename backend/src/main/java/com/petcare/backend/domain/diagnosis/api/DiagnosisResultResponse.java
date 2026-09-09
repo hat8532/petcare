@@ -1,7 +1,8 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.petcare.backend.domain.diagnosis.DiagnosisRecordDTO;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

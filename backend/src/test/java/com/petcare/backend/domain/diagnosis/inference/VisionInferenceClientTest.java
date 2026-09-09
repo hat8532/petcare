@@ -1,6 +1,9 @@
-package com.petcare.backend.domain.diagnosis;
+package com.petcare.backend.domain.diagnosis.inference;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.petcare.backend.domain.diagnosis.api.DiagnosisAnalyzeRequest;
+import com.petcare.backend.domain.diagnosis.image.DiagnosisImageValidator;
+import com.petcare.backend.domain.diagnosis.support.DiagnosisTestImages;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
